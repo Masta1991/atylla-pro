@@ -1,0 +1,16 @@
+{
+  "name": "Atylla Pro",
+  "short_name": "Atylla Pro",
+  "description": "Personal Trainer Management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}
