@@ -1,0 +1,22 @@
+[
+  {
+    "event_date": "2026-05-24",
+    "event_hour": 10,
+    "client_id": "afdeed67-4691-4929-9132-f6d3ccfa0546",
+    "workout_type_id": "e382d43a-42bc-4024-a295-b2f05e8f1803",
+    "status": "active",
+    "id": "c44e001b-b311-4bf0-9a60-d4a8e2c5614e",
+    "created_at": "2026-05-25T21:07:04.231163Z",
+    "updated_at": "2026-05-25T21:07:04.231163Z"
+  },
+  {
+    "event_date": "2026-05-24",
+    "event_hour": 13,
+    "client_id": "86b6f2d6-38f5-4575-b3aa-2d7faf55a001",
+    "workout_type_id": "98daf5d9-bb11-4b04-b9d7-52fa985aae07",
+    "status": "active",
+    "id": "178085a4-c917-434a-936c-4c8e5e922bb8",
+    "created_at": "2026-05-25T21:17:30.204231Z",
+    "updated_at": "2026-05-25T21:17:30.204231Z"
+  }
+]
