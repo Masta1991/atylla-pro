@@ -65,6 +65,8 @@ CREATE TABLE clients (
     default_workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
     -- ProgresjaSilowa: JSON array of exercise IDs for strength progression tracking
     strength_progression JSONB DEFAULT '[]'::JSONB,
+    -- Harmonogram: JSON array of {day, hour, workout_type_id}
+    training_schedule JSONB DEFAULT '[]'::JSONB,
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
