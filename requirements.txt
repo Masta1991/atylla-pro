@@ -1,1 +1,9 @@
--r backend/requirements.txt
+fastapi>=0.110
+uvicorn[standard]>=0.27
+supabase>=2.3
+pydantic>=2.5
+python-dotenv>=1.0
+python-multipart>=0.0.9
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.8
