@@ -13,6 +13,7 @@ class ClientBase(BaseModel):
     email: Optional[str] = None
     default_workout_type_id: Optional[UUID] = None
     strength_progression: List[str] = Field(default_factory=list)
+    training_schedule: List[dict] = Field(default_factory=list)
 
 class ClientCreate(ClientBase):
     pass
@@ -24,6 +25,7 @@ class ClientUpdate(BaseModel):
     email: Optional[str] = None
     default_workout_type_id: Optional[UUID] = None
     strength_progression: Optional[List[str]] = None
+    training_schedule: Optional[List[dict]] = None
 
 class ClientResponse(ClientBase):
     id: UUID
