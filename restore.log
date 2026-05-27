@@ -1,0 +1,103 @@
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows                              
+-------------------------------------------------------------------------------
+
+  Started : Wednesday, May 27, 2026 7:56:48 PM
+   Source : C:\Projects\atylla-pro\frontend-restore\
+     Dest : C:\Projects\atylla-pro\frontend\
+
+    Files : *.*
+	    
+ Exc Dirs : node_modules
+	    .git
+	    
+  Options : *.* /S /E /DCOPY:DA /COPY:DAT /PURGE /MIR /R:1000000 /W:30 
+
+------------------------------------------------------------------------------
+
+	                  13	C:\Projects\atylla-pro\frontend-restore\
+	    New File  		     481	.gitignore100%  
+	    New File  		     121	AGENTS.md100%  
+	    New File  		    2882	App.js100%  
+	    New File  		     929	app.json100%  
+	    New File  		      12	CLAUDE.md100%  
+	    New File  		     313	eas.json100%  
+	    New File  		     969	expo-server.log100%  
+	    New File  		     315	index.js100%  
+	    New File  		    1127	LICENSE100%  
+	    New File  		     944	make_dog_base64.py100%  
+	    New File  		  301643	package-lock.json100%  
+	    New File  		    1113	package.json100%  
+	    New File  		     974	qr.png100%  
+	  New Dir          1	C:\Projects\atylla-pro\frontend-restore\.claude\
+	    New File  		      76	settings.json100%  
+	  New Dir         11	C:\Projects\atylla-pro\frontend-restore\assets\
+	    New File  		   17549	android-icon-background.png100%  
+	    New File  		   78796	android-icon-foreground.png100%  
+	    New File  		    4140	android-icon-monochrome.png100%  
+	    New File  		   54964	dog-home-transparent.png100%  
+	    New File  		  270928	dog-home-transparent2.png100%  
+	    New File  		  768698	dog-home.png100%  
+	    New File  		    1129	favicon.png100%  
+	    New File  		  393493	icon.png100%  
+	    New File  		   66289	logo.png100%  
+	    New File  		  11.1 m	rich-dark-brown-leather-texture.jpg  8.9% 17.9% 26.8% 35.8% 44.8% 53.7% 62.7% 71.7% 80.6% 89.6% 98.6%100%  
+	    New File  		   17547	splash-icon.png100%  
+	  New Dir          3	C:\Projects\atylla-pro\frontend-restore\export-test\
+	    New File  		   14510	favicon.ico100%  
+	    New File  		    1253	index.html100%  
+	    New File  		      49	metadata.json100%  
+	  New Dir          0	C:\Projects\atylla-pro\frontend-restore\export-test\assets\
+	  New Dir          2	C:\Projects\atylla-pro\frontend-restore\export-test\assets\assets\
+	    New File  		  270928	dog-home-transparent2.d7783bcae6095e04ad45d66566362c2f.png100%  
+	    New File  		  11.1 m	rich-dark-brown-leather-texture.de9a04a345c4d8c546394a7a96eca4d9.jpg  8.9% 17.9% 26.8% 35.8% 44.8% 53.7% 62.7% 71.7% 80.6% 89.6% 98.6%100%  
+	  New Dir          0	C:\Projects\atylla-pro\frontend-restore\export-test\_expo\
+	  New Dir          0	C:\Projects\atylla-pro\frontend-restore\export-test\_expo\static\
+	  New Dir          0	C:\Projects\atylla-pro\frontend-restore\export-test\_expo\static\js\
+	  New Dir          1	C:\Projects\atylla-pro\frontend-restore\export-test\_expo\static\js\web\
+	    New File  		   1.4 m	index-99b2c1d9d41c652a77b7caed6588b988.js 70%  100%  
+	  New Dir          0	C:\Projects\atylla-pro\frontend-restore\src\
+	  New Dir          5	C:\Projects\atylla-pro\frontend-restore\src\assets\
+	    New File  		   22506	leather_texture.jpg100%  
+	    New File  		    7087	lookbook-leather.js100%  
+	    New File  		   33227	paper_texture.jpg100%  
+	    New File  		   14861	premium_leather.jpg100%  
+	    New File  		     683	theme.js100%  
+	  New Dir          3	C:\Projects\atylla-pro\frontend-restore\src\components\
+	    New File  		    5771	AppLayout.js100%  
+	    New File  		  348980	DogIconData.js100%  
+	    New File  		    4751	LeatherBottomBar.js100%  
+	  New Dir          2	C:\Projects\atylla-pro\frontend-restore\src\context\
+	    New File  		     945	AuthContext.js100%  
+	    New File  		    1509	ThemeContext.js100%  
+	  New Dir         13	C:\Projects\atylla-pro\frontend-restore\src\screens\
+	    New File  		   21674	CalendarScreen.js100%  
+	    New File  		   23035	CalendarScreen.js.bak100%  
+	    New File  		   10538	ClientFormScreen.js100%  
+	    New File  		    5682	ClientsScreen.js100%  
+	    New File  		    2561	DashboardScreen.js100%  
+	    New File  		    2915	HamburgerMenu.js100%  
+	    New File  		    3221	LoginScreen.js100%  
+	    New File  		    8134	ManagerScreen.js100%  
+	    New File  		    7827	MeasurementsScreen.js100%  
+	    New File  		    6842	PlansScreen.js100%  
+	    New File  		   25288	ReportsScreen.js100%  
+	    New File  		    9008	SettingsScreen.js100%  
+	    New File  		   18571	TrainingScreen.js100%  
+	  New Dir          1	C:\Projects\atylla-pro\frontend-restore\src\services\
+	    New File  		    6004	api.js100%  
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :        17        15         2         0         0         1
+   Files :        55        55         0         0         0         0
+   Bytes :   26.46 m   26.46 m         0         0         0         0
+   Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+
+
+   Speed :           440,458,349 Bytes/sec.
+   Speed :            25,203.229 MegaBytes/min.
+   Ended : Wednesday, May 27, 2026 7:56:48 PM
+
