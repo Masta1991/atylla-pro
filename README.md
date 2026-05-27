@@ -148,6 +148,18 @@ Aby zainicjalizować schemat, wklej cały plik w Supabase SQL Editor.
 
 ## Historia zmian (Changelog)
 
+### v1.0.15 — 2026-05-27
+- Przeprojektowanie dolnego paska nawigacyjnego (Bottom Bar)
+- 3 przyciski: KLIENCI (lewo), GŁÓWNA z okrągłą ikoną pieska wystającą ponad pasek (środek), EDYCJA (prawo)
+- Pasek przypięty na stałe do dolnej krawędzi ekranu
+
+### v1.0.12 — 2026-05-27
+- Poprawka: kliknięcie na docelowy slot teraz przenosi zapis (isMoveTarget zamiast isMoving)
+
+### v1.0.11 — 2026-05-27
+- Drag & drop: long press na zapisie → przenoszenie na dowolny slot (swap API)
+- Banner informacyjny z przyciskiem anulowania podczas przenoszenia
+
 ### v1.0.10 — 2026-05-27
 - Poprawka: potwierdzenie usunięcia zapisu w kalendarzu na web (window.confirm zamiast Alert.alert)
 
