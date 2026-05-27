@@ -6,7 +6,8 @@ Gdy użytkownik poprosi o backup, wykonaj:
 
 1. `git tag -a backup-v<wersja> -m "Backup: stabilna wersja v<wersja>"`
 2. `git branch backup/v<wersja>` (gałąź zapasowa)
-3. `git bundle create ..\atylla-pro-backup-v<wersja>.bundle --all`
+3. `git bundle create backup\atylla-pro-backup-v<wersja>.bundle --all` (w głównym repo)
+    - Jeśli frontend (submoduł) też wymaga backupu: `cd frontend; git bundle create ..\backup\atylla-pro-frontend-backup-v<wersja>.bundle --all`
 4. Poinformuj użytkownika o utworzonych artefaktach (tag, branch, plik bundle)
 
 Bundle pozwala w każdej chwili odtworzyć repozytorium poleceniem:
