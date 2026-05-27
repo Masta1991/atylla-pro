@@ -148,6 +148,9 @@ Aby zainicjalizować schemat, wklej cały plik w Supabase SQL Editor.
 
 ## Historia zmian (Changelog)
 
+### v1.0.10 — 2026-05-27
+- Poprawka: potwierdzenie usunięcia zapisu w kalendarzu na web (window.confirm zamiast Alert.alert)
+
 ### v1.0.7 — 2026-05-26
 - Ciemne tło dolnego paska nawigacji (bottom bar)
 - Ikona aplikacji 180px
