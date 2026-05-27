@@ -1,4 +1,4 @@
-# Backup v1.0.14 — Atylla Pro
+# Backup v1.0.15 — Atylla Pro
 
 ## Data utworzenia
 2026-05-27
@@ -53,8 +53,8 @@ Tabele: `workout_types`, `muscle_groups`, `exercises`, `training_plans`, `plan_e
 
 ## Ostatnie 10 zmian (Changelog)
 
-### v1.0.15 (nieoficjalna) — usunięte podświetlanie docelowych slotów podczas przenoszenia
-### v1.0.14 — przycisk usuwania X na slocie, optimistic updates (UI natychmiast + API w tle), long press skrócony do 300ms
+### v1.0.15 — backup z opisem i archiwum wersji (wersje/)
+### v1.0.14 — przycisk usuwania X na slocie, optimistic updates (UI natychmiast + API w tle), long press 300ms
 ### v1.0.12 — fix: kliknięcie na docelowy slot przenosi zapis (isMoveTarget zamiast isMoving)
 ### v1.0.11 — long press drag & drop: przenoszenie zapisów po przytrzymaniu, banner informacyjny
 ### v1.0.10 — fix: potwierdzenie usuwania zapisu na web (window.confirm zamiast Alert.alert)
@@ -70,21 +70,21 @@ Tabele: `workout_types`, `muscle_groups`, `exercises`, `training_plans`, `plan_e
 
 ```bash
 # Przywrócenie głównego repozytorium z bundle'a
-git clone backup/atylla-pro-backup-v1.0.14.bundle atylla-pro-restore
+git clone backup/atylla-pro-backup-v1.0.15.bundle atylla-pro-restore
 
 # Frontend jest niezależnym repozytorium (submoduł bez .gitmodules)
 # Przejdź do katalogu frontend i przywróć z osobnego bundle'a:
 cd atylla-pro-restore/frontend
 git init
-git remote add origin ../../backup/atylla-pro-frontend-backup-v1.0.14.bundle
+git remote add origin ../../backup/atylla-pro-frontend-backup-v1.0.15.bundle
 git fetch origin
 git checkout master
 ```
 
 Lub rozpakowanie bundle'a bezpośrednio:
 ```bash
-git clone backup/atylla-pro-backup-v1.0.14.bundle atylla-pro
+git clone backup/atylla-pro-backup-v1.0.15.bundle atylla-pro
 cd atylla-pro/frontend
-git clone ../../backup/atylla-pro-frontend-backup-v1.0.14.bundle .
+git clone ../../backup/atylla-pro-frontend-backup-v1.0.15.bundle .
 git checkout master
 ```
