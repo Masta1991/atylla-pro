@@ -1,5 +1,21 @@
 # Atylla Pro — zasady pracy
 
+## Rozpoczęcie pracy — sprawdzenie stanu projektu
+
+Za każdym razem gdy zaczynamy sesję, wykonaj:
+
+1. **Sprawdź stash** — `git stash list` w każdym repozytorium (główne + frontend). Użytkownik może pracować z różnymi modelami AI i edytorami, więc zmiany mogą czekać w stashu. Jeśli stash nie jest pusty, poinformuj użytkownika i zapytaj czy przywrócić.
+2. **Sprawdź status repo** — `git status --short` aby zobaczyć niezcommitowane modyfikacje.
+3. **Sprawdź wersję** — porównaj `frontend/package.json` / `frontend/app.json` z ostatnim commitem.
+
+## Przywracanie backupu
+
+Gdy użytkownik poprosi o przywrócenie backupu:
+
+1. **Znajdź najnowszy backup** — przeszukaj folder `backup/` (w tym podfoldery) pod kątem plików `.bundle` i plików informacyjnych. Sortuj po dacie modyfikacji lub numerze wersji.
+2. **Jeśli nie masz pewności który backup** — zapytaj użytkownika przed przywróceniem.
+3. Przywróć z bundle: `git clone "sciezka/do/pliku.bundle" katalog-docelowy`
+
 ## Backup
 
 Gdy użytkownik poprosi o backup, wykonaj:
