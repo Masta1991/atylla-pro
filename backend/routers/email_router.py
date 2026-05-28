@@ -46,8 +46,20 @@ class EmailPlanRequest(BaseModel):
 def make_bar_chart(weekly_sessions: list) -> str:
     if not weekly_sessions:
         return ""
-    weeks = [w.week.split('-W')[1] if hasattr(w, 'week') else w['week'].split('-W')[1] for w in weekly_sessions]
-    values = [w.count if hasattr(w, 'count') else w['count'] for w in weekly_sessions]
+    weeks = []
+    values = []
+    for w in weekly_sessions:
+        if isinstance(w, dict):
+            wk = w.get('week', '')
+            val = w.get('count', 0)
+        elif hasattr(w, 'week'):
+            wk = w.week
+            val = w.count
+        else:
+            continue
+        vals = wk.split('-W')
+        weeks.append(vals[1] if len(vals) > 1 else wk)
+        values.append(int(val))
 
     fig, ax = plt.subplots(figsize=(8, 3), dpi=80)
     fig.patch.set_facecolor('#0d1117')
@@ -86,9 +98,18 @@ def make_line_chart(strength_data: list) -> str:
 
     exercises = {}
     for s in strength_data:
-        ex = s.exercise if hasattr(s, 'exercise') else s['exercise']
-        wk = s.week if hasattr(s, 'week') else s['week']
-        w = float(s.weight) if hasattr(s, 'weight') else float(s['weight'])
+        if isinstance(s, dict):
+            ex = s.get('exercise', '')
+            wk = s.get('week', '')
+            w = float(s.get('weight', 0))
+        elif hasattr(s, 'exercise'):
+            ex = s.exercise
+            wk = s.week
+            w = float(s.weight)
+        else:
+            continue
+        if not ex or not wk:
+            continue
         if ex not in exercises:
             exercises[ex] = []
         exercises[ex].append((wk, w))
@@ -225,7 +246,8 @@ def send_report(data: EmailReportRequest):
         msg.attach(img)
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
             server.login(SMTP_EMAIL, SMTP_PASSWORD)
             server.sendmail(SMTP_EMAIL, data.recipient, msg.as_string())
         return {"status": "sent"}
@@ -269,7 +291,8 @@ def send_plan(data: EmailPlanRequest):
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
             server.login(SMTP_EMAIL, SMTP_PASSWORD)
             server.sendmail(SMTP_EMAIL, data.recipient, msg.as_string())
         return {"status": "sent"}
