@@ -14,6 +14,11 @@ class ClientBase(BaseModel):
     default_workout_type_id: Optional[UUID] = None
     strength_progression: List[str] = Field(default_factory=list)
     training_schedule: List[dict] = Field(default_factory=list)
+    billing_type: Optional[str] = "package"
+    package_purchase_date: Optional[date] = None
+    package_size: Optional[int] = 10
+    package_current_count: Optional[int] = 0
+    payment_history: Optional[List[dict]] = Field(default_factory=list)
 
 class ClientCreate(ClientBase):
     pass
@@ -26,6 +31,11 @@ class ClientUpdate(BaseModel):
     default_workout_type_id: Optional[UUID] = None
     strength_progression: Optional[List[str]] = None
     training_schedule: Optional[List[dict]] = None
+    billing_type: Optional[str] = None
+    package_purchase_date: Optional[date] = None
+    package_size: Optional[int] = None
+    package_current_count: Optional[int] = None
+    payment_history: Optional[List[dict]] = None
 
 class ClientResponse(ClientBase):
     id: UUID
@@ -42,6 +52,7 @@ class CalendarEventBase(BaseModel):
     client_id: Optional[UUID] = None
     workout_type_id: Optional[UUID] = None
     status: str = "active"
+    is_settled: bool = False
 
 class CalendarEventCreate(CalendarEventBase):
     pass
@@ -50,6 +61,7 @@ class CalendarEventUpdate(BaseModel):
     client_id: Optional[UUID] = None
     workout_type_id: Optional[UUID] = None
     status: Optional[str] = None
+    is_settled: Optional[bool] = None
 
 class CalendarSwapRequest(BaseModel):
     date1: date
