@@ -22,5 +22,10 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
   <script src="/_expo/static/js/web/index-18bc6b176b7738d442f43488125e034e.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+    }
+  </script>
 </body>
 </html>
