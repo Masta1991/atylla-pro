@@ -66,6 +66,14 @@ if os.path.isdir(STATIC_DIR):
     async def favicon():
         return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
 
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse(os.path.join(STATIC_DIR, "sw.js"), media_type="application/javascript")
+
+    @app.get("/manifest.json")
+    async def manifest():
+        return FileResponse(os.path.join(STATIC_DIR, "manifest.json"), media_type="application/json")
+
     @app.get("/")
     async def index():
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
