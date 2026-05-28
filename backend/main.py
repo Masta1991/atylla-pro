@@ -64,7 +64,7 @@ if os.path.isdir(STATIC_DIR):
 
     @app.get("/favicon.ico")
     async def favicon():
-        return FileResponse(os.path.join(STATIC_DIR, "icon.png"))
+        return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
 
     @app.get("/")
     async def index():
