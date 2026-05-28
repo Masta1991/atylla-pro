@@ -145,6 +145,106 @@ def swap_events(data: CalendarSwapRequest):
     return {"status": "swapped"}
 
 
+@router.get("/stats")
+def get_calendar_stats(months: int = Query(1)):
+    from datetime import datetime, date, timedelta
+    today = date.today()
+    
+    start_year = today.year
+    start_month = today.month - months
+    while start_month <= 0:
+        start_month += 12
+        start_year -= 1
+        
+    try:
+        start_date = date(start_year, start_month, today.day)
+    except ValueError:
+        next_month = start_month + 1
+        next_year = start_year
+        if next_month > 12:
+            next_month = 1
+            next_year += 1
+        start_date = date(next_year, next_month, 1) - timedelta(days=1)
+        
+    supabase = get_supabase()
+    
+    # Active events count
+    active_res = supabase.table("calendar_events") \
+        .select("id", count="exact") \
+        .gte("event_date", start_date.isoformat()) \
+        .lte("event_date", today.isoformat()) \
+        .neq("status", "deleted") \
+        .execute()
+    active_count = active_res.count or 0
+    
+    # Deleted events count
+    deleted_res = supabase.table("deleted_workouts") \
+        .select("id", count="exact") \
+        .gte("event_date", start_date.isoformat()) \
+        .lte("event_date", today.isoformat()) \
+        .execute()
+    deleted_count = deleted_res.count or 0
+    
+    # 12 months chart data
+    year_ago = today - timedelta(days=365)
+    events_res = supabase.table("calendar_events") \
+        .select("event_date") \
+        .gte("event_date", year_ago.isoformat()) \
+        .lte("event_date", today.isoformat()) \
+        .neq("status", "deleted") \
+        .execute()
+        
+    monthly_counts = {}
+    temp_date = year_ago
+    while temp_date <= today:
+        key = temp_date.strftime("%Y-%m")
+        monthly_counts[key] = 0
+        if temp_date.month == 12:
+            temp_date = date(temp_date.year + 1, 1, 1)
+        else:
+            temp_date = date(temp_date.year, temp_date.month + 1, 1)
+            
+    for ev in (events_res.data or []):
+        d_str = ev.get("event_date")
+        if d_str:
+            key = d_str[:7]
+            if key in monthly_counts:
+                monthly_counts[key] += 1
+                
+    sorted_months = sorted(monthly_counts.items())
+    chart_data = [{"month": k, "count": v} for k, v in sorted_months]
+    
+    return {
+        "total_planned": active_count + deleted_count,
+        "cancelled": deleted_count,
+        "final": active_count,
+        "chart_data": chart_data
+    }
+
+
+@router.post("/{event_date}/{event_hour}/settle")
+def settle_workout(event_date: str, event_hour: int):
+    supabase = get_supabase()
+    ev = supabase.table("calendar_events").select("*").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
+    if not ev.data:
+        raise HTTPException(404, "Workout not found in calendar")
+        
+    if ev.data.get("is_settled"):
+        return {"status": "already settled"}
+        
+    client_id = ev.data.get("client_id")
+    if not client_id:
+        raise HTTPException(400, "No client assigned to this workout")
+        
+    client = supabase.table("clients").select("package_current_count").eq("id", client_id).single().execute()
+    curr_count = client.data.get("package_current_count") or 0
+    
+    supabase.table("clients").update({"package_current_count": curr_count + 1}).eq("id", client_id).execute()
+    supabase.table("calendar_events").update({"is_settled": True}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
+    
+    return {"status": "settled", "new_count": curr_count + 1}
+
+
 @router.delete("/{event_date}/{event_hour}")
 def delete_event(event_date: str, event_hour: int):
     """Soft-delete: set status='deleted' and log to deleted_workouts."""

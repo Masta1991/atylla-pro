@@ -103,6 +103,41 @@ def update_client(client_id: str, data: ClientUpdate):
     return res.data[0]
 
 
+@router.post("/{client_id}/new-package")
+def add_new_package(client_id: str):
+    supabase = get_supabase()
+    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client_res.data:
+        raise HTTPException(404, "Client not found")
+        
+    client = client_res.data
+    purchase_date = client.get("package_purchase_date")
+    size = client.get("package_size") or 10
+    current_count = client.get("package_current_count") or 0
+    history = client.get("payment_history") or []
+    
+    if not isinstance(history, list):
+        history = []
+        
+    if purchase_date:
+        history.append({
+            "purchase_date": purchase_date,
+            "package_size": size,
+            "completed_count": current_count,
+            "archived_at": datetime.now().isoformat()
+        })
+        
+    new_payload = {
+        "package_purchase_date": date.today().isoformat(),
+        "package_current_count": 0,
+        "payment_history": history,
+        "updated_at": "now()"
+    }
+    
+    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
+    return res.data[0]
+
+
 @router.delete("/{client_id}")
 def delete_client(client_id: str):
     supabase = get_supabase()
