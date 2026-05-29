@@ -1,0 +1,110 @@
+# deploy.ps1
+# Automates the entire deployment process for Atylla Pro PWA
+
+param(
+    [string]$Version = $null
+)
+
+$ErrorActionPreference = "Stop"
+
+# 1. Update version if provided
+if ($Version) {
+    Write-Host "Updating version to $Version..." -ForegroundColor Cyan
+    # Update frontend/src/version.js
+    "export const APP_VERSION = '$Version';" | Set-Content "frontend/src/version.js"
+    
+    # Update package.json version
+    $packageJsonPath = "frontend/package.json"
+    $packageJson = Get-Content $packageJsonPath | ConvertFrom-Json
+    $packageJson.version = $Version
+    $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packageJsonPath
+
+    # Update app.json version
+    $appJsonPath = "frontend/app.json"
+    $appJson = Get-Content $appJsonPath -Raw | ConvertFrom-Json
+    $appJson.expo.version = $Version
+    $appJson | ConvertTo-Json -Depth 10 | Set-Content $appJsonPath
+}
+
+# Read current version from frontend/src/version.js
+$versionFileContent = Get-Content "frontend/src/version.js" -Raw
+if ($versionFileContent -match "export const APP_VERSION = '([^']+)';") {
+    $currentVersion = $Matches[1]
+} else {
+    Write-Error "Could not read version from frontend/src/version.js"
+}
+
+Write-Host "Current version: $currentVersion" -ForegroundColor Green
+
+# 2. Build Expo PWA
+Write-Host "Building Expo PWA..." -ForegroundColor Cyan
+Push-Location frontend
+try {
+    npx expo export --platform web
+} finally {
+    Pop-Location
+}
+
+# 3. Locate the new bundle index-*.js
+$jsDir = "frontend/dist/_expo/static/js/web"
+$jsFile = Get-ChildItem -Path $jsDir -Filter "index-*.js" | Select-Object -First 1
+if (-not $jsFile) {
+    Write-Error "Could not find index-*.js in $jsDir"
+}
+$newBundleName = $jsFile.Name
+Write-Host "Found new bundle: $newBundleName" -ForegroundColor Green
+
+# 4. Copy build to backend
+Write-Host "Copying build to backend..." -ForegroundColor Cyan
+if (Test-Path "backend/static/_expo") {
+    Remove-Item -Path "backend/static/_expo" -Recurse -Force
+}
+Copy-Item -Path "frontend/dist/_expo" -Destination "backend/static/_expo" -Recurse -Force
+
+# 5. Update index.html reference to the bundle
+Write-Host "Updating index.html script tag..." -ForegroundColor Cyan
+$indexHtmlPath = "backend/static/index.html"
+$indexHtml = Get-Content $indexHtmlPath -Raw
+# Replace index-*.js reference
+$indexHtml = $indexHtml -replace 'src="/_expo/static/js/web/index-[a-f0-9]+\.js"', "src=`"/_expo/static/js/web/$newBundleName`""
+$indexHtml | Set-Content $indexHtmlPath
+
+# 6. Update sw.js cache name
+Write-Host "Updating sw.js cache name..." -ForegroundColor Cyan
+$swPath = "backend/static/sw.js"
+$swContent = Get-Content $swPath -Raw
+$swContent = $swContent -replace "const CACHE_NAME = 'atylla-pro-v[^']+';", "const CACHE_NAME = 'atylla-pro-v$currentVersion';"
+$swContent | Set-Content $swPath
+
+# 7. Git commit, tag & push
+Write-Host "Staging, committing, tagging, and pushing changes..." -ForegroundColor Cyan
+
+# Commit frontend changes
+Push-Location frontend
+git add -A
+$frontStatus = git status --porcelain
+if ($frontStatus) {
+    git commit -m "v$currentVersion - deployment"
+}
+Pop-Location
+
+# Commit root changes
+git add backend/static frontend deploy.ps1
+$rootStatus = git status --porcelain
+if ($rootStatus) {
+    git commit -m "v$currentVersion - deployment"
+}
+
+# Tag and push
+# Remove old tag if it exists to allow re-tagging the same version
+git tag -d "v$currentVersion" 2>$null
+git tag "v$currentVersion"
+git tag -d "backup-v$currentVersion" 2>$null
+git tag "backup-v$currentVersion"
+git branch -D "backup/v$currentVersion" 2>$null
+git branch "backup/v$currentVersion"
+
+Write-Host "Pushing to GitHub..." -ForegroundColor Cyan
+git push origin master --tags --force
+
+Write-Host "Deployment of v$currentVersion completed successfully!" -ForegroundColor Green
