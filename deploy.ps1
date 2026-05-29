@@ -97,12 +97,15 @@ if ($rootStatus) {
 
 # Tag and push
 # Remove old tag if it exists to allow re-tagging the same version
-& git tag -d "v$currentVersion" *>$null
-& git tag "v$currentVersion"
-& git tag -d "backup-v$currentVersion" *>$null
-& git tag "backup-v$currentVersion"
-& git branch -D "backup/v$currentVersion" *>$null
-& git branch "backup/v$currentVersion"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git tag -d "v$currentVersion" 2>$null
+git tag "v$currentVersion" 2>$null
+git tag -d "backup-v$currentVersion" 2>$null
+git tag "backup-v$currentVersion" 2>$null
+git branch -D "backup/v$currentVersion" 2>$null
+git branch "backup/v$currentVersion" 2>$null
+$ErrorActionPreference = $oldPreference
 
 Write-Host "Pushing to GitHub..." -ForegroundColor Cyan
 git push origin master --tags --force
