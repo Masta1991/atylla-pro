@@ -1,4 +1,4 @@
-const CACHE_NAME = 'atylla-pro-v1.0.28';
+const CACHE_NAME = 'atylla-pro-v1.0.29';
 const urlsToCache = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', event => {
@@ -20,6 +20,7 @@ self.addEventListener('activate', event => {
     )
   );
 });
+
 
 
 
