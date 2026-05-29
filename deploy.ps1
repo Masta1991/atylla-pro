@@ -54,12 +54,12 @@ if (-not $jsFile) {
 $newBundleName = $jsFile.Name
 Write-Host "Found new bundle: $newBundleName" -ForegroundColor Green
 
-# 4. Copy build to backend
+# 4. Copy build to backend (merging to keep old bundles active for cached clients)
 Write-Host "Copying build to backend..." -ForegroundColor Cyan
-if (Test-Path "backend/static/_expo") {
-    Remove-Item -Path "backend/static/_expo" -Recurse -Force
+if (-not (Test-Path "backend/static/_expo")) {
+    New-Item -ItemType Directory -Path "backend/static/_expo" -Force
 }
-Copy-Item -Path "frontend/dist/_expo" -Destination "backend/static/_expo" -Recurse -Force
+Copy-Item -Path "frontend/dist/_expo\*" -Destination "backend/static/_expo" -Recurse -Force
 
 # 5. Update index.html reference to the bundle
 Write-Host "Updating index.html script tag..." -ForegroundColor Cyan
