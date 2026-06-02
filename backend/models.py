@@ -53,6 +53,9 @@ class CalendarEventBase(BaseModel):
     workout_type_id: Optional[UUID] = None
     status: str = "active"
     is_settled: bool = False
+    note: Optional[str] = None
+    main_group: Optional[str] = None
+    added_groups: Optional[List[str]] = Field(default_factory=list)
 
 class CalendarEventCreate(CalendarEventBase):
     pass
@@ -62,6 +65,9 @@ class CalendarEventUpdate(BaseModel):
     workout_type_id: Optional[UUID] = None
     status: Optional[str] = None
     is_settled: Optional[bool] = None
+    note: Optional[str] = None
+    main_group: Optional[str] = None
+    added_groups: Optional[List[str]] = None
 
 class CalendarSwapRequest(BaseModel):
     date1: date
