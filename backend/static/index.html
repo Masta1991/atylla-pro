@@ -21,26 +21,6 @@
   <body style="background-color: #0d1117;">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-7e48365b7902fc7a806a1527c5a9153a.js" defer></script>
-  <div id="pwa-install" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99999;background:#c28b71;color:#fff;padding:14px 28px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-family:sans-serif;text-align:center;" onclick="this.style.display='none';if(window._pwaPrompt){window._pwaPrompt.prompt();window._pwaPrompt.userChoice.then(function(r){if(r.outcome==='accepted'){this.textContent='Zainstalowano!'}}.bind(this))}">📱 Zainstaluj Atylla Pro</div>
-  <script>
-    window.addEventListener('beforeinstallprompt', function(e) {
-      e.preventDefault();
-      window._pwaPrompt = e;
-      document.getElementById('pwa-install').style.display = 'block';
-    });
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js');
-      });
-    }
-  </script>
+  <script src="/_expo/static/js/web/index-ceb53c1a4c6f480e61163c184ca6e8dd.js" defer></script>
 </body>
 </html>
-
-
-
-
-
-
-
