@@ -9,6 +9,11 @@ class AdjustPackageRequest(BaseModel):
     new_count: int
     comment: str
 
+class AdjustHistoryPackageRequest(BaseModel):
+    archived_at: str
+    new_count: int
+    comment: str
+
 router = APIRouter(prefix="/clients", tags=["clients"])
 
 
@@ -167,6 +172,51 @@ def adjust_package(client_id: str, data: AdjustPackageRequest):
     
     new_payload = {
         "package_current_count": data.new_count,
+        "payment_history": history,
+        "updated_at": "now()"
+    }
+    
+    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
+    return res.data[0]
+
+@router.post("/{client_id}/adjust-history-package")
+def adjust_history_package(client_id: str, data: AdjustHistoryPackageRequest):
+    supabase = get_supabase()
+    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client_res.data:
+        raise HTTPException(404, "Client not found")
+        
+    client = client_res.data
+    history = client.get("payment_history") or []
+    
+    if not isinstance(history, list):
+        history = []
+        
+    # Find the package to modify
+    target_idx = -1
+    old_count = 0
+    for i, item in enumerate(history):
+        if item.get("archived_at") == data.archived_at:
+            target_idx = i
+            old_count = item.get("completed_count", 0)
+            break
+            
+    if target_idx == -1:
+        raise HTTPException(404, "Archived package not found")
+        
+    # Modify the history item
+    history[target_idx]["completed_count"] = data.new_count
+    
+    # Add an adjustment log to history
+    history.append({
+        "type": "adjustment",
+        "date": datetime.now().isoformat(),
+        "old_count": old_count,
+        "new_count": data.new_count,
+        "comment": f"[Historia] {data.comment}"
+    })
+    
+    new_payload = {
         "payment_history": history,
         "updated_at": "now()"
     }
