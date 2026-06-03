@@ -3,6 +3,11 @@ from typing import List
 from datetime import date, datetime, timedelta
 from database import get_supabase
 from models import ClientCreate, ClientUpdate, ClientResponse
+from pydantic import BaseModel
+
+class AdjustPackageRequest(BaseModel):
+    new_count: int
+    comment: str
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -137,6 +142,37 @@ def add_new_package(client_id: str):
     res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
     return res.data[0]
 
+
+
+@router.post("/{client_id}/adjust-package")
+def adjust_package(client_id: str, data: AdjustPackageRequest):
+    supabase = get_supabase()
+    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client_res.data:
+        raise HTTPException(404, "Client not found")
+        
+    client = client_res.data
+    history = client.get("payment_history") or []
+    
+    if not isinstance(history, list):
+        history = []
+        
+    history.append({
+        "type": "adjustment",
+        "date": datetime.now().isoformat(),
+        "old_count": client.get("package_current_count") or 0,
+        "new_count": data.new_count,
+        "comment": data.comment
+    })
+    
+    new_payload = {
+        "package_current_count": data.new_count,
+        "payment_history": history,
+        "updated_at": "now()"
+    }
+    
+    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
+    return res.data[0]
 
 @router.delete("/{client_id}")
 def delete_client(client_id: str):
