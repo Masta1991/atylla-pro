@@ -56,6 +56,8 @@ class CalendarEventBase(BaseModel):
     note: Optional[str] = None
     main_group: Optional[str] = None
     added_groups: Optional[List[str]] = Field(default_factory=list)
+    is_replacement: bool = False
+    replaced_client_id: Optional[UUID] = None
 
 class CalendarEventCreate(CalendarEventBase):
     pass
@@ -68,6 +70,8 @@ class CalendarEventUpdate(BaseModel):
     note: Optional[str] = None
     main_group: Optional[str] = None
     added_groups: Optional[List[str]] = None
+    is_replacement: Optional[bool] = None
+    replaced_client_id: Optional[UUID] = None
 
 class CalendarSwapRequest(BaseModel):
     date1: date
@@ -81,6 +85,22 @@ class CalendarEventResponse(CalendarEventBase):
     updated_at: datetime
     clients: Optional[dict] = None
     workout_types: Optional[dict] = None
+    model_config = {"from_attributes": True}
+
+
+# ── Absences ─────────────────────────────────────────────────────────────────
+
+class AbsenceBase(BaseModel):
+    client_id: UUID
+    absence_date: date
+
+class AbsenceCreate(AbsenceBase):
+    pass
+
+class AbsenceResponse(AbsenceBase):
+    id: UUID
+    created_at: datetime
+    clients: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 
