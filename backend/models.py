@@ -8,10 +8,11 @@ from uuid import UUID
 
 class ClientBase(BaseModel):
     name: str
+    phone: Optional[str] = None
     join_date: Optional[date] = None
     notes: Optional[str] = None
-    phone: Optional[str] = None
     default_workout_type_id: Optional[UUID] = None
+    default_plan_id: Optional[UUID] = None
     strength_progression: List[str] = Field(default_factory=list)
     training_schedule: List[dict] = Field(default_factory=list)
     billing_type: Optional[str] = "package"
@@ -51,6 +52,7 @@ class CalendarEventBase(BaseModel):
     event_hour: int = Field(ge=6, le=21)
     client_id: Optional[UUID] = None
     workout_type_id: Optional[UUID] = None
+    plan_id: Optional[UUID] = None
     status: str = "active"
     is_settled: bool = False
     note: Optional[str] = None
@@ -65,6 +67,7 @@ class CalendarEventCreate(CalendarEventBase):
 class CalendarEventUpdate(BaseModel):
     client_id: Optional[UUID] = None
     workout_type_id: Optional[UUID] = None
+    plan_id: Optional[UUID] = None
     status: Optional[str] = None
     is_settled: Optional[bool] = None
     note: Optional[str] = None
@@ -83,8 +86,11 @@ class CalendarEventResponse(CalendarEventBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    clients: Optional[dict] = None
+    default_workout_type_id: Optional[UUID] = None
+    default_plan_id: Optional[UUID] = None
+    training_plans: Optional[dict] = None
     workout_types: Optional[dict] = None
+    clients: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 
