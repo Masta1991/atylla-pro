@@ -215,13 +215,14 @@ def get_calendar_stats(months: int = Query(1)):
         .execute()
     active_count = active_res.count or 0
     
-    # Deleted events count
-    deleted_res = supabase.table("deleted_workouts") \
+    # Cancelled events count (from calendar_events directly, not deleted_workouts audit log)
+    cancelled_res = supabase.table("calendar_events") \
         .select("id", count="exact") \
         .gte("event_date", start_date.isoformat()) \
         .lte("event_date", today.isoformat()) \
+        .eq("status", "deleted") \
         .execute()
-    deleted_count = deleted_res.count or 0
+    cancelled_count = cancelled_res.count or 0
     
     # 12 months chart data
     year_ago = today - timedelta(days=365)
@@ -253,8 +254,8 @@ def get_calendar_stats(months: int = Query(1)):
     chart_data = [{"month": k, "count": v} for k, v in sorted_months]
     
     return {
-        "total_planned": active_count + deleted_count,
-        "cancelled": deleted_count,
+        "total_planned": active_count + cancelled_count,
+        "cancelled": cancelled_count,
         "final": active_count,
         "chart_data": chart_data
     }
