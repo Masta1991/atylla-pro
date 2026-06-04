@@ -51,6 +51,21 @@ def create_absence(data: AbsenceCreate):
 @router.delete("/absences/{absence_id}")
 def delete_absence(absence_id: str):
     supabase = get_supabase()
+    # Get absence details before deleting
+    abs_res = supabase.table("absences").select("*").eq("id", absence_id).single().execute()
+    if abs_res.data:
+        client_id = str(abs_res.data.get("client_id"))
+        absence_date = abs_res.data.get("absence_date")
+        absence_hour = abs_res.data.get("absence_hour")
+        # Restore calendar events from cancelled back to active
+        update_query = supabase.table("calendar_events").update({
+            "status": "active",
+            "updated_at": "now()"
+        }).eq("client_id", client_id).eq("event_date", absence_date.isoformat() if hasattr(absence_date, 'isoformat') else absence_date)
+        if absence_hour is not None:
+            update_query = update_query.eq("event_hour", absence_hour)
+        update_query.execute()
+    
     supabase.table("absences").delete().eq("id", absence_id).execute()
     return {"status": "deleted"}
 
@@ -309,6 +324,11 @@ def delete_event(event_date: str, event_hour: int):
             "client_name": event.get("clients", {}).get("name") if isinstance(event.get("clients"), dict) else None,
             "workout_type": event.get("workout_types", {}).get("name") if isinstance(event.get("workout_types"), dict) else None,
         }).execute()
+        
+        # Also delete workout logs for this client on this date to prevent stale data
+        client_id = event.get("client_id")
+        if client_id:
+            supabase.table("workout_logs").delete().eq("client_id", client_id).eq("session_date", event_date).execute()
 
     # Soft delete
     supabase.table("calendar_events").update({"status": "deleted", "updated_at": "now()"}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
