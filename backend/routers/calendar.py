@@ -289,7 +289,7 @@ def delete_event(event_date: str, event_hour: int):
     """Soft-delete: set status='deleted' and log to deleted_workouts."""
     supabase = get_supabase()
 
-    ev = supabase.table("calendar_events").select("*,clients(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
 
     if ev.data and len(ev.data) > 0:
         event = ev.data[0]
