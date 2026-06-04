@@ -156,8 +156,9 @@ CREATE TABLE absences (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id       UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     absence_date    DATE NOT NULL,
+    absence_hour    INT,
     created_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(client_id, absence_date)
+    UNIQUE(client_id, absence_date, absence_hour)
 );
 
 CREATE INDEX idx_absences_client ON absences(client_id);

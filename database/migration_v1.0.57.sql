@@ -63,3 +63,8 @@ END $$;
 -- 8. Add 'cancelled' to calendar_events status CHECK constraint
 ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_status_check;
 ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_status_check CHECK (status IN ('active', 'deleted', 'cancelled'));
+
+-- 9. Add absence_hour column and update unique constraint
+ALTER TABLE absences ADD COLUMN IF NOT EXISTS absence_hour INT;
+ALTER TABLE absences DROP CONSTRAINT IF EXISTS absences_client_id_absence_date_key;
+ALTER TABLE absences ADD CONSTRAINT absences_client_id_absence_date_hour_key UNIQUE (client_id, absence_date, absence_hour);
