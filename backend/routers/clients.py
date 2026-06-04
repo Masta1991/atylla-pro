@@ -67,7 +67,7 @@ def generate_all_schedules():
 @router.get("/", response_model=List[ClientResponse])
 def list_clients():
     supabase = get_supabase()
-    res = supabase.table("clients").select("*").order("name").execute()
+    res = supabase.table("clients").select("*, training_plans(name)").order("name").execute()
     return res.data or []
 
 
