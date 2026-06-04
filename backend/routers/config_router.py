@@ -6,6 +6,7 @@ from models import (
     MuscleGroupCreate, MuscleGroupResponse,
     ExerciseCreate, ExerciseResponse,
     TrainingPlanCreate, TrainingPlanResponse,
+    PlanExerciseCreate, PlanExerciseUpdate,
 )
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -102,7 +103,7 @@ def create_exercise(data: ExerciseCreate):
     existing = supabase.table("exercises").select("id").eq("muscle_group_id", str(data.muscle_group_id)).eq("name", data.name).execute()
     if existing.data:
         raise HTTPException(400, f"Exercise '{data.name}' already exists in this group")
-    res = supabase.table("exercises").insert(data.model_dump()).execute()
+    res = supabase.table("exercises").insert(data.model_dump(mode='json')).execute()
     return res.data[0]
 
 @router.delete("/exercises/{exercise_id}")
@@ -139,7 +140,11 @@ def create_plan(data: TrainingPlanCreate):
     if existing.data:
         raise HTTPException(400, f"Plan '{data.name}' already exists")
 
-    plan = supabase.table("training_plans").insert({"name": data.name}).execute()
+    plan_data = {"name": data.name}
+    if data.workout_type_id:
+        plan_data["workout_type_id"] = str(data.workout_type_id)
+
+    plan = supabase.table("training_plans").insert(plan_data).execute()
 
     if data.exercise_ids:
         records = [
@@ -154,4 +159,30 @@ def create_plan(data: TrainingPlanCreate):
 def delete_plan(plan_id: str):
     supabase = get_supabase()
     supabase.table("training_plans").delete().eq("id", plan_id).execute()
+    return {"status": "deleted"}
+
+@router.post("/plans/{plan_id}/exercises", status_code=201)
+def add_exercise_to_plan(plan_id: str, data: PlanExerciseCreate):
+    supabase = get_supabase()
+    res = supabase.table("plan_exercises").insert({
+        "plan_id": plan_id,
+        "exercise_id": str(data.exercise_id),
+        "sort_order": data.sort_order,
+        "sets_data": data.sets_data
+    }).execute()
+    return res.data[0] if res.data else None
+
+@router.put("/plan-exercises/{id}")
+def update_plan_exercise(id: str, data: PlanExerciseUpdate):
+    supabase = get_supabase()
+    payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
+    if not payload:
+        return {"status": "no update"}
+    res = supabase.table("plan_exercises").update(payload).eq("id", id).execute()
+    return res.data[0] if res.data else None
+
+@router.delete("/plan-exercises/{id}")
+def remove_exercise_from_plan(id: str):
+    supabase = get_supabase()
+    supabase.table("plan_exercises").delete().eq("id", id).execute()
     return {"status": "deleted"}

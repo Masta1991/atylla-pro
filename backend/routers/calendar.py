@@ -87,7 +87,7 @@ def create_or_update_event(data: CalendarEventCreate):
 @router.put("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
 def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate):
     supabase = get_supabase()
-    payload = {k: v for k, v in data.model_dump(exclude_none=True).items() if v is not None}
+    payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
     payload["updated_at"] = "now()"
 
     res = (

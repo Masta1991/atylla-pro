@@ -177,6 +177,7 @@ class ExerciseResponse(ExerciseBase):
 
 class TrainingPlanBase(BaseModel):
     name: str
+    workout_type_id: Optional[UUID] = None
 
 class TrainingPlanCreate(TrainingPlanBase):
     exercise_ids: List[UUID] = Field(default_factory=list)
@@ -186,6 +187,14 @@ class TrainingPlanResponse(TrainingPlanBase):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+class PlanExerciseCreate(BaseModel):
+    exercise_id: UUID
+    sort_order: Optional[int] = 0
+    sets_data: Optional[List[dict]] = Field(default_factory=list)
+
+class PlanExerciseUpdate(BaseModel):
+    sets_data: Optional[List[dict]] = None
+    sort_order: Optional[int] = None
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
