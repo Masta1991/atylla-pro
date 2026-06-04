@@ -55,7 +55,7 @@ def list_events(
     client_id: Optional[str] = Query(None),
 ):
     supabase = get_supabase()
-    query = supabase.table("calendar_events").select("*, clients(name), workout_types(name)")
+    query = supabase.table("calendar_events").select("*, clients!calendar_events_client_id_fkey(name), workout_types(name)")
 
     if date_from:
         query = query.gte("event_date", date_from)
@@ -78,7 +78,7 @@ def get_week_events(monday_date: str):
     supabase = get_supabase()
     res = (
         supabase.table("calendar_events")
-        .select("*, clients(name), workout_types(name)")
+        .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name)")
         .gte("event_date", monday.isoformat())
         .lte("event_date", saturday.isoformat())
         .neq("status", "deleted")
@@ -93,7 +93,7 @@ def get_event(event_date: str, event_hour: int):
     supabase = get_supabase()
     res = (
         supabase.table("calendar_events")
-        .select("*, clients(name), workout_types(name)")
+        .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name)")
         .eq("event_date", event_date)
         .eq("event_hour", event_hour)
         .neq("status", "deleted")
@@ -261,9 +261,9 @@ def get_calendar_stats(months: int = Query(1)):
 
 
 @router.post("/{event_date}/{event_hour}/settle")
-def settle_workout(event_date: str, event_hour: int):
+def settle_event(event_date: str, event_hour: int):
     supabase = get_supabase()
-    ev = supabase.table("calendar_events").select("*").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
     if not ev.data:
         raise HTTPException(404, "Workout not found in calendar")
         

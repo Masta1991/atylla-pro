@@ -10,7 +10,7 @@ class ClientBase(BaseModel):
     name: str
     join_date: Optional[date] = None
     notes: Optional[str] = None
-    email: Optional[str] = None
+    phone: Optional[str] = None
     default_workout_type_id: Optional[UUID] = None
     strength_progression: List[str] = Field(default_factory=list)
     training_schedule: List[dict] = Field(default_factory=list)
@@ -27,7 +27,7 @@ class ClientUpdate(BaseModel):
     name: Optional[str] = None
     join_date: Optional[date] = None
     notes: Optional[str] = None
-    email: Optional[str] = None
+    phone: Optional[str] = None
     default_workout_type_id: Optional[UUID] = None
     strength_progression: Optional[List[str]] = None
     training_schedule: Optional[List[dict]] = None
