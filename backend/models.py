@@ -99,6 +99,7 @@ class CalendarEventResponse(CalendarEventBase):
 class AbsenceBase(BaseModel):
     client_id: UUID
     absence_date: date
+    absence_hour: Optional[int] = None
 
 class AbsenceCreate(AbsenceBase):
     pass

@@ -25,16 +25,26 @@ def get_absences(date_from: Optional[str] = Query(None)):
 def create_absence(data: AbsenceCreate):
     supabase = get_supabase()
     payload = data.model_dump(mode='json')
-    # Upsert to avoid duplicates for same client and date
+    # Upsert to avoid duplicates for same client, date and hour
+    on_conflict = "client_id,absence_date"
+    if data.absence_hour is not None:
+        on_conflict = "client_id,absence_date,absence_hour"
     res = supabase.table("absences").upsert(
-        payload, on_conflict="client_id,absence_date"
+        payload, on_conflict=on_conflict
     ).execute()
     
-    # Also cancel any existing active event for this client on this date
-    supabase.table("calendar_events").update({
-        "status": "cancelled",
-        "updated_at": "now()"
-    }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).execute()
+    # Cancel the specific calendar event for this client on this date/hour
+    if data.absence_hour is not None:
+        supabase.table("calendar_events").update({
+            "status": "cancelled",
+            "updated_at": "now()"
+        }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).eq("event_hour", data.absence_hour).execute()
+    else:
+        # No hour specified - cancel all events for this client on this date (backward compat)
+        supabase.table("calendar_events").update({
+            "status": "cancelled",
+            "updated_at": "now()"
+        }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).execute()
     
     return res.data[0]
 
