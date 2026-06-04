@@ -191,6 +191,7 @@ class MuscleGroupResponse(MuscleGroupBase):
 class ExerciseBase(BaseModel):
     muscle_group_id: UUID
     name: str
+    unit: Optional[str] = "KG"
 
 class ExerciseCreate(ExerciseBase):
     pass

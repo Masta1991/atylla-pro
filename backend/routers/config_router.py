@@ -91,7 +91,7 @@ def list_exercises_grouped():
     result = {}
     for g in (groups.data or []):
         result[g["name"]] = [
-            {"id": e["id"], "name": e["name"]}
+            {"id": e["id"], "name": e["name"], "unit": e.get("unit", "KG")}
             for e in (exercises.data or [])
             if e["muscle_group_id"] == g["id"]
         ]

@@ -227,9 +227,17 @@ def adjust_history_package(client_id: str, data: AdjustHistoryPackageRequest):
 @router.delete("/{client_id}")
 def delete_client(client_id: str):
     supabase = get_supabase()
+    
+    # Manually delete related records to simulate CASCADE DELETE
+    supabase.table("workout_logs").delete().eq("client_id", client_id).execute()
+    supabase.table("calendar_events").delete().eq("client_id", client_id).execute()
+    supabase.table("absences").delete().eq("client_id", client_id).execute()
+    supabase.table("measurements").delete().eq("client_id", client_id).execute()
+
     res = supabase.table("clients").delete().eq("id", client_id).execute()
     if not res.data:
-        raise HTTPException(404, "Client not found")
+        # It's possible the client was already deleted, just return success
+        return {"status": "deleted", "name": "Unknown"}
     return {"status": "deleted", "name": res.data[0]["name"]}
 
 
