@@ -25,50 +25,17 @@ def get_absences(date_from: Optional[str] = Query(None)):
 def create_absence(data: AbsenceCreate):
     supabase = get_supabase()
     payload = data.model_dump(mode='json')
-    print(f"[DEBUG create_absence] absence_hour={data.absence_hour}, type={type(data.absence_hour).__name__}, client_id={data.client_id}, date={data.absence_date}")
-    # Upsert to avoid duplicates for same client, date and hour
     on_conflict = "client_id,absence_date"
     if data.absence_hour is not None:
         on_conflict = "client_id,absence_date,absence_hour"
     res = supabase.table("absences").upsert(
         payload, on_conflict=on_conflict
     ).execute()
-    
-    # Cancel the specific calendar event for this client on this date/hour
-    if data.absence_hour is not None:
-        print(f"[DEBUG] Cancelling ONLY hour={data.absence_hour}")
-        supabase.table("calendar_events").update({
-            "status": "cancelled",
-            "updated_at": "now()"
-        }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).eq("event_hour", data.absence_hour).execute()
-    else:
-        print(f"[DEBUG] Cancelling ALL hours (absence_hour is None)")
-        # No hour specified - cancel all events for this client on this date (backward compat)
-        supabase.table("calendar_events").update({
-            "status": "cancelled",
-            "updated_at": "now()"
-        }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).execute()
-    
     return res.data[0]
 
 @router.delete("/absences/{absence_id}")
 def delete_absence(absence_id: str):
     supabase = get_supabase()
-    # Get absence details before deleting
-    abs_res = supabase.table("absences").select("*").eq("id", absence_id).single().execute()
-    if abs_res.data:
-        client_id = str(abs_res.data.get("client_id"))
-        absence_date = abs_res.data.get("absence_date")
-        absence_hour = abs_res.data.get("absence_hour")
-        # Restore calendar events from cancelled back to active
-        update_query = supabase.table("calendar_events").update({
-            "status": "active",
-            "updated_at": "now()"
-        }).eq("client_id", client_id).eq("event_date", absence_date.isoformat() if hasattr(absence_date, 'isoformat') else absence_date)
-        if absence_hour is not None:
-            update_query = update_query.eq("event_hour", absence_hour)
-        update_query.execute()
-    
     supabase.table("absences").delete().eq("id", absence_id).execute()
     return {"status": "deleted"}
 
