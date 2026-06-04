@@ -32,7 +32,7 @@ def generate_client_events(supabase, client_id, schedule):
         for entry in schedule:
             day = entry.get("day", 0)
             hour = entry.get("hour", 8)
-            wt_id = entry.get("workout_type_id")
+            wt_id = entry.get("workout_type_id") or entry.get("plan_id")
 
             if not (0 <= day <= 5 and 6 <= hour <= 21):
                 continue

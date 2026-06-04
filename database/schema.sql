@@ -29,6 +29,7 @@ CREATE TABLE exercises (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     muscle_group_id UUID NOT NULL REFERENCES muscle_groups(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
+    unit            TEXT DEFAULT 'KG',
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(muscle_group_id, name)
 );
@@ -38,9 +39,10 @@ CREATE TABLE exercises (
 -- ============================================================================
 
 CREATE TABLE training_plans (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMPTZ DEFAULT now()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            TEXT NOT NULL UNIQUE,
+    workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE plan_exercises (
@@ -48,6 +50,7 @@ CREATE TABLE plan_exercises (
     plan_id         UUID NOT NULL REFERENCES training_plans(id) ON DELETE CASCADE,
     exercise_id     UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
     sort_order      INT NOT NULL DEFAULT 0,
+    sets_data       JSONB DEFAULT '[]'::JSONB,
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(plan_id, exercise_id)
 );
@@ -59,14 +62,22 @@ CREATE TABLE plan_exercises (
 CREATE TABLE clients (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT NOT NULL,
+    phone           TEXT,
     join_date       DATE,
     notes           TEXT,
     email           TEXT,
     default_workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
+    default_plan_id UUID REFERENCES training_plans(id) ON DELETE SET NULL,
     -- ProgresjaSilowa: JSON array of exercise IDs for strength progression tracking
     strength_progression JSONB DEFAULT '[]'::JSONB,
-    -- Harmonogram: JSON array of {day, hour, workout_type_id}
+    -- Harmonogram: JSON array of {day, hour, plan_id}
     training_schedule JSONB DEFAULT '[]'::JSONB,
+    -- Billing / packages
+    billing_type            TEXT DEFAULT 'package',
+    package_purchase_date   DATE,
+    package_size            INT DEFAULT 10,
+    package_current_count   INT DEFAULT 0,
+    payment_history         JSONB DEFAULT '[]'::JSONB,
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
@@ -83,7 +94,14 @@ CREATE TABLE calendar_events (
     event_hour      INT NOT NULL CHECK (event_hour >= 6 AND event_hour <= 21),
     client_id       UUID REFERENCES clients(id) ON DELETE SET NULL,
     workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
+    plan_id         UUID REFERENCES training_plans(id) ON DELETE SET NULL,
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    is_settled      BOOLEAN DEFAULT FALSE,
+    note            TEXT,
+    main_group      TEXT,
+    added_groups    JSONB DEFAULT '[]'::JSONB,
+    is_replacement  BOOLEAN DEFAULT FALSE,
+    replaced_client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(event_date, event_hour)
@@ -131,7 +149,22 @@ CREATE INDEX idx_measurements_client ON measurements(client_id);
 CREATE INDEX idx_measurements_date ON measurements(client_id, measure_date);
 
 -- ============================================================================
--- 7. DELETED WORKOUTS AUDIT LOG (UsunieteTreningi)
+-- 7. ABSENCES (Absencje)
+-- ============================================================================
+
+CREATE TABLE absences (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id       UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    absence_date    DATE NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(client_id, absence_date)
+);
+
+CREATE INDEX idx_absences_client ON absences(client_id);
+CREATE INDEX idx_absences_date ON absences(absence_date);
+
+-- ============================================================================
+-- 8. DELETED WORKOUTS AUDIT LOG (UsunieteTreningi)
 -- ============================================================================
 
 CREATE TABLE deleted_workouts (
@@ -144,7 +177,7 @@ CREATE TABLE deleted_workouts (
 );
 
 -- ============================================================================
--- 8. AUTH USERS (for trainer login)
+-- 9. AUTH USERS (for trainer login)
 -- ============================================================================
 
 -- Note: Supabase provides auth.users table automatically.
@@ -157,7 +190,7 @@ CREATE TABLE trainer_profiles (
 );
 
 -- ============================================================================
--- 9. ROW LEVEL SECURITY (RLS)
+-- 10. ROW LEVEL SECURITY (RLS)
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -170,6 +203,7 @@ ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE measurements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE absences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deleted_workouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_profiles ENABLE ROW LEVEL SECURITY;
 
@@ -183,7 +217,7 @@ BEGIN
             'workout_types','muscle_groups','exercises',
             'training_plans','plan_exercises','clients',
             'calendar_events','workout_logs','measurements',
-            'deleted_workouts','trainer_profiles'
+            'absences','deleted_workouts','trainer_profiles'
         ])
     LOOP
         EXECUTE format(
@@ -197,7 +231,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- 10. SEED DATA
+-- 11. SEED DATA
 -- ============================================================================
 
 INSERT INTO workout_types (name) VALUES

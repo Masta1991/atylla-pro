@@ -8,7 +8,7 @@ from routers import clients, calendar, workouts, measurements, config_router, au
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="1.0.0",
+    version="1.0.57",
 )
 
 from fastapi import Request
