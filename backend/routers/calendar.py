@@ -4,10 +4,48 @@ from datetime import date as DateType
 from database import get_supabase
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
-    CalendarSwapRequest,
+    CalendarSwapRequest, AbsenceCreate, AbsenceResponse
 )
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
+
+
+# ── Absences ─────────────────────────────────────────────────────────────────
+
+@router.get("/absences", response_model=List[AbsenceResponse])
+def get_absences(date_from: Optional[str] = Query(None)):
+    supabase = get_supabase()
+    query = supabase.table("absences").select("*, clients(name)").order("absence_date", desc=True)
+    if date_from:
+        query = query.gte("absence_date", date_from)
+    res = query.execute()
+    return res.data or []
+
+@router.post("/absences", response_model=AbsenceResponse, status_code=201)
+def create_absence(data: AbsenceCreate):
+    supabase = get_supabase()
+    payload = data.model_dump(mode='json')
+    # Upsert to avoid duplicates for same client and date
+    res = supabase.table("absences").upsert(
+        payload, on_conflict="client_id,absence_date"
+    ).execute()
+    
+    # Also cancel any existing active event for this client on this date
+    supabase.table("calendar_events").update({
+        "status": "cancelled",
+        "updated_at": "now()"
+    }).eq("client_id", str(data.client_id)).eq("event_date", data.absence_date.isoformat()).execute()
+    
+    return res.data[0]
+
+@router.delete("/absences/{absence_id}")
+def delete_absence(absence_id: str):
+    supabase = get_supabase()
+    supabase.table("absences").delete().eq("id", absence_id).execute()
+    return {"status": "deleted"}
+
+
+# ── Calendar Events ──────────────────────────────────────────────────────────
 
 
 @router.get("/", response_model=List[CalendarEventResponse])
