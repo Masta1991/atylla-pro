@@ -78,11 +78,22 @@ if os.path.isdir(STATIC_DIR):
     async def index():
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
+    # API prefixes that should NOT be intercepted by SPA fallback
+    API_PREFIXES = (
+        "clients", "calendar", "workouts", "measurements",
+        "config", "auth", "email", "health",
+    )
+
     @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
+    async def serve_spa(full_path: str, request: Request):
+        # If it looks like an API call, skip SPA fallback (will 404 naturally)
+        if any(full_path.startswith(p) for p in API_PREFIXES):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        # Serve specific static file if it exists
         file_path = os.path.join(STATIC_DIR, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
+        # Otherwise return SPA shell
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
