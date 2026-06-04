@@ -95,7 +95,7 @@ CREATE TABLE calendar_events (
     client_id       UUID REFERENCES clients(id) ON DELETE SET NULL,
     workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
     plan_id         UUID REFERENCES training_plans(id) ON DELETE SET NULL,
-    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
+    status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted', 'cancelled')),
     is_settled      BOOLEAN DEFAULT FALSE,
     note            TEXT,
     main_group      TEXT,
