@@ -286,7 +286,7 @@ def settle_event(event_date: str, event_hour: int, request: Request):
 
 @router.delete("/{event_date}/{event_hour}")
 def delete_event(event_date: str, event_hour: int, request: Request):
-    """Soft-delete: set status='deleted' and log to deleted_workouts."""
+    """Soft-delete: set status='deleted', log to deleted_workouts, and create absence."""
     supabase, user_id = get_user_supabase(request)
 
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
@@ -305,6 +305,13 @@ def delete_event(event_date: str, event_hour: int, request: Request):
         client_id = event.get("client_id")
         if client_id:
             supabase.table("workout_logs").delete().eq("client_id", client_id).eq("session_date", event_date).execute()
+            # Create absence record so it shows in Absences module and on calendar
+            supabase.table("absences").upsert({
+                "client_id": client_id,
+                "absence_date": event_date,
+                "absence_hour": event_hour,
+                "trainer_id": user_id,
+            }, on_conflict="client_id,absence_date,absence_hour").execute()
 
     # Soft delete
     supabase.table("calendar_events").update({"status": "deleted", "updated_at": "now()"}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
