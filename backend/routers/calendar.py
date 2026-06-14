@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
 from datetime import date as DateType
-from database import get_supabase
+from database import get_supabase, get_user_supabase
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
     CalendarSwapRequest, AbsenceCreate, AbsenceResponse
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
 # ── Absences ─────────────────────────────────────────────────────────────────
 
 @router.get("/absences", response_model=List[AbsenceResponse])
-def get_absences(date_from: Optional[str] = Query(None)):
-    supabase = get_supabase()
+def get_absences(date_from: Optional[str] = Query(None), request: Request = None):
+    supabase, _ = get_user_supabase(request)
     query = supabase.table("absences").select("*, clients(name)").order("absence_date", desc=True)
     if date_from:
         query = query.gte("absence_date", date_from)
@@ -22,9 +22,10 @@ def get_absences(date_from: Optional[str] = Query(None)):
     return res.data or []
 
 @router.post("/absences", response_model=AbsenceResponse, status_code=201)
-def create_absence(data: AbsenceCreate):
-    supabase = get_supabase()
+def create_absence(data: AbsenceCreate, request: Request):
+    supabase, user_id = get_user_supabase(request)
     payload = data.model_dump(mode='json')
+    payload["trainer_id"] = user_id
     on_conflict = "client_id,absence_date"
     if data.absence_hour is not None:
         on_conflict = "client_id,absence_date,absence_hour"
@@ -34,8 +35,8 @@ def create_absence(data: AbsenceCreate):
     return res.data[0]
 
 @router.delete("/absences/{absence_id}")
-def delete_absence(absence_id: str):
-    supabase = get_supabase()
+def delete_absence(absence_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
     supabase.table("absences").delete().eq("id", absence_id).execute()
     return {"status": "deleted"}
 
@@ -48,8 +49,9 @@ def list_events(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     client_id: Optional[str] = Query(None),
+    request: Request = None,
 ):
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     query = supabase.table("calendar_events").select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
 
     if date_from:
@@ -64,13 +66,13 @@ def list_events(
 
 
 @router.get("/week/{monday_date}", response_model=List[CalendarEventResponse])
-def get_week_events(monday_date: str):
+def get_week_events(monday_date: str, request: Request):
     """Get events from Monday to Saturday of a given week."""
     from datetime import datetime, timedelta
     monday = datetime.strptime(monday_date, "%Y-%m-%d").date()
     saturday = monday + timedelta(days=5)
 
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     res = (
         supabase.table("calendar_events")
         .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
@@ -84,8 +86,8 @@ def get_week_events(monday_date: str):
 
 
 @router.get("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
-def get_event(event_date: str, event_hour: int):
-    supabase = get_supabase()
+def get_event(event_date: str, event_hour: int, request: Request):
+    supabase, _ = get_user_supabase(request)
     res = (
         supabase.table("calendar_events")
         .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
@@ -101,14 +103,15 @@ def get_event(event_date: str, event_hour: int):
 
 
 @router.post("/", response_model=CalendarEventResponse, status_code=201)
-def create_or_update_event(data: CalendarEventCreate):
+def create_or_update_event(data: CalendarEventCreate, request: Request):
     """Upsert: create or replace calendar event."""
-    supabase = get_supabase()
+    supabase, user_id = get_user_supabase(request)
     payload = data.model_dump(exclude_none=True, mode='json')
+    payload["trainer_id"] = user_id
 
     try:
         res = supabase.table("calendar_events").upsert(
-            payload, on_conflict="event_date,event_hour"
+            payload, on_conflict="event_date,event_hour,trainer_id"
         ).execute()
         return res.data[0]
     except Exception as e:
@@ -118,8 +121,8 @@ def create_or_update_event(data: CalendarEventCreate):
 
 
 @router.put("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
-def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate):
-    supabase = get_supabase()
+def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate, request: Request):
+    supabase, _ = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
     payload["updated_at"] = "now()"
 
@@ -136,9 +139,9 @@ def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate):
 
 
 @router.post("/swap")
-def swap_events(data: CalendarSwapRequest):
+def swap_events(data: CalendarSwapRequest, request: Request):
     """Swap two calendar events (drag-and-drop)."""
-    supabase = get_supabase()
+    supabase, user_id = get_user_supabase(request)
 
     # Fetch both events
     res1 = supabase.table("calendar_events").select("*").eq("event_date", data.date1.isoformat()).eq("event_hour", data.hour1).execute()
@@ -158,7 +161,8 @@ def swap_events(data: CalendarSwapRequest):
             "client_id": ev1_data.get("client_id"),
             "workout_type_id": ev1_data.get("workout_type_id"),
             "status": "active",
-        }, on_conflict="event_date,event_hour").execute()
+            "trainer_id": user_id,
+        }, on_conflict="event_date,event_hour,trainer_id").execute()
 
     if ev2_data:
         supabase.table("calendar_events").upsert({
@@ -167,7 +171,8 @@ def swap_events(data: CalendarSwapRequest):
             "client_id": ev2_data.get("client_id"),
             "workout_type_id": ev2_data.get("workout_type_id"),
             "status": "active",
-        }, on_conflict="event_date,event_hour").execute()
+            "trainer_id": user_id,
+        }, on_conflict="event_date,event_hour,trainer_id").execute()
 
     # If one slot was empty, delete the original
     if not ev1_data:
@@ -179,7 +184,7 @@ def swap_events(data: CalendarSwapRequest):
 
 
 @router.get("/stats")
-def get_calendar_stats(months: int = Query(1)):
+def get_calendar_stats(months: int = Query(1), request: Request = None):
     from datetime import datetime, date, timedelta
     today = date.today()
     
@@ -199,7 +204,7 @@ def get_calendar_stats(months: int = Query(1)):
             next_year += 1
         start_date = date(next_year, next_month, 1) - timedelta(days=1)
         
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     
     # Active events count
     active_res = supabase.table("calendar_events") \
@@ -210,7 +215,7 @@ def get_calendar_stats(months: int = Query(1)):
         .execute()
     active_count = active_res.count or 0
     
-    # Cancelled events count (from calendar_events directly, not deleted_workouts audit log)
+    # Cancelled events count
     cancelled_res = supabase.table("calendar_events") \
         .select("id", count="exact") \
         .gte("event_date", start_date.isoformat()) \
@@ -257,8 +262,8 @@ def get_calendar_stats(months: int = Query(1)):
 
 
 @router.post("/{event_date}/{event_hour}/settle")
-def settle_event(event_date: str, event_hour: int):
-    supabase = get_supabase()
+def settle_event(event_date: str, event_hour: int, request: Request):
+    supabase, _ = get_user_supabase(request)
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
     if not ev.data:
         raise HTTPException(404, "Workout not found in calendar")
@@ -280,9 +285,9 @@ def settle_event(event_date: str, event_hour: int):
 
 
 @router.delete("/{event_date}/{event_hour}")
-def delete_event(event_date: str, event_hour: int):
+def delete_event(event_date: str, event_hour: int, request: Request):
     """Soft-delete: set status='deleted' and log to deleted_workouts."""
-    supabase = get_supabase()
+    supabase, user_id = get_user_supabase(request)
 
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
 
@@ -293,6 +298,7 @@ def delete_event(event_date: str, event_hour: int):
             "event_hour": event_hour,
             "client_name": event.get("clients", {}).get("name") if isinstance(event.get("clients"), dict) else None,
             "workout_type": event.get("workout_types", {}).get("name") if isinstance(event.get("workout_types"), dict) else None,
+            "trainer_id": user_id,
         }).execute()
         
         # Also delete workout logs for this client on this date to prevent stale data
@@ -307,8 +313,8 @@ def delete_event(event_date: str, event_hour: int):
 
 
 @router.delete("/events/{event_date}/{event_hour}/hard")
-def hard_delete_event(event_date: str, event_hour: int):
+def hard_delete_event(event_date: str, event_hour: int, request: Request):
     """Hard delete (remove row entirely)."""
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     supabase.table("calendar_events").delete().eq("event_date", event_date).eq("event_hour", event_hour).execute()
     return {"status": "deleted"}

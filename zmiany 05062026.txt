@@ -1,0 +1,28 @@
+1. Absencje 
+a) usuwanie za pomocą (x) z kalendarza 
+b) usuwanie tak jak jest teraz przez modul absencje
+c) dodac ten wyszarzony tekst trening usunięto lub szare tlo czy jakakolwiek adnotacja
+
+2.Treningi 
+a)zmiana ich kolejności zarówno w samej edycji jak i w rejestrze treingu
+
+3.Harmonogram /menadżer 
+a) zaciąganie na caly miesiąc 
+
+4.Podsumoanie w strefie trenera 
+a) ilość treningow na tydzień
+b) ilość treningow na miesiąc 
+c) wykres zostaje 
+
+4. Rozliczenia 
+a) pakiet 
+b) bez pakietu 
+d) dodac możliwość zwiększenia pakietu 
+c) 
+
+5.Polaczenie dwóch modulow przy odwoalny treningu 
+a) musisz trening odwolac przez absencje - jeżeli absencja była zbyt pozno to będzie opcja rozliczenia treningu nawet jak sie nie odbyl 
+b) rejestrusze w to miejsce zastępstwo i tez rozlcizasz 
+c) jeżeli trening sie nie odbyl a zostało za to zapłacone ma być adnotacja w rozliczenia
+
+6. Rejestrowanie glosu 

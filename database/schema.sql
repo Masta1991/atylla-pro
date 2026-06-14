@@ -1,9 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ATYLLA PRO — Supabase (PostgreSQL) Schema
--- Migrated from Google Sheets: TrainerApp_Data
+-- ATYLLA PRO — Supabase (PostgreSQL) Schema v2.0.0
+-- Multi-trainer support: each trainer has isolated data via trainer_id
 -- ═══════════════════════════════════════════════════════════════════════════
 -- NOTE: Uses gen_random_uuid() — available in Supabase by default (pgcrypto)
 --       Paste this entire file into Supabase SQL Editor and click RUN
+--       For NEW trainers, run seed_new_trainer.sql with their UUID after
+--       creating the user in Supabase Auth.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -13,15 +15,19 @@
 -- Workout types (RodzajeTreningu)
 CREATE TABLE workout_types (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMPTZ DEFAULT now()
+    name        TEXT NOT NULL,
+    trainer_id  UUID NOT NULL REFERENCES auth.users(id),
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(name, trainer_id)
 );
 
 -- Muscle groups / body parts (Partie)
 CREATE TABLE muscle_groups (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        TEXT NOT NULL UNIQUE,
-    created_at  TIMESTAMPTZ DEFAULT now()
+    name        TEXT NOT NULL,
+    trainer_id  UUID NOT NULL REFERENCES auth.users(id),
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(name, trainer_id)
 );
 
 -- Exercises (Cwiczenia)
@@ -30,6 +36,7 @@ CREATE TABLE exercises (
     muscle_group_id UUID NOT NULL REFERENCES muscle_groups(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     unit            TEXT DEFAULT 'KG',
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(muscle_group_id, name)
 );
@@ -40,9 +47,11 @@ CREATE TABLE exercises (
 
 CREATE TABLE training_plans (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            TEXT NOT NULL UNIQUE,
+    name            TEXT NOT NULL,
     workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
-    created_at      TIMESTAMPTZ DEFAULT now()
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(name, trainer_id)
 );
 
 CREATE TABLE plan_exercises (
@@ -51,6 +60,7 @@ CREATE TABLE plan_exercises (
     exercise_id     UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
     sort_order      INT NOT NULL DEFAULT 0,
     sets_data       JSONB DEFAULT '[]'::JSONB,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(plan_id, exercise_id)
 );
@@ -68,21 +78,20 @@ CREATE TABLE clients (
     email           TEXT,
     default_workout_type_id UUID REFERENCES workout_types(id) ON DELETE SET NULL,
     default_plan_id UUID REFERENCES training_plans(id) ON DELETE SET NULL,
-    -- ProgresjaSilowa: JSON array of exercise IDs for strength progression tracking
     strength_progression JSONB DEFAULT '[]'::JSONB,
-    -- Harmonogram: JSON array of {day, hour, plan_id}
     training_schedule JSONB DEFAULT '[]'::JSONB,
-    -- Billing / packages
     billing_type            TEXT DEFAULT 'package',
     package_purchase_date   DATE,
     package_size            INT DEFAULT 10,
     package_current_count   INT DEFAULT 0,
     payment_history         JSONB DEFAULT '[]'::JSONB,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX idx_clients_name ON clients(name);
+CREATE INDEX idx_clients_trainer ON clients(trainer_id);
 
 -- ============================================================================
 -- 4. CALENDAR / SCHEDULE (Kalendarz)
@@ -102,13 +111,15 @@ CREATE TABLE calendar_events (
     added_groups    JSONB DEFAULT '[]'::JSONB,
     is_replacement  BOOLEAN DEFAULT FALSE,
     replaced_client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(event_date, event_hour)
+    UNIQUE(event_date, event_hour, trainer_id)
 );
 
 CREATE INDEX idx_calendar_date ON calendar_events(event_date);
 CREATE INDEX idx_calendar_client ON calendar_events(client_id);
+CREATE INDEX idx_calendar_trainer ON calendar_events(trainer_id);
 
 -- ============================================================================
 -- 5. WORKOUT LOGS (Treningi)
@@ -122,6 +133,7 @@ CREATE TABLE workout_logs (
     reps            INT,
     week_number     INT NOT NULL,
     session_date    DATE NOT NULL,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
@@ -129,6 +141,7 @@ CREATE TABLE workout_logs (
 CREATE INDEX idx_workout_client ON workout_logs(client_id);
 CREATE INDEX idx_workout_date ON workout_logs(session_date);
 CREATE INDEX idx_workout_client_date ON workout_logs(client_id, session_date);
+CREATE INDEX idx_workout_logs_trainer ON workout_logs(trainer_id);
 
 -- ============================================================================
 -- 6. BODY MEASUREMENTS (Pomiary)
@@ -141,12 +154,14 @@ CREATE TABLE measurements (
     weight_kg       NUMERIC(5,1),
     body_fat_pct    NUMERIC(4,1),
     muscle_mass_pct NUMERIC(4,1),
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX idx_measurements_client ON measurements(client_id);
 CREATE INDEX idx_measurements_date ON measurements(client_id, measure_date);
+CREATE INDEX idx_measurements_trainer ON measurements(trainer_id);
 
 -- ============================================================================
 -- 7. ABSENCES (Absencje)
@@ -157,12 +172,14 @@ CREATE TABLE absences (
     client_id       UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     absence_date    DATE NOT NULL,
     absence_hour    INT,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     created_at      TIMESTAMPTZ DEFAULT now(),
     UNIQUE(client_id, absence_date, absence_hour)
 );
 
 CREATE INDEX idx_absences_client ON absences(client_id);
 CREATE INDEX idx_absences_date ON absences(absence_date);
+CREATE INDEX idx_absences_trainer ON absences(trainer_id);
 
 -- ============================================================================
 -- 8. DELETED WORKOUTS AUDIT LOG (UsunieteTreningi)
@@ -174,6 +191,7 @@ CREATE TABLE deleted_workouts (
     event_hour      INT NOT NULL,
     client_name     TEXT,
     workout_type    TEXT,
+    trainer_id      UUID NOT NULL REFERENCES auth.users(id),
     deleted_at      TIMESTAMPTZ DEFAULT now()
 );
 
@@ -191,7 +209,7 @@ CREATE TABLE trainer_profiles (
 );
 
 -- ============================================================================
--- 10. ROW LEVEL SECURITY (RLS)
+-- 10. ROW LEVEL SECURITY (RLS) — Per-Trainer Isolation
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -208,7 +226,7 @@ ALTER TABLE absences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deleted_workouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_profiles ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to read/write their own data
+-- Each trainer can only access their own data
 DO $$
 DECLARE
     tbl TEXT;
@@ -218,132 +236,26 @@ BEGIN
             'workout_types','muscle_groups','exercises',
             'training_plans','plan_exercises','clients',
             'calendar_events','workout_logs','measurements',
-            'absences','deleted_workouts','trainer_profiles'
+            'absences','deleted_workouts'
         ])
     LOOP
         EXECUTE format(
-            'CREATE POLICY "Authenticated full access" ON %I
+            'CREATE POLICY "trainer_isolation" ON %I
              FOR ALL TO authenticated
-             USING (true)
-             WITH CHECK (true)',
+             USING (trainer_id = auth.uid())
+             WITH CHECK (trainer_id = auth.uid())',
             tbl
         );
     END LOOP;
 END $$;
 
+-- trainer_profiles uses id = auth.uid() (id references auth.users directly)
+CREATE POLICY "trainer_isolation" ON trainer_profiles
+    FOR ALL TO authenticated
+    USING (id = auth.uid())
+    WITH CHECK (id = auth.uid());
+
 -- ============================================================================
--- 11. SEED DATA
+-- 11. SEED DATA — Run manually after creating a user in Supabase Auth:
+--     See: database/seed_new_trainer.sql (replace %(trainer_id)s with UUID)
 -- ============================================================================
-
-INSERT INTO workout_types (name) VALUES
-    ('Push'), ('Pull'), ('FBW'), ('PPL Push'), ('PPL Pull'),
-    ('Upper'), ('Lower'), ('Nogi'), ('Barki + Łydki'), ('Klatka + Triceps'),
-    ('Plecy + Biceps'), ('Cardio');
-
-INSERT INTO muscle_groups (name) VALUES
-    ('KLATKA PIERSIOWA'), ('PLECY'), ('BARKI'), ('BICEPS'),
-    ('TRICEPS'), ('PRZEDRAMIONA'), ('NOGI'), ('ŁYDKI'),
-    ('BRZUCH'), ('CARDIO');
-
--- Seed exercises for Klatka Piersiowa (chest)
-WITH chest AS (SELECT id FROM muscle_groups WHERE name = 'KLATKA PIERSIOWA')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT chest.id, e FROM chest, unnest(ARRAY[
-    'Wyciskanie sztangi na ławce płaskiej',
-    'Wyciskanie sztangielek na ławce płaskiej',
-    'Wyciskanie sztangi na ławce skośnej',
-    'Wyciskanie sztangielek na ławce skośnej',
-    'Rozpiętki ze sztangielkami',
-    'Wyciskanie na maszynie',
-    'Pompki'
-]) AS e;
-
--- Seed exercises for Plecy (back)
-WITH back AS (SELECT id FROM muscle_groups WHERE name = 'PLECY')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT back.id, e FROM back, unnest(ARRAY[
-    'Martwy ciąg',
-    'Podciąganie na drążku',
-    'Wiosłowanie sztangą',
-    'Wiosłowanie sztangielką',
-    'Ściąganie drążka wyciągu górnego',
-    'Wiosłowanie na wyciągu dolnym',
-    'Face Pull'
-]) AS e;
-
--- Seed exercises for Barki (shoulders)
-WITH shoulders AS (SELECT id FROM muscle_groups WHERE name = 'BARKI')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT shoulders.id, e FROM shoulders, unnest(ARRAY[
-    'Wyciskanie sztangi nad głowę',
-    'Wyciskanie sztangielek siedząc',
-    'Unoszenie sztangielek bokiem',
-    'Unoszenie sztangielek przodem',
-    'Unoszenie sztangielek w opadzie',
-    'Arnoldki'
-]) AS e;
-
--- Seed exercises for Biceps
-WITH biceps AS (SELECT id FROM muscle_groups WHERE name = 'BICEPS')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT biceps.id, e FROM biceps, unnest(ARRAY[
-    'Uginanie sztangi stojąc',
-    'Uginanie sztangielek stojąc',
-    'Uginanie młotkowe',
-    'Uginanie na modlitewniku',
-    'Uginanie na wyciągu'
-]) AS e;
-
--- Seed exercises for Triceps
-WITH triceps AS (SELECT id FROM muscle_groups WHERE name = 'TRICEPS')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT triceps.id, e FROM triceps, unnest(ARRAY[
-    'Wyciskanie francuskie',
-    'Prostowanie ramion na wyciągu',
-    'Pompki na poręczach',
-    'Wyciskanie wąskim chwytem',
-    'Prostowanie sztangielki zza głowy'
-]) AS e;
-
--- Seed exercises for Nogi (legs)
-WITH legs AS (SELECT id FROM muscle_groups WHERE name = 'NOGI')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT legs.id, e FROM legs, unnest(ARRAY[
-    'Przysiady ze sztangą',
-    'Przysiady wykroczne',
-    'Prostowanie nóg na maszynie',
-    'Uginanie nóg na maszynie',
-    'Hack squat',
-    'Wykroki ze sztangielkami'
-]) AS e;
-
--- Seed exercises for Łydki (calves)
-WITH calves AS (SELECT id FROM muscle_groups WHERE name = 'ŁYDKI')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT calves.id, e FROM calves, unnest(ARRAY[
-    'Wspięcia na palce stojąc',
-    'Wspięcia na palce siedząc',
-    'Wspięcia na palce na maszynie'
-]) AS e;
-
--- Seed exercises for Brzuch (abs)
-WITH abs AS (SELECT id FROM muscle_groups WHERE name = 'BRZUCH')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT abs.id, e FROM abs, unnest(ARRAY[
-    'Brzuszki',
-    'Plank',
-    'Unoszenie nóg w zwisie',
-    'Russian twist',
-    'Spięcia brzucha na maszynie'
-]) AS e;
-
--- Seed exercises for Cardio
-WITH cardio AS (SELECT id FROM muscle_groups WHERE name = 'CARDIO')
-INSERT INTO exercises (muscle_group_id, name)
-SELECT cardio.id, e FROM cardio, unnest(ARRAY[
-    'Bieżnia',
-    'Rower',
-    'Wiosłowanie (ergometr)',
-    'Skakanka',
-    'Stepper'
-]) AS e;

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List
 import io, base64, httpx
@@ -53,7 +53,7 @@ def send_via_resend(payload: dict):
 
 
 @router.post("/send-report")
-def send_report(data: EmailReportRequest):
+def send_report(data: EmailReportRequest, request: Request):
     delta_weight = round(data.weight_end - data.weight_start, 1) if data.weight_start is not None and data.weight_end is not None else None
     delta_fat = round(data.fat_end - data.fat_start, 1) if data.fat_start is not None and data.fat_end is not None else None
     delta_muscle = round(data.muscle_end - data.muscle_start, 1) if data.muscle_start is not None and data.muscle_end is not None else None
@@ -197,7 +197,7 @@ def send_report(data: EmailReportRequest):
 
 
 @router.post("/send-plan")
-def send_plan(data: EmailPlanRequest):
+def send_plan(data: EmailPlanRequest, request: Request):
     plans_html = ""
     for p in (data.plans or []):
         name = p.get("name", "")

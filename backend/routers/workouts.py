@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from database import get_supabase
+from database import get_supabase, get_user_supabase
 from models import WorkoutLogBatch, WorkoutLogResponse
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -12,8 +12,9 @@ def list_workouts(
     session_date: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    request: Request = None,
 ):
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     query = supabase.table("workout_logs").select("*")
 
     if client_id:
@@ -33,9 +34,10 @@ def list_workouts(
 def get_client_workouts(
     client_id: str,
     session_date: Optional[str] = Query(None),
+    request: Request = None,
 ):
     """Get all workouts for a client, optionally filtered by date."""
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     query = (
         supabase.table("workout_logs")
         .select("*")
@@ -49,9 +51,9 @@ def get_client_workouts(
 
 
 @router.get("/client/{client_id}/history")
-def get_client_history(client_id: str):
+def get_client_history(client_id: str, request: Request):
     """Get all workout history as a flat list (for reports/charts)."""
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     res = (
         supabase.table("workout_logs")
         .select("*,exercises(name,muscle_groups(name))")
@@ -63,12 +65,12 @@ def get_client_history(client_id: str):
 
 
 @router.post("/batch", status_code=201)
-def save_workout_batch(data: WorkoutLogBatch):
+def save_workout_batch(data: WorkoutLogBatch, request: Request):
     """
     Save a batch of workout logs for a session.
     Replaces existing logs for this client+date combination.
     """
-    supabase = get_supabase()
+    supabase, user_id = get_user_supabase(request)
 
     # Delete existing logs for this client+date
     supabase.table("workout_logs").delete() \
@@ -86,6 +88,7 @@ def save_workout_batch(data: WorkoutLogBatch):
                 "reps": log.reps,
                 "week_number": data.week_number,
                 "session_date": data.session_date.isoformat(),
+                "trainer_id": user_id,
             })
         res = supabase.table("workout_logs").insert(records).execute()
         return res.data
@@ -94,8 +97,8 @@ def save_workout_batch(data: WorkoutLogBatch):
 
 
 @router.put("/{log_id}", response_model=WorkoutLogResponse)
-def update_workout_log(log_id: str, weight_kg: Optional[float] = None, reps: Optional[int] = None):
-    supabase = get_supabase()
+def update_workout_log(log_id: str, weight_kg: Optional[float] = None, reps: Optional[int] = None, request: Request = None):
+    supabase, _ = get_user_supabase(request)
     payload = {"updated_at": "now()"}
     if weight_kg is not None:
         payload["weight_kg"] = weight_kg
@@ -109,7 +112,7 @@ def update_workout_log(log_id: str, weight_kg: Optional[float] = None, reps: Opt
 
 
 @router.delete("/{log_id}")
-def delete_workout_log(log_id: str):
-    supabase = get_supabase()
+def delete_workout_log(log_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
     supabase.table("workout_logs").delete().eq("id", log_id).execute()
     return {"status": "deleted"}
