@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from database import get_supabase
+from database import get_supabase, get_user_supabase
 from models import MeasurementCreate, MeasurementUpdate, MeasurementResponse
 
 router = APIRouter(prefix="/measurements", tags=["measurements"])
@@ -11,8 +11,9 @@ def list_measurements(
     client_id: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    request: Request = None,
 ):
-    supabase = get_supabase()
+    supabase, _ = get_user_supabase(request)
     query = supabase.table("measurements").select("*")
 
     if client_id:
@@ -27,8 +28,8 @@ def list_measurements(
 
 
 @router.get("/{measurement_id}", response_model=MeasurementResponse)
-def get_measurement(measurement_id: str):
-    supabase = get_supabase()
+def get_measurement(measurement_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
     res = supabase.table("measurements").select("*").eq("id", measurement_id).single().execute()
     if not res.data:
         raise HTTPException(404, "Measurement not found")
@@ -36,16 +37,17 @@ def get_measurement(measurement_id: str):
 
 
 @router.post("/", response_model=MeasurementResponse, status_code=201)
-def create_measurement(data: MeasurementCreate):
-    supabase = get_supabase()
+def create_measurement(data: MeasurementCreate, request: Request):
+    supabase, user_id = get_user_supabase(request)
     payload = data.model_dump(exclude_none=True, mode='json')
+    payload["trainer_id"] = user_id
     res = supabase.table("measurements").insert(payload).execute()
     return res.data[0]
 
 
 @router.put("/{measurement_id}", response_model=MeasurementResponse)
-def update_measurement(measurement_id: str, data: MeasurementUpdate):
-    supabase = get_supabase()
+def update_measurement(measurement_id: str, data: MeasurementUpdate, request: Request):
+    supabase, _ = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
     payload["updated_at"] = "now()"
 
@@ -56,7 +58,7 @@ def update_measurement(measurement_id: str, data: MeasurementUpdate):
 
 
 @router.delete("/{measurement_id}")
-def delete_measurement(measurement_id: str):
-    supabase = get_supabase()
+def delete_measurement(measurement_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
     supabase.table("measurements").delete().eq("id", measurement_id).execute()
     return {"status": "deleted"}

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from datetime import date, datetime, timedelta
-from database import get_supabase
+from database import get_supabase, get_user_supabase
 from models import ClientCreate, ClientUpdate, ClientResponse
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ def get_monday(dt=None):
     return d - timedelta(days=day)
 
 
-def generate_client_events(supabase, client_id, schedule):
+def generate_client_events(supabase, user_id, client_id, schedule):
     today = date.today()
     this_monday = get_monday(today)
     next_monday = this_monday + timedelta(days=7)
@@ -46,34 +46,35 @@ def generate_client_events(supabase, client_id, schedule):
                 "client_id": client_id,
                 "workout_type_id": wt_id,
                 "status": "active",
+                "trainer_id": user_id,
             }
             supabase.table("calendar_events").upsert(
-                payload, on_conflict="event_date,event_hour"
+                payload, on_conflict="event_date,event_hour,trainer_id"
             ).execute()
 
 
-def generate_all_schedules():
-    supabase = get_supabase()
+def generate_all_schedules(request: Request):
+    supabase, user_id = get_user_supabase(request)
     clients = supabase.table("clients").select("id,training_schedule").not_.is_("training_schedule", "null").execute()
     count = 0
     for c in (clients.data or []):
         schedule = c.get("training_schedule") or []
         if schedule:
-            generate_client_events(supabase, c["id"], schedule)
+            generate_client_events(supabase, user_id, c["id"], schedule)
             count += 1
     return count
 
 
 @router.get("/", response_model=List[ClientResponse])
-def list_clients():
-    supabase = get_supabase()
-    res = supabase.table("clients").select("*, training_plans(name)").order("name").execute()
+def list_clients(request: Request):
+    supabase, _ = get_user_supabase(request)
+    res = supabase.table("clients").select("*").order("name").execute()
     return res.data or []
 
 
 @router.get("/{client_id}", response_model=ClientResponse)
-def get_client(client_id: str):
-    supabase = get_supabase()
+def get_client(client_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
     res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     if not res.data:
         raise HTTPException(404, "Client not found")
@@ -81,25 +82,17 @@ def get_client(client_id: str):
 
 
 @router.post("/", response_model=ClientResponse, status_code=201)
-def create_client(data: ClientCreate):
-    supabase = get_supabase()
-    existing = supabase.table("clients").select("id").eq("name", data.name).execute()
-    if existing.data:
-        raise HTTPException(400, f"Client '{data.name}' already exists")
-
+def create_client(data: ClientCreate, request: Request):
+    supabase, user_id = get_user_supabase(request)
     payload = data.model_dump(exclude_none=True, mode='json')
+    payload["trainer_id"] = user_id
     res = supabase.table("clients").insert(payload).execute()
-    client = res.data[0]
-
-    if data.training_schedule:
-        generate_client_events(supabase, client["id"], data.training_schedule)
-
-    return client
+    return res.data[0]
 
 
 @router.put("/{client_id}", response_model=ClientResponse)
-def update_client(client_id: str, data: ClientUpdate):
-    supabase = get_supabase()
+def update_client(client_id: str, data: ClientUpdate, request: Request):
+    supabase, user_id = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
     payload["updated_at"] = "now()"
 
@@ -107,141 +100,96 @@ def update_client(client_id: str, data: ClientUpdate):
     if not res.data:
         raise HTTPException(404, "Client not found")
 
-    if data.training_schedule is not None:
-        generate_client_events(supabase, client_id, data.training_schedule or [])
+    schedule = data.training_schedule or (res.data[0].get("training_schedule") if res.data else None)
+    if schedule:
+        generate_client_events(supabase, user_id, client_id, schedule)
 
     return res.data[0]
 
 
-@router.post("/{client_id}/new-package")
-def add_new_package(client_id: str):
-    supabase = get_supabase()
-    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    if not client_res.data:
-        raise HTTPException(404, "Client not found")
-        
-    client = client_res.data
-    purchase_date = client.get("package_purchase_date")
-    size = client.get("package_size") or 10
-    current_count = client.get("package_current_count") or 0
-    history = client.get("payment_history") or []
-    
-    if not isinstance(history, list):
-        history = []
-        
-    if purchase_date:
-        history.append({
-            "purchase_date": purchase_date,
-            "package_size": size,
-            "completed_count": current_count,
-            "archived_at": datetime.now().isoformat()
-        })
-        
-    new_payload = {
-        "package_purchase_date": date.today().isoformat(),
-        "package_current_count": 0,
-        "payment_history": history,
-        "updated_at": "now()"
-    }
-    
-    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
-    return res.data[0]
+@router.delete("/{client_id}")
+def delete_client(client_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
+    supabase.table("clients").delete().eq("id", client_id).execute()
+    return {"status": "deleted"}
 
+
+@router.post("/regenerate-schedules")
+def regenerate_schedules(request: Request):
+    count = generate_all_schedules(request)
+    return {"status": "ok", "clients_processed": count}
 
 
 @router.post("/{client_id}/adjust-package")
-def adjust_package(client_id: str, data: AdjustPackageRequest):
-    supabase = get_supabase()
-    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    if not client_res.data:
+def adjust_package(client_id: str, data: AdjustPackageRequest, request: Request):
+    supabase, _ = get_user_supabase(request)
+    client = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client.data:
         raise HTTPException(404, "Client not found")
-        
-    client = client_res.data
-    history = client.get("payment_history") or []
-    
-    if not isinstance(history, list):
-        history = []
-        
+
+    c = client.data
+    history = c.get("payment_history") or []
     history.append({
-        "type": "adjustment",
         "date": datetime.now().isoformat(),
-        "old_count": client.get("package_current_count") or 0,
+        "action": "adjust",
+        "old_count": c.get("package_current_count", 0),
         "new_count": data.new_count,
-        "comment": data.comment
+        "comment": data.comment,
     })
-    
-    new_payload = {
+
+    supabase.table("clients").update({
         "package_current_count": data.new_count,
         "payment_history": history,
-        "updated_at": "now()"
-    }
-    
-    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
-    return res.data[0]
+    }).eq("id", client_id).execute()
+
+    return {"status": "ok"}
+
+
+@router.post("/{client_id}/new-package")
+def new_package(client_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
+    client = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client.data:
+        raise HTTPException(404, "Client not found")
+
+    c = client.data
+    history = c.get("payment_history") or []
+    history.append({
+        "date": datetime.now().isoformat(),
+        "action": "archive",
+        "old_count": c.get("package_current_count", 0),
+        "package_size": c.get("package_size", 10),
+    })
+
+    supabase.table("clients").update({
+        "package_current_count": 0,
+        "payment_history": history,
+    }).eq("id", client_id).execute()
+
+    return {"status": "ok"}
+
 
 @router.post("/{client_id}/adjust-history-package")
-def adjust_history_package(client_id: str, data: AdjustHistoryPackageRequest):
-    supabase = get_supabase()
-    client_res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    if not client_res.data:
+def adjust_history_package(client_id: str, data: AdjustHistoryPackageRequest, request: Request):
+    supabase, _ = get_user_supabase(request)
+    client = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client.data:
         raise HTTPException(404, "Client not found")
-        
-    client = client_res.data
-    history = client.get("payment_history") or []
-    
-    if not isinstance(history, list):
-        history = []
-        
-    # Find the package to modify
-    target_idx = -1
-    old_count = 0
-    for i, item in enumerate(history):
-        if item.get("archived_at") == data.archived_at:
-            target_idx = i
-            old_count = item.get("completed_count", 0)
-            break
-            
-    if target_idx == -1:
-        raise HTTPException(404, "Archived package not found")
-        
-    # Modify the history item
-    history[target_idx]["completed_count"] = data.new_count
-    
-    # Add an adjustment log to history
+
+    c = client.data
+    history = c.get("payment_history") or []
     history.append({
-        "type": "adjustment",
         "date": datetime.now().isoformat(),
-        "old_count": old_count,
+        "action": "adjust_history",
+        "archived_at": data.archived_at,
+        "old_count": c.get("package_current_count", 0),
         "new_count": data.new_count,
-        "comment": f"[Historia] {data.comment}"
+        "comment": data.comment,
     })
-    
-    new_payload = {
+
+    supabase.table("clients").update({
+        "package_current_count": data.new_count,
         "payment_history": history,
-        "updated_at": "now()"
-    }
-    
-    res = supabase.table("clients").update(new_payload).eq("id", client_id).execute()
-    return res.data[0]
+    }).eq("id", client_id).execute()
 
-@router.delete("/{client_id}")
-def delete_client(client_id: str):
-    supabase = get_supabase()
-    
-    # Manually delete related records to simulate CASCADE DELETE
-    supabase.table("workout_logs").delete().eq("client_id", client_id).execute()
-    supabase.table("calendar_events").delete().eq("client_id", client_id).execute()
-    supabase.table("absences").delete().eq("client_id", client_id).execute()
-    supabase.table("measurements").delete().eq("client_id", client_id).execute()
-
-    res = supabase.table("clients").delete().eq("id", client_id).execute()
-    if not res.data:
-        # It's possible the client was already deleted, just return success
-        return {"status": "deleted", "name": "Unknown"}
-    return {"status": "deleted", "name": res.data[0]["name"]}
-
-
-@router.post("/generate-schedules")
-def regenerate_schedules():
-    count = generate_all_schedules()
-    return {"status": "generated", "clients_processed": count}
+    return {"status": "ok"}
