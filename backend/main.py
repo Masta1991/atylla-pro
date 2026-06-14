@@ -8,7 +8,7 @@ from routers import clients, calendar, workouts, measurements, config_router, au
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="1.0.57",
+    version="1.3.1",
 )
 
 from fastapi import Request
@@ -51,6 +51,11 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/version")
+def version_check():
+    return {"version": app.version}
 
 
 if os.path.isdir(STATIC_DIR):
