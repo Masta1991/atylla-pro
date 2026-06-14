@@ -86,7 +86,7 @@ if os.path.isdir(STATIC_DIR):
     # API prefixes that should NOT be intercepted by SPA fallback
     API_PREFIXES = (
         "clients", "calendar", "workouts", "measurements",
-        "config", "auth", "email", "health",
+        "config", "auth", "email", "health", "version",
     )
 
     @app.get("/{full_path:path}")
