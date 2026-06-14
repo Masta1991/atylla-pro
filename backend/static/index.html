@@ -18,10 +18,21 @@
       #root { display: flex; height: 100%; flex: 1; background-color: #0d1117; }
     </style>
   <link rel="icon" href="/favicon.ico" /></head>
-  <body style="background-color: #0d1117;">
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  <script src="/_expo/static/js/web/index-7000c2bd552dac22e9c69b59d5300bd6.js" defer></script>
+  <body style="background-color: #0d1117; color: #8b949e; font-family: sans-serif;">
+    <noscript>Do działania aplikacji wymagana jest obsługa JavaScript.</noscript>
+    <div id="root" style="display:flex;align-items:center;justify-content:center;height:100%;font-size:14px">Ładowanie...</div>
+    <script>
+      window.addEventListener('load', function() {
+        // Clear "Loading..." after 8 seconds if React didn't mount
+        setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.children.length === 1 && root.textContent === 'Ładowanie...') {
+            root.innerHTML = '<div style="text-align:center;padding:20px"><p style="font-size:16px;color:#f85149">Aplikacja nie może się załadować.</p><p style="font-size:13px;margin-top:8px">Odśwież stronę lub zainstaluj ponownie.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#31d5f2;color:#0d1117;border:none;border-radius:8px;font-weight:700;font-size:14px">ODSWIEZ</button></div>';
+          }
+        }, 8000);
+      });
+    </script>
+    <script src="/_expo/static/js/web/index-7000c2bd552dac22e9c69b59d5300bd6.js" onerror="document.getElementById('root').innerHTML='<div style=\'text-align:center;padding:20px\'><p style=\'font-size:16px;color:#f85149\'>Błąd ładowania aplikacji.</p><p style=\'font-size:13px;margin-top:8px\'>Sprawdź połączenie z internetem.</p></div>'"></script>
 </body>
 </html>
 
