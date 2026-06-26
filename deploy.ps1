@@ -24,6 +24,12 @@ if ($Version) {
     $appJson = Get-Content $appJsonPath -Raw | ConvertFrom-Json
     $appJson.expo.version = $Version
     $appJson | ConvertTo-Json -Depth 10 | Set-Content $appJsonPath
+
+    # Update backend/main.py version
+    $mainPyPath = "backend/main.py"
+    $mainPyContent = Get-Content $mainPyPath -Raw
+    $mainPyContent = $mainPyContent -replace 'version="[^"]+"', "version=`"$Version`""
+    $mainPyContent | Set-Content $mainPyPath
 }
 
 # Read current version from frontend/src/version.js
