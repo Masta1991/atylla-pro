@@ -44,6 +44,43 @@ def delete_absence(absence_id: str, request: Request):
 # ── Calendar Events ──────────────────────────────────────────────────────────
 
 
+def assign_chronological_numbers(events, supabase):
+    client_ids = list(set([
+        ev["client_id"] for ev in events
+        if ev.get("client_id") and ev.get("clients") and ev["clients"].get("billing_type") != "package"
+    ]))
+    
+    if not client_ids:
+        return events
+        
+    all_events_res = supabase.table("calendar_events") \
+        .select("id, client_id, event_date, event_hour") \
+        .in_("client_id", client_ids) \
+        .neq("status", "deleted") \
+        .order("event_date") \
+        .order("event_hour") \
+        .execute()
+        
+    event_order = {}
+    for ev in all_events_res.data:
+        cid = ev["client_id"]
+        if cid not in event_order:
+            event_order[cid] = []
+        event_order[cid].append(ev["id"])
+        
+    for ev in events:
+        cid = ev.get("client_id")
+        if cid in event_order:
+            try:
+                idx = event_order[cid].index(ev["id"]) + 1
+                if ev.get("clients"):
+                    ev["clients"]["package_current_count"] = idx
+            except ValueError:
+                pass
+                
+    return events
+
+
 @router.get("/", response_model=List[CalendarEventResponse])
 def list_events(
     date_from: Optional[str] = Query(None),
@@ -62,7 +99,8 @@ def list_events(
         query = query.eq("client_id", client_id)
 
     res = query.neq("status", "deleted").order("event_date,event_hour").execute()
-    return res.data or []
+    events = res.data or []
+    return assign_chronological_numbers(events, supabase)
 
 
 @router.get("/week/{monday_date}", response_model=List[CalendarEventResponse])
@@ -82,7 +120,8 @@ def get_week_events(monday_date: str, request: Request):
         .order("event_date,event_hour")
         .execute()
     )
-    return res.data or []
+    events = res.data or []
+    return assign_chronological_numbers(events, supabase)
 
 
 @router.get("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
@@ -99,7 +138,8 @@ def get_event(event_date: str, event_hour: int, request: Request):
     )
     if not res.data:
         raise HTTPException(404, "Event not found")
-    return res.data
+    events = assign_chronological_numbers([res.data], supabase)
+    return events[0]
 
 
 @router.post("/", response_model=CalendarEventResponse, status_code=201)
