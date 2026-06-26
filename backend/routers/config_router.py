@@ -4,7 +4,7 @@ from database import get_supabase, get_user_supabase
 from models import (
     WorkoutTypeCreate, WorkoutTypeResponse,
     MuscleGroupCreate, MuscleGroupResponse,
-    ExerciseCreate, ExerciseResponse,
+    ExerciseCreate, ExerciseResponse, ExerciseUpdate,
     TrainingPlanCreate, TrainingPlanResponse,
     PlanExerciseCreate, PlanExerciseUpdate,
 )
@@ -78,7 +78,7 @@ def list_exercises(muscle_group_id: str = None, request: Request = None):
     query = supabase.table("exercises").select("*")
     if muscle_group_id:
         query = query.eq("muscle_group_id", muscle_group_id)
-    res = query.order("name").execute()
+    res = query.order("sort_order").order("name").execute()
     return res.data or []
 
 @router.get("/exercises/by-group")
@@ -86,7 +86,7 @@ def list_exercises_grouped(request: Request):
     """Get exercises grouped by muscle group."""
     supabase, _ = get_user_supabase(request)
     groups = supabase.table("muscle_groups").select("*").order("name").execute()
-    exercises = supabase.table("exercises").select("*").order("name").execute()
+    exercises = supabase.table("exercises").select("*").order("sort_order").order("name").execute()
 
     result = {}
     for g in (groups.data or []):
@@ -113,6 +113,15 @@ def delete_exercise(exercise_id: str, request: Request):
     supabase, _ = get_user_supabase(request)
     supabase.table("exercises").delete().eq("id", exercise_id).execute()
     return {"status": "deleted"}
+
+@router.put("/exercises/{exercise_id}", response_model=ExerciseResponse)
+def update_exercise(exercise_id: str, data: ExerciseUpdate, request: Request):
+    supabase, _ = get_user_supabase(request)
+    payload = data.model_dump(exclude_unset=True)
+    res = supabase.table("exercises").update(payload).eq("id", exercise_id).execute()
+    if not res.data:
+        raise HTTPException(404, "Exercise not found")
+    return res.data[0]
 
 
 # ── Training Plans ───────────────────────────────────────────────────────────

@@ -52,7 +52,7 @@ def list_events(
     request: Request = None,
 ):
     supabase, _ = get_user_supabase(request)
-    query = supabase.table("calendar_events").select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
+    query = supabase.table("calendar_events").select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
 
     if date_from:
         query = query.gte("event_date", date_from)
@@ -75,7 +75,7 @@ def get_week_events(monday_date: str, request: Request):
     supabase, _ = get_user_supabase(request)
     res = (
         supabase.table("calendar_events")
-        .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
+        .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
         .gte("event_date", monday.isoformat())
         .lte("event_date", saturday.isoformat())
         .neq("status", "deleted")
@@ -90,7 +90,7 @@ def get_event(event_date: str, event_hour: int, request: Request):
     supabase, _ = get_user_supabase(request)
     res = (
         supabase.table("calendar_events")
-        .select("*, clients!calendar_events_client_id_fkey(name), workout_types(name), training_plans(name)")
+        .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
         .eq("event_date", event_date)
         .eq("event_hour", event_hour)
         .neq("status", "deleted")
@@ -264,7 +264,7 @@ def get_calendar_stats(months: int = Query(1), request: Request = None):
 @router.post("/{event_date}/{event_hour}/settle")
 def settle_event(event_date: str, event_hour: int, request: Request):
     supabase, _ = get_user_supabase(request)
-    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
     if not ev.data:
         raise HTTPException(404, "Workout not found in calendar")
         
@@ -289,7 +289,7 @@ def delete_event(event_date: str, event_hour: int, request: Request):
     """Soft-delete: set status='deleted', log to deleted_workouts, and create absence."""
     supabase, user_id = get_user_supabase(request)
 
-    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
 
     if ev.data and len(ev.data) > 0:
         event = ev.data[0]

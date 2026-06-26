@@ -8,7 +8,7 @@ from routers import clients, calendar, workouts, measurements, config_router, au
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="1.3.4",
+    version="1.3.5",
 )
 
 from fastapi import Request
@@ -17,13 +17,22 @@ import traceback
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    exc_str = str(exc)
+    
+    # Check if the exception is a Supabase/PostgREST JWT error
+    if "JWT" in exc_str or "PGRST30" in exc_str:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Session expired (JWT expired or invalid)"},
+        )
+        
     with open("error.log", "a") as f:
         f.write("=== ERROR ===\n")
         f.write(traceback.format_exc())
         f.write("\n")
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={"detail": exc_str},
     )
 
 # CORS — allow frontend (Expo dev + production)

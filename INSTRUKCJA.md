@@ -1,4 +1,4 @@
-# INSTRUKCJA OBSŁUGI — Atylla Pro v1.3.4
+# INSTRUKCJA OBSŁUGI — Atylla Pro v1.3.5
 
 Aplikacja do zarządzania treningami personalnymi.
 
