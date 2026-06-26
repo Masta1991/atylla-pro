@@ -61,6 +61,12 @@ if (-not (Test-Path "backend/static/_expo")) {
 }
 Copy-Item -Path "frontend/dist/_expo\*" -Destination "backend/static/_expo" -Recurse -Force
 
+Write-Host "Copying PWA assets to backend..." -ForegroundColor Cyan
+Copy-Item -Path "frontend/assets/apple-touch-icon.png" -Destination "backend/static/" -ErrorAction SilentlyContinue
+Copy-Item -Path "frontend/assets/icon-192.png" -Destination "backend/static/" -ErrorAction SilentlyContinue
+Copy-Item -Path "frontend/assets/icon-512.png" -Destination "backend/static/" -ErrorAction SilentlyContinue
+Copy-Item -Path "frontend/assets/manifest.json" -Destination "backend/static/" -ErrorAction SilentlyContinue
+
 # 5. Update index.html reference to the bundle
 Write-Host "Updating index.html script tag..." -ForegroundColor Cyan
 $indexHtmlPath = "backend/static/index.html"
