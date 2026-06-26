@@ -175,13 +175,17 @@ def delete_plan(plan_id: str, request: Request):
 @router.post("/plans/{plan_id}/exercises", status_code=201)
 def add_exercise_to_plan(plan_id: str, data: PlanExerciseCreate, request: Request):
     supabase, user_id = get_user_supabase(request)
-    res = supabase.table("plan_exercises").insert({
+    payload = {
         "plan_id": plan_id,
         "exercise_id": str(data.exercise_id),
         "sort_order": data.sort_order,
         "sets_data": data.sets_data,
         "trainer_id": user_id,
-    }).execute()
+    }
+    if data.superset_id:
+        payload["superset_id"] = str(data.superset_id)
+        
+    res = supabase.table("plan_exercises").insert(payload).execute()
     return res.data[0] if res.data else None
 
 @router.put("/plan-exercises/{id}")
