@@ -193,9 +193,15 @@ class ExerciseBase(BaseModel):
     muscle_group_id: UUID
     name: str
     unit: Optional[str] = "KG"
+    sort_order: Optional[int] = 0
 
 class ExerciseCreate(ExerciseBase):
     pass
+
+class ExerciseUpdate(BaseModel):
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    sort_order: Optional[int] = None
 
 class ExerciseResponse(ExerciseBase):
     id: UUID
