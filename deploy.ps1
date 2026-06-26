@@ -72,9 +72,13 @@ $indexHtml | Set-Content $indexHtmlPath
 # 6. Update sw.js cache name
 Write-Host "Updating sw.js cache name..." -ForegroundColor Cyan
 $swPath = "backend/static/sw.js"
-$swContent = Get-Content $swPath -Raw
-$swContent = $swContent -replace "const CACHE_NAME = 'atylla-pro-v[^']+';", "const CACHE_NAME = 'atylla-pro-v$currentVersion';"
-$swContent | Set-Content $swPath
+if (Test-Path $swPath) {
+    $swContent = Get-Content $swPath -Raw
+    $swContent = $swContent -replace "const CACHE_NAME = 'atylla-pro-v[^']+';", "const CACHE_NAME = 'atylla-pro-v$currentVersion';"
+    $swContent | Set-Content $swPath
+} else {
+    Write-Host "sw.js not found, skipping..." -ForegroundColor Yellow
+}
 
 # 7. Git commit, tag & push
 Write-Host "Staging, committing, tagging, and pushing changes..." -ForegroundColor Cyan
