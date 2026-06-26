@@ -225,10 +225,12 @@ class PlanExerciseCreate(BaseModel):
     exercise_id: UUID
     sort_order: Optional[int] = 0
     sets_data: Optional[List[dict]] = Field(default_factory=list)
+    superset_id: Optional[UUID] = None
 
 class PlanExerciseUpdate(BaseModel):
     sets_data: Optional[List[dict]] = None
     sort_order: Optional[int] = None
+    superset_id: Optional[UUID] = None
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
