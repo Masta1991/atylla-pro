@@ -1,4 +1,4 @@
-# INSTRUKCJA OBSŁUGI — Atylla Pro v1.3.8
+# INSTRUKCJA OBSŁUGI — Atylla Pro v1.3.13
 
 Aplikacja do zarządzania treningami personalnymi.
 
@@ -23,9 +23,9 @@ Przy pierwszym logowaniu nowego trenera aplikacja automatycznie tworzy podstawow
 - **Ikona kalendarza (prawy górny róg)** — przełączanie między widokiem tygodnia a dnia
 
 ### Dolny pasek
-- **KLIENCI** — lista podopiecznych
-- **GŁÓWNA (piesek)** — powrót do kalendarza
-- **EDYCJA** — włącza tryb edycji (kasowanie i przeciąganie)
+- **HISTORIA (zegar)** — włącza tryb szybkiego podglądu (po kliknięciu w kafelek na kalendarzu, aplikacja przenosi bezpośrednio do historii klienta)
+- **GŁÓWNA (piesek)** — główny widok / powrót do kalendarza
+- **EDYCJA (ołówek)** — włącza tryb edycji (kasowanie i przeciąganie)
 
 ### Dodawanie treningu
 1. Kliknij na pusty slot w kalendarzu (dzień + godzina)
@@ -54,6 +54,13 @@ Przy pierwszym logowaniu nowego trenera aplikacja automatycznie tworzy podstawow
 - Dolicza 1 do licznika pakietu klienta
 - Rozliczone treningi mają ikonkę $ na kaflu
 
+### Statusy rozliczeniowe na kafelkach (NOWE)
+- System automatycznie oznacza cykle rozliczeniowe bezpośrednio na kafelkach kalendarza:
+  - **Koniec Pakietu** – pojawia się na ostatnim zrealizowanym treningu w ramach obecnego pakietu.
+  - **Rozpoczęto nowy pakiet** – przypisywane automatycznie do kolejnego planowanego treningu po kliknięciu "Rozpocznij nowy pakiet".
+  - **Rozliczono** – widoczne po ręcznym wskazaniu ostatnio opłaconego treningu u klientów bez pakietu.
+  - **Rozpoczęto nowe rozliczanie** – pojawia się na następnym treningu po "Rozliczono".
+
 ### Tryb HISTORIA (lewy dolny przycisk)
 - Kliknij kafelek → wyświetla historię treningów danego klienta
 - Szybki podgląd ostatnich sesji, ciężarów i progresji
@@ -63,7 +70,7 @@ Przy pierwszym logowaniu nowego trenera aplikacja automatycznie tworzy podstawow
 ## 3. KLIENCI
 
 ### Lista klientów
-- **KLIENCI** (dolny pasek) → pełna lista podopiecznych
+- **Menu hamburger → Klienci** → pełna lista podopiecznych
 - Każdy klient pokazuje imię, datę dołączenia, przypisany plan
 
 ### Dodawanie / Edycja klienta
@@ -121,14 +128,19 @@ Narzędzie do planowania tygodnia.
 - **Treningi z Harmonogramu** — terminy wynikające z harmonogramów klientów
 - **Pozostałe Treningi** — wszystkie inne wpisy w kalendarzu
 
-### Kopiowanie
+### Kopiowanie na kolejne tygodnie / miesiące
 1. Zaznacz wybrane treningi (ptaszek)
-2. Kliknij **Kopiuj zaznaczone na następny tydzień**
-3. **NOWE**: dostępny też przycisk **Kopiuj na następny miesiąc** (4 tygodnie)
+2. Kliknij **Kopiuj zaznaczone na następny tydzień** lub **Kopiuj na następny miesiąc** (4 tygodnie).
+3. **Uwaga (Nadpisywanie)**: Kopiowanie całkowicie nadpisuje treningi w docelowym okresie. Ewentualne wcześniejsze zapisy w docelowym tygodniu są usuwane (i nie wliczają się do rozliczeń) na rzecz nowo kopiowanych.
+4. Treningi kopiowane uwzględniają **Absencje** klienta – jeśli w docelowym tygodniu klient ma zapisaną absencję, treningi z harmonogramu automatycznie ją pominą (nie nadpiszą jej).
 
-### Ostrzeżenia
-- Manager pokazuje, czy klient ma absencję w następnym tygodniu
-- Zastępstwa są odpowiednio oznaczone
+### Ostrzeżenia i Zastępstwa
+- Manager pokazuje, czy klient ma absencję w następnym tygodniu.
+- Zastępstwa są odpowiednio oznaczone.
+
+### Czyszczenie Tygodnia (NOWE)
+- Masz możliwość szybkiego i całkowitego wyczyszczenia danego tygodnia (tylko tygodni przyszłych, które się jeszcze nie rozpoczęły).
+- Użyj czerwonego przycisku **Wyczyść ten tydzień** na dole ekranu menedżera. Wszystkie zapisy zostaną trwale usunięte z bazy (bez dodawania do absencji/historii).
 
 ---
 
@@ -138,8 +150,9 @@ Narzędzie do planowania tygodnia.
 - **Rozliczenia** (w menu hamburger) — lista wszystkich klientów z ich pakietami
 - Pokazuje: typ (Pakiet / Miesięcznie / Bez pakietu), użyte/zakupione treningi
 
-### Nowy pakiet
-- Kliknij **Nowy Pakiet** — archiwizuje obecny stan i zaczyna od 0
+### Nowy pakiet / Nowy miesiąc
+- Kliknij **Nowy Pakiet** (lub Nowy Miesiąc) — archiwizuje obecny stan i zaczyna od 0.
+- **Wybór daty (NOWE)**: Dla klientów *bez pakietu* (Miesięcznie / Pojedyncze), system zapyta o datę **Ostatnio zapłaconego treningu**. Możesz wybrać ją z rozwijalnej listy (treningi z ostatnich i nadchodzących dni). System następnie automatycznie oznaczy ten trening jako "Rozliczono" na kalendarzu.
 
 ### Zwiększanie pakietu (NOWE)
 - Kliknij zielony **+** przy kliencie z pakietem
@@ -158,10 +171,11 @@ Narzędzie do planowania tygodnia.
 
 ## 8. ABSENCJE
 
-- **Menu hamburger → Absencje** — lista wszystkich odwołanych terminów
-- Automatycznie tworzone przy usuwaniu treningu w kalendarzu
-- Można dodawać ręcznie: wybierz klienta, datę, godzinę
-- Absencje wpływają na wyświetlanie w kalendarzu (czerwony trójkąt) i w Managerze
+- **Menu hamburger → Absencje** — lista wszystkich odwołanych terminów.
+- **Ręczne dodawanie**: Wybierz klienta, a z listy rozwijanej wybierz **jedną lub wiele dat naraz** (wiele checkboxów) oraz, jeśli to konieczne, precyzyjną godzinę.
+- **Wpływ na Kalendarz**: 
+  - Jeśli zapiszesz absencję w dniu, w którym klient miał już zaplanowane treningi, system **automatycznie je odwoła i zdejmie z kalendarza** (bez naliczania kosztów w pakiecie, jak w przypadku ręcznego usunięcia).
+  - Absencje blokują kopiowanie w Menadżerze – treningi z harmonogramu nie zostaną na ten dzień wstawione.
 
 ---
 
@@ -249,7 +263,7 @@ Logowanie innym kontem: wyloguj się (menu hamburger → Wyloguj) i zaloguj pono
 | Co chcesz zrobić | Gdzie |
 |---|---|
 | Dodać trening | Kalendarz → kliknij slot → wybierz klienta → ćwiczenia → ZAPISZ |
-| Dodać klienta | Dolny pasek KLIENCI → + |
+| Dodać klienta | Menu hamburger → Klienci → + |
 | Rozliczyć trening | Wejdź w trening → ROZLICZ TRENING |
 | Sprawdzić pakiety | Menu → Rozliczenia |
 | Zaplanować tydzień | Menu → Menadżer → zaznacz → kopiuj |
