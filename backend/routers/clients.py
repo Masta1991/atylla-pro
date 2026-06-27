@@ -9,6 +9,10 @@ class AdjustPackageRequest(BaseModel):
     new_count: int
     comment: str
 
+class NewPackageRequest(BaseModel):
+    last_paid_event_date: str = None
+    last_paid_event_hour: int = None
+
 class AdjustHistoryPackageRequest(BaseModel):
     archived_at: str
     new_count: int
@@ -27,6 +31,17 @@ def generate_client_events(supabase, user_id, client_id, schedule):
     today = date.today()
     this_monday = get_monday(today)
     next_monday = this_monday + timedelta(days=7)
+    end_date_limit = next_monday + timedelta(days=6)
+
+    # Fetch existing events for this client in the two weeks
+    res = supabase.table("calendar_events") \
+        .select("event_date,event_hour,status") \
+        .eq("client_id", client_id) \
+        .gte("event_date", this_monday.isoformat()) \
+        .lte("event_date", end_date_limit.isoformat()) \
+        .execute()
+        
+    existing = {(r["event_date"], r["event_hour"]): r["status"] for r in (res.data or [])}
 
     for week_start in [this_monday, next_monday]:
         for entry in schedule:
@@ -40,6 +55,11 @@ def generate_client_events(supabase, user_id, client_id, schedule):
             event_date = week_start + timedelta(days=day)
             event_date_str = event_date.isoformat()
 
+            # Skip if already exists (whether active, deleted, or settled)
+            # This prevents overwriting manual modifications or deletions
+            if (event_date_str, hour) in existing:
+                continue
+
             payload = {
                 "event_date": event_date_str,
                 "event_hour": hour,
@@ -48,9 +68,7 @@ def generate_client_events(supabase, user_id, client_id, schedule):
                 "status": "active",
                 "trainer_id": user_id,
             }
-            supabase.table("calendar_events").upsert(
-                payload, on_conflict="event_date,event_hour,trainer_id"
-            ).execute()
+            supabase.table("calendar_events").insert(payload).execute()
 
 
 def generate_all_schedules(request: Request):
@@ -145,24 +163,49 @@ def adjust_package(client_id: str, data: AdjustPackageRequest, request: Request)
     return {"status": "ok"}
 
 
-@router.post("/{client_id}/new-package")
-def new_package(client_id: str, request: Request):
+
+@router.post("/{client_id}/start-billing")
+def start_billing(client_id: str, data: StartBillingRequest, request: Request):
     supabase, _ = get_user_supabase(request)
     client = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     if not client.data:
         raise HTTPException(404, "Client not found")
+        
+    c = client.data
+    
+    # Just reset counter and set new purchase date, NO archiving
+    supabase.table("clients").update({
+        "package_current_count": 0,
+        "package_purchase_date": data.start_date,
+    }).eq("id", client_id).execute()
 
+    return {"status": "ok"}
+
+
+@router.post("/{client_id}/end-billing")
+def end_billing(client_id: str, data: EndBillingRequest, request: Request):
+    from datetime import datetime
+    supabase, _ = get_user_supabase(request)
+    client = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    if not client.data:
+        raise HTTPException(404, "Client not found")
+        
     c = client.data
     history = c.get("payment_history") or []
+    
+    # Archive the current count
     history.append({
-        "date": datetime.now().isoformat(),
-        "action": "archive",
-        "old_count": c.get("package_current_count", 0),
+        "purchase_date": c.get("package_purchase_date") or datetime.now().isoformat()[:10],
+        "archived_at": datetime.now().isoformat(),
+        "completed_count": c.get("package_current_count", 0),
         "package_size": c.get("package_size", 10),
+        "end_date": data.end_date,
+        "action": "end"
     })
 
     supabase.table("clients").update({
         "package_current_count": 0,
+        "package_purchase_date": None,
         "payment_history": history,
     }).eq("id", client_id).execute()
 

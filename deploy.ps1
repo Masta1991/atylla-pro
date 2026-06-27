@@ -105,7 +105,7 @@ if ($frontStatus) {
 Pop-Location
 
 # Commit root changes
-git add backend/static frontend deploy.ps1
+git add backend frontend deploy.ps1
 $rootStatus = git status --porcelain
 if ($rootStatus) {
     git commit -m "v$currentVersion - deployment"

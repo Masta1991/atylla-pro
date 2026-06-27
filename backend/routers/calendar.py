@@ -4,7 +4,7 @@ from datetime import date as DateType
 from database import get_supabase, get_user_supabase
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
-    CalendarSwapRequest, AbsenceCreate, AbsenceResponse
+    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest
 )
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -32,6 +32,17 @@ def create_absence(data: AbsenceCreate, request: Request):
     res = supabase.table("absences").upsert(
         payload, on_conflict=on_conflict
     ).execute()
+
+    # Cancel (soft-delete) any existing events on that day/hour for this client
+    query = supabase.table("calendar_events").update({
+        "status": "deleted", 
+        "updated_at": "now()"
+    }).eq("client_id", data.client_id).eq("event_date", data.absence_date.isoformat())
+    
+    if data.absence_hour is not None:
+        query = query.eq("event_hour", data.absence_hour)
+    query.execute()
+
     return res.data[0]
 
 @router.delete("/absences/{absence_id}")
@@ -154,6 +165,73 @@ def create_or_update_event(data: CalendarEventCreate, request: Request):
             payload, on_conflict="event_date,event_hour,trainer_id"
         ).execute()
         return res.data[0]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, detail=repr(e))
+
+
+@router.post("/replace-week")
+def replace_week(data: ReplaceWeekRequest, request: Request):
+    """Hard delete all events for a given week, then insert new ones."""
+    from datetime import timedelta
+    supabase, user_id = get_user_supabase(request)
+    
+    # Target date range
+    monday = data.monday_date
+    saturday = monday + timedelta(days=5)
+
+    try:
+        # 1. Hard delete all calendar_events between monday and saturday for this trainer
+        supabase.table("calendar_events") \
+            .delete() \
+            .gte("event_date", monday.isoformat()) \
+            .lte("event_date", saturday.isoformat()) \
+            .eq("trainer_id", user_id) \
+            .execute()
+        
+        # 2. Insert new events
+        if data.events:
+            payloads = []
+            for ev in data.events:
+                p = ev.model_dump(exclude_none=True, mode='json')
+                p["trainer_id"] = user_id
+                payloads.append(p)
+                
+            res = supabase.table("calendar_events").upsert(
+                payloads, on_conflict="event_date,event_hour,trainer_id"
+            ).execute()
+            
+            # Raise exception if Supabase returns an error
+            if hasattr(res, 'error') and res.error:
+                raise Exception(f"Supabase upsert error: {res.error}")
+            
+        return {"status": "replaced"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, detail=repr(e))
+
+
+@router.delete("/clear-week/{monday_date}")
+def clear_week(monday_date: str, request: Request):
+    """Hard delete all events for a given week."""
+    from datetime import timedelta, date
+    supabase, user_id = get_user_supabase(request)
+    
+    # Parse monday_date string to date object
+    monday = date.fromisoformat(monday_date)
+    # week = Mon to Sun (6 days later) to be safe and delete entire week
+    sunday = monday + timedelta(days=6)
+
+    try:
+        res = supabase.table("calendar_events") \
+            .delete() \
+            .gte("event_date", monday.isoformat()) \
+            .lte("event_date", sunday.isoformat()) \
+            .eq("trainer_id", user_id) \
+            .execute()
+        return {"status": "cleared"}
     except Exception as e:
         import traceback
         traceback.print_exc()
