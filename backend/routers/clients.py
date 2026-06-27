@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from datetime import date, datetime, timedelta
 from database import get_supabase, get_user_supabase
-from models import ClientCreate, ClientUpdate, ClientResponse
+from models import ClientCreate, ClientUpdate, ClientResponse, StartBillingRequest, EndBillingRequest
 from pydantic import BaseModel
 
 class AdjustPackageRequest(BaseModel):
