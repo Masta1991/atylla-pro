@@ -64,6 +64,10 @@ class CalendarEventBase(BaseModel):
 class CalendarEventCreate(CalendarEventBase):
     pass
 
+class ReplaceWeekRequest(BaseModel):
+    monday_date: date
+    events: List[CalendarEventCreate]
+
 class CalendarEventUpdate(BaseModel):
     client_id: Optional[UUID] = None
     workout_type_id: Optional[UUID] = None
@@ -75,6 +79,17 @@ class CalendarEventUpdate(BaseModel):
     added_groups: Optional[List[str]] = None
     is_replacement: Optional[bool] = None
     replaced_client_id: Optional[UUID] = None
+
+class AdjustHistoryPackageRequest(BaseModel):
+    archived_at: str
+    completed_count: int
+    comment: str
+
+class StartBillingRequest(BaseModel):
+    start_date: str
+
+class EndBillingRequest(BaseModel):
+    end_date: str
 
 class CalendarSwapRequest(BaseModel):
     date1: date
