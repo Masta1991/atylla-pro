@@ -89,6 +89,16 @@ def assign_chronological_numbers(events, supabase):
             history = c_info.get("payment_history") or []
             curr_start = c_info.get("package_purchase_date")
             
+            start_dates = []
+            for h in history:
+                if h.get("action") == "end":
+                    pd = h.get("purchase_date")
+                    if pd and pd != "0000-00-00":
+                        start_dates.append(pd)
+            if curr_start:
+                start_dates.append(curr_start)
+            start_dates = sorted(list(set(start_dates)))
+            
             belongs_to_history = False
             for h in history:
                 if h.get("action") == "end":
@@ -96,17 +106,20 @@ def assign_chronological_numbers(events, supabase):
                     ed = h.get("end_date") or "9999-12-31"
                     if pd <= ev_date <= ed:
                         if ev_date == ed and not ev.get("is_settled"):
-                            # If it's unsettled on the end date, it shouldn't be locked in history
                             continue
-                        cycle_key = f"{pd}_{ed}"
+                        cycle_key = f"pkg_{pd}"
                         belongs_to_history = True
                         break
             
             if not belongs_to_history:
-                if curr_start and ev_date >= curr_start:
-                    cycle_key = "current_active"
-                else:
-                    cycle_key = "unknown"
+                cycle_key = "before_any"
+                for sd in reversed(start_dates):
+                    if ev_date >= sd:
+                        cycle_key = f"pkg_{sd}"
+                        break
+                        
+            if cycle_key == "before_any":
+                continue
                     
         if cid not in event_order:
             event_order[cid] = {}
