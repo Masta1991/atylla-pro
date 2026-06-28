@@ -74,74 +74,66 @@ def assign_chronological_numbers(events, supabase):
         
     event_order = {}
     client_info = {}
+    client_events = {}
     
     for ev in all_events_res.data:
         cid = ev["client_id"]
-        c_info = ev.get("clients") or {}
         if cid not in client_info:
-            client_info[cid] = c_info
-            
+            client_info[cid] = ev.get("clients") or {}
+        if cid not in client_events:
+            client_events[cid] = []
+        client_events[cid].append(ev)
+        
+    for cid, evs in client_events.items():
+        c_info = client_info[cid]
         b_type = c_info.get("billing_type")
+        event_order[cid] = {}
         
-        cycle_key = "single"
         if b_type == "package":
-            ev_date = ev["event_date"]
             history = c_info.get("payment_history") or []
-            curr_start = c_info.get("package_purchase_date")
+            target_counts = [h.get("completed_count", 0) for h in history if h.get("action") == "end"]
             
-            found = False
-            for h in history:
-                if h.get("action") == "end":
-                    pd = h.get("purchase_date") or "0000-00-00"
-                    ed = h.get("end_date") or "9999-12-31"
-                    if pd <= ev_date <= ed:
-                        if ev_date == ed and not ev.get("is_settled"):
-                            continue
-                        cycle_key = f"{pd}_{ed}"
-                        found = True
-                        break
+            current_history_idx = 0
+            settled_in_current_history = 0
             
-            if not found:
-                cycle_key = "current_active"
+            for ev in evs:
+                if ev.get("is_settled"):
+                    if current_history_idx < len(target_counts):
+                        if settled_in_current_history >= target_counts[current_history_idx]:
+                            current_history_idx += 1
+                            settled_in_current_history = 0
                     
-        if cid not in event_order:
-            event_order[cid] = {}
-        if cycle_key not in event_order[cid]:
-            event_order[cid][cycle_key] = []
-            
-        event_order[cid][cycle_key].append(ev["id"])
-        
+                    if current_history_idx < len(target_counts):
+                        cycle_key = f"archived_{current_history_idx}"
+                        settled_in_current_history += 1
+                    else:
+                        cycle_key = "current_active"
+                else:
+                    cycle_key = "current_active"
+                    
+                if cycle_key not in event_order[cid]:
+                    event_order[cid][cycle_key] = []
+                event_order[cid][cycle_key].append(ev["id"])
+        else:
+            event_order[cid]["single"] = [ev["id"] for ev in evs]
+
     for ev in events:
         cid = ev.get("client_id")
         if cid in event_order:
-            c_info = client_info.get(cid, {})
-            b_type = c_info.get("billing_type")
-            cycle_key = "single"
-            if b_type == "package":
-                ev_date = ev["event_date"]
-                history = c_info.get("payment_history") or []
-                curr_start = c_info.get("package_purchase_date")
-                found = False
-                for h in history:
-                    if h.get("action") == "end":
-                        pd = h.get("purchase_date") or "0000-00-00"
-                        ed = h.get("end_date") or "9999-12-31"
-                        if pd <= ev_date <= ed:
-                            if ev_date == ed and not ev.get("is_settled"):
-                                continue
-                            cycle_key = f"{pd}_{ed}"
-                            found = True
-                            break
-                if not found:
-                    cycle_key = "current_active"
-                        
-            try:
-                idx = event_order[cid][cycle_key].index(ev["id"]) + 1
-                if ev.get("clients"):
-                    ev["clients"]["package_current_count"] = idx
-            except (ValueError, KeyError):
-                pass
-                
+            cycle_key = None
+            for ck, e_ids in event_order[cid].items():
+                if ev["id"] in e_ids:
+                    cycle_key = ck
+                    break
+            
+            if cycle_key:
+                try:
+                    idx = event_order[cid][cycle_key].index(ev["id"]) + 1
+                    if ev.get("clients"):
+                        ev["clients"]["package_current_count"] = idx
+                except ValueError:
+                    pass
+                    
     return events
 
 
