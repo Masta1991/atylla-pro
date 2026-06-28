@@ -95,15 +95,14 @@ def assign_chronological_numbers(events, supabase):
                     pd = h.get("purchase_date") or "0000-00-00"
                     ed = h.get("end_date") or "9999-12-31"
                     if pd <= ev_date <= ed:
+                        if ev_date == ed and not ev.get("is_settled"):
+                            continue
                         cycle_key = f"{pd}_{ed}"
                         found = True
                         break
             
             if not found:
-                if curr_start and ev_date >= curr_start:
-                    cycle_key = f"{curr_start}_now"
-                else:
-                    cycle_key = "unknown"
+                cycle_key = "current_active"
                     
         if cid not in event_order:
             event_order[cid] = {}
@@ -128,14 +127,13 @@ def assign_chronological_numbers(events, supabase):
                         pd = h.get("purchase_date") or "0000-00-00"
                         ed = h.get("end_date") or "9999-12-31"
                         if pd <= ev_date <= ed:
+                            if ev_date == ed and not ev.get("is_settled"):
+                                continue
                             cycle_key = f"{pd}_{ed}"
                             found = True
                             break
                 if not found:
-                    if curr_start and ev_date >= curr_start:
-                        cycle_key = f"{curr_start}_now"
-                    else:
-                        cycle_key = "unknown"
+                    cycle_key = "current_active"
                         
             try:
                 idx = event_order[cid][cycle_key].index(ev["id"]) + 1
