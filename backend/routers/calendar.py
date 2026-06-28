@@ -58,35 +58,90 @@ def delete_absence(absence_id: str, request: Request):
 def assign_chronological_numbers(events, supabase):
     client_ids = list(set([
         ev["client_id"] for ev in events
-        if ev.get("client_id") and ev.get("clients") and ev["clients"].get("billing_type") != "package"
+        if ev.get("client_id") and ev.get("clients")
     ]))
     
     if not client_ids:
         return events
         
     all_events_res = supabase.table("calendar_events") \
-        .select("id, client_id, event_date, event_hour") \
+        .select("id, client_id, event_date, event_hour, status, is_settled, clients!calendar_events_client_id_fkey(billing_type, package_purchase_date, payment_history)") \
         .in_("client_id", client_ids) \
-        .neq("status", "deleted") \
+        .or_("status.neq.deleted,is_settled.eq.true") \
         .order("event_date") \
         .order("event_hour") \
         .execute()
         
     event_order = {}
+    client_info = {}
+    
     for ev in all_events_res.data:
         cid = ev["client_id"]
+        c_info = ev.get("clients") or {}
+        if cid not in client_info:
+            client_info[cid] = c_info
+            
+        b_type = c_info.get("billing_type")
+        
+        cycle_key = "single"
+        if b_type == "package":
+            ev_date = ev["event_date"]
+            history = c_info.get("payment_history") or []
+            curr_start = c_info.get("package_purchase_date")
+            
+            found = False
+            for h in history:
+                if h.get("action") == "end":
+                    pd = h.get("purchase_date") or "0000-00-00"
+                    ed = h.get("end_date") or "9999-12-31"
+                    if pd <= ev_date <= ed:
+                        cycle_key = f"{pd}_{ed}"
+                        found = True
+                        break
+            
+            if not found:
+                if curr_start and ev_date >= curr_start:
+                    cycle_key = f"{curr_start}_now"
+                else:
+                    cycle_key = "unknown"
+                    
         if cid not in event_order:
-            event_order[cid] = []
-        event_order[cid].append(ev["id"])
+            event_order[cid] = {}
+        if cycle_key not in event_order[cid]:
+            event_order[cid][cycle_key] = []
+            
+        event_order[cid][cycle_key].append(ev["id"])
         
     for ev in events:
         cid = ev.get("client_id")
         if cid in event_order:
+            c_info = client_info.get(cid, {})
+            b_type = c_info.get("billing_type")
+            cycle_key = "single"
+            if b_type == "package":
+                ev_date = ev["event_date"]
+                history = c_info.get("payment_history") or []
+                curr_start = c_info.get("package_purchase_date")
+                found = False
+                for h in history:
+                    if h.get("action") == "end":
+                        pd = h.get("purchase_date") or "0000-00-00"
+                        ed = h.get("end_date") or "9999-12-31"
+                        if pd <= ev_date <= ed:
+                            cycle_key = f"{pd}_{ed}"
+                            found = True
+                            break
+                if not found:
+                    if curr_start and ev_date >= curr_start:
+                        cycle_key = f"{curr_start}_now"
+                    else:
+                        cycle_key = "unknown"
+                        
             try:
-                idx = event_order[cid].index(ev["id"]) + 1
+                idx = event_order[cid][cycle_key].index(ev["id"]) + 1
                 if ev.get("clients"):
                     ev["clients"]["package_current_count"] = idx
-            except ValueError:
+            except (ValueError, KeyError):
                 pass
                 
     return events
