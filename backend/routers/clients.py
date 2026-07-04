@@ -199,13 +199,33 @@ def delete_client_package(package_id: str, request: Request):
     supabase.table("client_packages").delete().eq("id", package_id).execute()
     return {"status": "deleted"}
 
+@router.post("/{client_id}/hard-reset", response_model=ClientResponse)
+def hard_reset_client(client_id: str, request: Request):
+    supabase, _ = get_user_supabase(request)
+    
+    # Usuń wszystkie powiązane pakiety SSOT
+    supabase.table("client_packages").delete().eq("client_id", client_id).execute()
+    
+    # Wyzeruj liczniki w kliencie
+    res = supabase.table("clients").update({
+        "package_purchase_date": None,
+        "package_current_count": 0,
+        "package_size": 0,
+        "active_package_id": None
+    }).eq("id", client_id).execute()
+    
+    if not res.data:
+        raise HTTPException(404, "Client not found")
+        
+    return assign_client_packages_status([res.data[0]], supabase)[0]
+
 @router.get("/{client_id}", response_model=ClientResponse)
 def get_client(client_id: str, request: Request):
     supabase, _ = get_user_supabase(request)
     res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
     if not res.data:
         raise HTTPException(404, "Client not found")
-    return res.data
+    return assign_client_packages_status([res.data], supabase)[0]
 
 
 @router.post("/", response_model=ClientResponse, status_code=201)
@@ -235,7 +255,7 @@ def update_client(client_id: str, data: ClientUpdate, request: Request):
         if schedule is not None:
             generate_client_events(supabase, user_id, client_id, schedule)
 
-    return res.data[0]
+    return assign_client_packages_status([res.data[0]], supabase)[0]
 
 
 @router.delete("/{client_id}")
