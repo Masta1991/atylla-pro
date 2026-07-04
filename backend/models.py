@@ -20,6 +20,8 @@ class ClientBase(BaseModel):
     package_size: Optional[int] = 10
     package_current_count: Optional[int] = 0
     payment_history: Optional[List[dict]] = Field(default_factory=list)
+    active_package_id: Optional[UUID] = None
+    cancelled_settled_count: Optional[int] = 0
 
 class ClientCreate(ClientBase):
     pass
@@ -37,6 +39,8 @@ class ClientUpdate(BaseModel):
     package_size: Optional[int] = None
     package_current_count: Optional[int] = None
     payment_history: Optional[List[dict]] = None
+    active_package_id: Optional[UUID] = None
+    cancelled_settled_count: Optional[int] = None
 
 class ClientResponse(ClientBase):
     id: UUID
@@ -246,6 +250,32 @@ class PlanExerciseUpdate(BaseModel):
     sets_data: Optional[List[dict]] = None
     sort_order: Optional[int] = None
     superset_id: Optional[UUID] = None
+
+
+# ── Packages SSOT ────────────────────────────────────────────────────────────
+
+class ClientPackageBase(BaseModel):
+    client_id: UUID
+    size: int
+    start_training_id: UUID
+    end_training_id: Optional[UUID] = None
+    offset: int = 0
+
+class ClientPackageCreate(BaseModel):
+    size: int
+    start_training_id: UUID
+    offset: int = 0
+
+class ClientPackageUpdate(BaseModel):
+    end_training_id: Optional[UUID] = None
+
+class ClientPackageResponse(ClientPackageBase):
+    id: UUID
+    trainer_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 

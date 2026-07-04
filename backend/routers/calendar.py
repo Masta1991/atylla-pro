@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from datetime import date as DateType
-from database import get_supabase, get_user_supabase
+from database import get_user_supabase
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
     CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest
@@ -33,15 +32,17 @@ def create_absence(data: AbsenceCreate, request: Request):
         payload, on_conflict=on_conflict
     ).execute()
 
-    # Cancel (soft-delete) any existing events on that day/hour for this client
-    query = supabase.table("calendar_events").update({
-        "status": "deleted", 
-        "updated_at": "now()"
-    }).eq("client_id", data.client_id).eq("event_date", data.absence_date.isoformat())
-    
+    # Handle existing events on that day/hour for this client
+    # If the event is settled, we mark it as 'cancelled' so it stays on the calendar and counts for billing.
+    # If unsettled, we mark it as 'deleted' so it disappears (leaving only the absence indicator).
+    query_evs = supabase.table("calendar_events").select("id, is_settled").eq("client_id", data.client_id).eq("event_date", data.absence_date.isoformat())
     if data.absence_hour is not None:
-        query = query.eq("event_hour", data.absence_hour)
-    query.execute()
+        query_evs = query_evs.eq("event_hour", data.absence_hour)
+    
+    existing_evs = query_evs.execute().data
+    for ev in existing_evs:
+        new_status = "cancelled" if ev.get("is_settled") else "deleted"
+        supabase.table("calendar_events").update({"status": new_status, "updated_at": "now()"}).eq("id", ev["id"]).execute()
 
     return res.data[0]
 
@@ -64,30 +65,88 @@ def assign_chronological_numbers(events, supabase):
     if not client_ids:
         return events
         
+    pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).execute()
+    packages = pkgs_res.data or []
+    
     all_events_res = supabase.table("calendar_events") \
         .select("id, client_id, event_date, event_hour, status, is_settled, clients!calendar_events_client_id_fkey(billing_type, package_purchase_date, payment_history)") \
         .in_("client_id", client_ids) \
-        .or_("status.neq.deleted,is_settled.eq.true") \
         .order("event_date") \
         .order("event_hour") \
         .execute()
         
-    event_order = {}
+    all_client_events = {}
     client_info = {}
+    for e in all_events_res.data:
+        cid = e["client_id"]
+        if cid not in all_client_events:
+            all_client_events[cid] = []
+        all_client_events[cid].append(e)
+        if cid not in client_info and e.get("clients"):
+            client_info[cid] = e["clients"]
+        
+    client_packages = {}
+    for p in packages:
+        cid = p["client_id"]
+        if cid not in client_packages:
+            client_packages[cid] = []
+        client_packages[cid].append(p)
+        
+    event_counts = {}
     
-    for ev in all_events_res.data:
-        cid = ev["client_id"]
-        c_info = ev.get("clients") or {}
-        if cid not in client_info:
-            client_info[cid] = c_info
-            
-        b_type = c_info.get("billing_type")
-        cycle_key = "single"
+    for cid, evs in all_client_events.items():
+        cinfo = client_info.get(cid, {})
+        b_type = cinfo.get("billing_type")
         
         if b_type == "package":
-            ev_date = ev["event_date"]
-            history = c_info.get("payment_history") or []
-            curr_start = c_info.get("package_purchase_date")
+            pkgs = client_packages.get(cid, [])
+            ev_id_to_idx = {e["id"]: i for i, e in enumerate(evs)}
+            
+            def get_pkg_start_idx(p):
+                return ev_id_to_idx.get(p["start_training_id"], 999999)
+            pkgs.sort(key=get_pkg_start_idx)
+            
+            for i, pkg in enumerate(pkgs):
+                start_id = pkg["start_training_id"]
+                end_id = pkg.get("end_training_id")
+                offset = pkg.get("offset", 0)
+                
+                start_idx = ev_id_to_idx.get(start_id)
+                if start_idx is None:
+                    continue 
+                    
+                end_idx = ev_id_to_idx.get(end_id) if end_id else len(evs)
+                if end_idx is None:
+                    end_idx = len(evs)
+                
+                if i + 1 < len(pkgs):
+                    next_start_idx = ev_id_to_idx.get(pkgs[i+1]["start_training_id"])
+                    if next_start_idx is not None and next_start_idx < end_idx:
+                        end_idx = next_start_idx - 1
+                
+                current_count = offset
+                for idx in range(start_idx, end_idx + 1):
+                    if idx >= len(evs):
+                        break
+                    e = evs[idx]
+                    
+                    if e.get("status") == "deleted":
+                        continue
+                        
+                    e_id = e["id"]
+                    
+                    if e["is_settled"]:
+                        current_count += 1
+                        
+                        pkg_size = pkg.get("size", 10)
+                        if current_count <= pkg_size:
+                            event_counts[e_id] = current_count
+                            event_counts[f"{e_id}_size"] = pkg_size
+                        else:
+                            pass
+        else:
+            purchase_date = cinfo.get("package_purchase_date")
+            history = cinfo.get("payment_history") or []
             
             start_dates = []
             for h in history:
@@ -95,60 +154,80 @@ def assign_chronological_numbers(events, supabase):
                     pd = h.get("purchase_date")
                     if pd and pd != "0000-00-00":
                         start_dates.append(pd)
-            if curr_start:
-                start_dates.append(curr_start)
+            if purchase_date:
+                start_dates.append(purchase_date)
             start_dates = sorted(list(set(start_dates)))
             
-            belongs_to_history = False
-            for h in history:
-                if h.get("action") == "end":
-                    pd = h.get("purchase_date") or "0000-00-00"
-                    ed = h.get("end_date") or "9999-12-31"
-                    if pd <= ev_date <= ed:
-                        if ev_date == ed and not ev.get("is_settled"):
-                            continue
-                        cycle_key = f"pkg_{pd}"
-                        belongs_to_history = True
-                        break
-            
-            if not belongs_to_history:
-                cycle_key = "before_any"
-                for sd in reversed(start_dates):
-                    if ev_date >= sd:
-                        cycle_key = f"pkg_{sd}"
-                        break
-                        
-            if cycle_key == "before_any":
-                continue
+            event_order_single = {}
+            for e in evs:
+                ev_date = e["event_date"]
+                cycle_key = "single"
+                belongs_to_history = False
+                for h in history:
+                    if h.get("action") == "end":
+                        pd = h.get("purchase_date") or "0000-00-00"
+                        ed = h.get("end_date") or "9999-12-31"
+                        if pd <= ev_date <= ed:
+                            if ev_date == ed and not e.get("is_settled"):
+                                continue
+                            cycle_key = f"pkg_{pd}"
+                            belongs_to_history = True
+                            break
+                if not belongs_to_history:
+                    if purchase_date and ev_date >= purchase_date:
+                        cycle_key = f"pkg_{purchase_date}"
+                    else:
+                        cycle_key = "before_any"
+                        # We do NOT want to fall back to a historical start date if the history was explicitly closed.
+                        # If there's an active purchase_date, it would be caught above.
+                        # If not, it means the cycle is completely closed and no new one started.
+                
+                if cycle_key != "before_any":
+                    if cycle_key not in event_order_single:
+                        event_order_single[cycle_key] = []
+                    event_order_single[cycle_key].append(e["id"])
                     
-        if cid not in event_order:
-            event_order[cid] = {}
-        if cycle_key not in event_order[cid]:
-            event_order[cid][cycle_key] = []
-            
-        event_order[cid][cycle_key].append(ev["id"])
-        
+            for ck, e_ids in event_order_single.items():
+                current_count = 0
+                for e_id in e_ids:
+                    # Find the event to check if it's settled
+                    ev = next((x for x in evs if x["id"] == e_id), None)
+                    if ev and ev.get("is_settled"):
+                        current_count += 1
+                        event_counts[e_id] = current_count
+
     for ev in events:
         cid = ev.get("client_id")
-        if cid in event_order:
-            c_info = client_info.get(cid, {})
-            b_type = c_info.get("billing_type")
+        if cid and ev.get("clients"):
+            b_type = ev["clients"].get("billing_type")
+            e_id = ev["id"]
             
-            cycle_key = None
-            for ck, e_ids in event_order[cid].items():
-                if ev["id"] in e_ids:
-                    cycle_key = ck
-                    break
+            has_active_or_history = False
+            
+            if b_type == "package":
+                pkgs = client_packages.get(cid, [])
+                is_start = any(p["start_training_id"] == e_id for p in pkgs)
+                ev["is_start_of_package"] = is_start
+
+                if e_id in event_counts:
+                    ev["clients"]["package_current_count"] = event_counts[e_id]
+                    ev["clients"]["package_size"] = event_counts.get(f"{e_id}_size", 10)
+                    has_active_or_history = True
+                else:
+                    ev["clients"]["package_current_count"] = 0
+                    has_active_or_history = False
+            else:
+                if e_id in event_counts:
+                    ev["clients"]["package_current_count"] = event_counts[e_id]
+                    has_active_or_history = True
+                else:
+                    ev["clients"]["package_current_count"] = 0
+                    has_active_or_history = False
                     
-            if cycle_key:
-                try:
-                    idx = event_order[cid][cycle_key].index(ev["id"]) + 1
-                    if ev.get("clients"):
-                        ev["clients"]["package_current_count"] = idx
-                except ValueError:
-                    pass
+            ev["clients"]["has_active_billing_or_history"] = has_active_or_history
                 
     return events
+
 
 
 @router.get("/", response_model=List[CalendarEventResponse])
@@ -186,7 +265,6 @@ def get_week_events(monday_date: str, request: Request):
         .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
         .gte("event_date", monday.isoformat())
         .lte("event_date", saturday.isoformat())
-        .neq("status", "deleted")
         .order("event_date,event_hour")
         .execute()
     )
@@ -247,6 +325,7 @@ def replace_week(data: ReplaceWeekRequest, request: Request):
             .gte("event_date", monday.isoformat()) \
             .lte("event_date", saturday.isoformat()) \
             .eq("trainer_id", user_id) \
+            .eq("is_settled", False) \
             .execute()
         
         # 2. Insert new events
@@ -284,11 +363,12 @@ def clear_week(monday_date: str, request: Request):
     sunday = monday + timedelta(days=6)
 
     try:
-        res = supabase.table("calendar_events") \
+        supabase.table("calendar_events") \
             .delete() \
             .gte("event_date", monday.isoformat()) \
             .lte("event_date", sunday.isoformat()) \
             .eq("trainer_id", user_id) \
+            .eq("is_settled", False) \
             .execute()
         return {"status": "cleared"}
     except Exception as e:
@@ -337,7 +417,8 @@ def swap_events(data: CalendarSwapRequest, request: Request):
             "event_hour": data.hour2,
             "client_id": ev1_data.get("client_id"),
             "workout_type_id": ev1_data.get("workout_type_id"),
-            "status": "active",
+            "status": ev1_data.get("status", "active"),
+            "is_settled": ev1_data.get("is_settled", False),
             "trainer_id": user_id,
         }, on_conflict="event_date,event_hour,trainer_id").execute()
 
@@ -347,7 +428,8 @@ def swap_events(data: CalendarSwapRequest, request: Request):
             "event_hour": data.hour1,
             "client_id": ev2_data.get("client_id"),
             "workout_type_id": ev2_data.get("workout_type_id"),
-            "status": "active",
+            "status": ev2_data.get("status", "active"),
+            "is_settled": ev2_data.get("is_settled", False),
             "trainer_id": user_id,
         }, on_conflict="event_date,event_hour,trainer_id").execute()
 
@@ -362,7 +444,7 @@ def swap_events(data: CalendarSwapRequest, request: Request):
 
 @router.get("/stats")
 def get_calendar_stats(months: int = Query(1), request: Request = None):
-    from datetime import datetime, date, timedelta
+    from datetime import date, timedelta
     today = date.today()
     
     start_year = today.year
@@ -383,33 +465,22 @@ def get_calendar_stats(months: int = Query(1), request: Request = None):
         
     supabase, _ = get_user_supabase(request)
     
-    # Active events count
-    active_res = supabase.table("calendar_events") \
-        .select("id", count="exact") \
-        .gte("event_date", start_date.isoformat()) \
-        .lte("event_date", today.isoformat()) \
-        .neq("status", "deleted") \
-        .execute()
-    active_count = active_res.count or 0
-    
-    # Cancelled events count
-    cancelled_res = supabase.table("calendar_events") \
-        .select("id", count="exact") \
-        .gte("event_date", start_date.isoformat()) \
-        .lte("event_date", today.isoformat()) \
-        .eq("status", "deleted") \
-        .execute()
-    cancelled_count = cancelled_res.count or 0
-    
-    # 12 months chart data
     year_ago = today - timedelta(days=365)
+    
+    # Fetch all events (except hard deleted) for the past 12 months
     events_res = supabase.table("calendar_events") \
-        .select("event_date") \
+        .select("event_date, status, is_settled") \
         .gte("event_date", year_ago.isoformat()) \
         .lte("event_date", today.isoformat()) \
         .neq("status", "deleted") \
         .execute()
         
+    all_events = events_res.data or []
+    
+    start_date_str = start_date.isoformat()
+    active_count = 0
+    cancelled_count = 0
+    
     monthly_counts = {}
     temp_date = year_ago
     while temp_date <= today:
@@ -420,9 +491,23 @@ def get_calendar_stats(months: int = Query(1), request: Request = None):
         else:
             temp_date = date(temp_date.year, temp_date.month + 1, 1)
             
-    for ev in (events_res.data or []):
+    for ev in all_events:
         d_str = ev.get("event_date")
-        if d_str:
+        if not d_str:
+            continue
+            
+        is_valid_active = ev.get("status") == "active" or (ev.get("status") == "cancelled" and ev.get("is_settled"))
+        is_free_cancellation = ev.get("status") == "cancelled" and not ev.get("is_settled")
+        
+        # Calculate recent period stats (e.g. past month)
+        if d_str >= start_date_str:
+            if is_valid_active:
+                active_count += 1
+            elif is_free_cancellation:
+                cancelled_count += 1
+                
+        # Calculate 12-month chart data
+        if is_valid_active:
             key = d_str[:7]
             if key in monthly_counts:
                 monthly_counts[key] += 1
@@ -452,13 +537,9 @@ def settle_event(event_date: str, event_hour: int, request: Request):
     if not client_id:
         raise HTTPException(400, "No client assigned to this workout")
         
-    client = supabase.table("clients").select("package_current_count").eq("id", client_id).single().execute()
-    curr_count = client.data.get("package_current_count") or 0
-    
-    supabase.table("clients").update({"package_current_count": curr_count + 1}).eq("id", client_id).execute()
     supabase.table("calendar_events").update({"is_settled": True}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
     
-    return {"status": "settled", "new_count": curr_count + 1}
+    return {"status": "settled"}
 
 
 @router.delete("/{event_date}/{event_hour}")
@@ -478,6 +559,9 @@ def delete_event(event_date: str, event_hour: int, request: Request):
             "trainer_id": user_id,
         }).execute()
         
+        # Decide status: if it was settled, it must remain on the calendar as 'cancelled' to hold the billing number
+        new_status = "cancelled" if event.get("is_settled") else "deleted"
+        
         # Also delete workout logs for this client on this date to prevent stale data
         client_id = event.get("client_id")
         if client_id:
@@ -490,8 +574,8 @@ def delete_event(event_date: str, event_hour: int, request: Request):
                 "trainer_id": user_id,
             }, on_conflict="client_id,absence_date,absence_hour").execute()
 
-    # Soft delete
-    supabase.table("calendar_events").update({"status": "deleted", "updated_at": "now()"}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
+        # Soft delete or cancel
+        supabase.table("calendar_events").update({"status": new_status, "updated_at": "now()"}).eq("id", event["id"]).execute()
 
     return {"status": "deleted"}
 
