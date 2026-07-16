@@ -261,12 +261,12 @@ def update_client(client_id: str, data: ClientUpdate, request: Request):
 @router.delete("/{client_id}")
 def delete_client(client_id: str, request: Request):
     supabase, _ = get_user_supabase(request)
-    # Clean up related records explicitly to prevent orphaned data or FK constraint errors
-    supabase.table("client_packages").delete().eq("client_id", client_id).execute()
-    supabase.table("calendar_events").delete().eq("client_id", client_id).execute()
-    supabase.table("workouts").delete().eq("client_id", client_id).execute()
-    # Finally delete the client
-    supabase.table("clients").delete().eq("id", client_id).execute()
+    # The database has ON DELETE CASCADE for client_packages, workout_logs, measurements, and absences.
+    # calendar_events has ON DELETE SET NULL to keep the timeslot free.
+    res = supabase.table("clients").delete().eq("id", client_id).execute()
+    if not res.data:
+        # Prawidłowo obsłuż brak klienta
+        pass
     return {"status": "deleted"}
 
 
