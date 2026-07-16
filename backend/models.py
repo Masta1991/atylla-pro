@@ -21,7 +21,7 @@ class ClientBase(BaseModel):
     package_current_count: Optional[int] = 0
     payment_history: Optional[List[dict]] = Field(default_factory=list)
     active_package_id: Optional[UUID] = None
-    cancelled_settled_count: Optional[int] = 0
+    cancelled_settled_count: Optional[int] = None
 
 class ClientCreate(ClientBase):
     pass
