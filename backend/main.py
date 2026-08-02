@@ -8,7 +8,7 @@ from routers import clients, calendar, workouts, measurements, config_router, au
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="1.3.37",
+    version="1.3.38",
 )
 
 from fastapi import Request
@@ -114,6 +114,7 @@ if os.path.isdir(STATIC_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 
 
