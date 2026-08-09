@@ -139,11 +139,8 @@ def assign_chronological_numbers(events, supabase):
                         current_count += 1
                         
                         pkg_size = pkg.get("size", 10)
-                        if current_count <= pkg_size:
-                            event_counts[e_id] = current_count
-                            event_counts[f"{e_id}_size"] = pkg_size
-                        else:
-                            pass
+                        event_counts[e_id] = current_count
+                        event_counts[f"{e_id}_size"] = pkg_size
         else:
             purchase_date = cinfo.get("package_purchase_date")
             history = cinfo.get("payment_history") or []
