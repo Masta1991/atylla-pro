@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-09T09:55:15.838710",
+  "timestamp": "2026-08-09T09:57:46.673330",
   "total_cycles": 3,
   "overall_status": "PASS",
-  "total_duration_s": 5.78,
+  "total_duration_s": 2.31,
   "cycles": [
     {
       "cycle": 1,
@@ -10,12 +10,12 @@
         {
           "test": "01_Backend_Imports",
           "status": "PASS",
-          "duration_ms": 5070.15
+          "duration_ms": 1882.38
         },
         {
           "test": "02_Database_Connection",
           "status": "PASS",
-          "duration_ms": 709.57
+          "duration_ms": 424.2
         },
         {
           "test": "03_SSOT_Package_Calculation",
@@ -102,7 +102,7 @@
         {
           "test": "03_SSOT_Package_Calculation",
           "status": "PASS",
-          "duration_ms": 1.01,
+          "duration_ms": 0.0,
           "metrics": {
             "initial": 10,
             "used": 5,
