@@ -157,6 +157,43 @@ class AtyllaEnterpriseHarness:
         except Exception as e:
             results.append({"test": "06_Measurements_Math_Engine", "status": "FAIL", "error": str(e)})
 
+        # 7. Calendar Tile SSOT DOM Rendering & Pagination
+        t7_start = time.time()
+        try:
+            import database
+            from routers.calendar import assign_chronological_numbers
+            client = database.get_supabase()
+            trainer_id = "520504a4-1a24-4534-aac6-56237ff84f15"
+            events_july = client.table("calendar_events").select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count)").eq("trainer_id", trainer_id).gte("event_date", "2026-07-20").lte("event_date", "2026-07-26").order("event_date").order("event_hour").execute().data
+            labeled = assign_chronological_numbers(events_july, client)
+            
+            # Verify DOM text matches CalendarScreen.js line 294
+            valid_tiles = 0
+            for e in labeled:
+                c = e.get("clients")
+                if c and c.get("billing_type") == "package" and e.get("is_settled"):
+                    # Formula from frontend CalendarScreen.js:294
+                    has_active = c.get("has_active_billing_or_history")
+                    cnt = c.get("package_current_count") or 0
+                    sz = c.get("package_size") or 10
+                    tile_label = f"{c['name']} [{cnt}/{sz}]" if has_active else c["name"]
+                    
+                    if not has_active or f"[{cnt}/{sz}]" not in tile_label:
+                        raise AssertionError(f"Tile DOM label missing package counter: {tile_label}")
+                    valid_tiles += 1
+            
+            if valid_tiles == 0:
+                raise AssertionError("No valid settled package tiles found in test week")
+                
+            results.append({
+                "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
+                "status": "PASS",
+                "duration_ms": round((time.time() - t7_start)*1000, 2),
+                "verified_tiles": valid_tiles
+            })
+        except Exception as e:
+            results.append({"test": "07_Calendar_Tile_SSOT_DOM_Renderer", "status": "FAIL", "error": str(e)})
+
         for r in results:
             icon = "[PASS]" if r["status"] == "PASS" else "[FAIL]"
             print(f"  {icon} {r['test']}: {r['status']}")

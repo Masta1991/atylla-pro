@@ -65,19 +65,31 @@ def assign_chronological_numbers(events, supabase):
     if not client_ids:
         return events
         
-    pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).execute()
+    pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).limit(5000).execute()
     packages = pkgs_res.data or []
     
-    all_events_res = supabase.table("calendar_events") \
-        .select("id, client_id, event_date, event_hour, status, is_settled, clients!calendar_events_client_id_fkey(billing_type, package_purchase_date, payment_history)") \
-        .in_("client_id", client_ids) \
-        .order("event_date") \
-        .order("event_hour") \
-        .execute()
+    # Retrieve all client calendar events with pagination to avoid 1000-row PostgREST truncation
+    all_events_data = []
+    page = 0
+    page_size = 1000
+    while True:
+        paged_res = supabase.table("calendar_events") \
+            .select("id, client_id, event_date, event_hour, status, is_settled, clients!calendar_events_client_id_fkey(billing_type, package_purchase_date, payment_history)") \
+            .in_("client_id", client_ids) \
+            .order("event_date") \
+            .order("event_hour") \
+            .range(page * page_size, (page + 1) * page_size - 1) \
+            .execute()
+        
+        chunk = paged_res.data or []
+        all_events_data.extend(chunk)
+        if len(chunk) < page_size:
+            break
+        page += 1
         
     all_client_events = {}
     client_info = {}
-    for e in all_events_res.data:
+    for e in all_events_data:
         cid = e["client_id"]
         if cid not in all_client_events:
             all_client_events[cid] = []

@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-09T10:18:22.536494",
+  "timestamp": "2026-08-09T10:37:49.193907",
   "total_cycles": 3,
   "overall_status": "PASS",
-  "total_duration_s": 2.47,
+  "total_duration_s": 3.32,
   "cycles": [
     {
       "cycle": 1,
@@ -10,12 +10,12 @@
         {
           "test": "01_Backend_Imports",
           "status": "PASS",
-          "duration_ms": 2019.44
+          "duration_ms": 1694.63
         },
         {
           "test": "02_Database_Connection",
           "status": "PASS",
-          "duration_ms": 452.5
+          "duration_ms": 400.23
         },
         {
           "test": "03_SSOT_Package_Calculation",
@@ -42,6 +42,12 @@
           "status": "PASS",
           "duration_ms": 0.0,
           "bmi": 25.9
+        },
+        {
+          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
+          "status": "PASS",
+          "duration_ms": 633.35,
+          "verified_tiles": 39
         }
       ]
     },
@@ -83,6 +89,12 @@
           "status": "PASS",
           "duration_ms": 0.0,
           "bmi": 25.9
+        },
+        {
+          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
+          "status": "PASS",
+          "duration_ms": 296.38,
+          "verified_tiles": 39
         }
       ]
     },
@@ -124,6 +136,12 @@
           "status": "PASS",
           "duration_ms": 0.0,
           "bmi": 25.9
+        },
+        {
+          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
+          "status": "PASS",
+          "duration_ms": 291.19,
+          "verified_tiles": 39
         }
       ]
     }
