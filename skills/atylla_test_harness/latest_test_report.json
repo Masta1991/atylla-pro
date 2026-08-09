@@ -1,0 +1,131 @@
+{
+  "timestamp": "2026-08-09T09:55:15.838710",
+  "total_cycles": 3,
+  "overall_status": "PASS",
+  "total_duration_s": 5.78,
+  "cycles": [
+    {
+      "cycle": 1,
+      "results": [
+        {
+          "test": "01_Backend_Imports",
+          "status": "PASS",
+          "duration_ms": 5070.15
+        },
+        {
+          "test": "02_Database_Connection",
+          "status": "PASS",
+          "duration_ms": 709.57
+        },
+        {
+          "test": "03_SSOT_Package_Calculation",
+          "status": "PASS",
+          "duration_ms": 0.0,
+          "metrics": {
+            "initial": 10,
+            "used": 5,
+            "remaining": 5
+          }
+        },
+        {
+          "test": "04_Calendar_Conflict_Detector",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "05_Physical_PWA_Interaction",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "06_Measurements_Math_Engine",
+          "status": "PASS",
+          "duration_ms": 0.0,
+          "bmi": 25.9
+        }
+      ]
+    },
+    {
+      "cycle": 2,
+      "results": [
+        {
+          "test": "01_Backend_Imports",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "02_Database_Connection",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "03_SSOT_Package_Calculation",
+          "status": "PASS",
+          "duration_ms": 0.0,
+          "metrics": {
+            "initial": 10,
+            "used": 5,
+            "remaining": 5
+          }
+        },
+        {
+          "test": "04_Calendar_Conflict_Detector",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "05_Physical_PWA_Interaction",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "06_Measurements_Math_Engine",
+          "status": "PASS",
+          "duration_ms": 0.0,
+          "bmi": 25.9
+        }
+      ]
+    },
+    {
+      "cycle": 3,
+      "results": [
+        {
+          "test": "01_Backend_Imports",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "02_Database_Connection",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "03_SSOT_Package_Calculation",
+          "status": "PASS",
+          "duration_ms": 1.01,
+          "metrics": {
+            "initial": 10,
+            "used": 5,
+            "remaining": 5
+          }
+        },
+        {
+          "test": "04_Calendar_Conflict_Detector",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "05_Physical_PWA_Interaction",
+          "status": "PASS",
+          "duration_ms": 0.0
+        },
+        {
+          "test": "06_Measurements_Math_Engine",
+          "status": "PASS",
+          "duration_ms": 0.0,
+          "bmi": 25.9
+        }
+      ]
+    }
+  ]
+}
