@@ -1,59 +1,85 @@
-# Atylla Pro — zasady pracy
+# Wytyczne i Standardy Deweloperskie — Atylla Pro
 
-## Rozpoczęcie pracy — sprawdzenie stanu projektu
+## 1. Rola i Zakres Agenta
 
-Za każdym razem gdy zaczynamy sesję, wykonaj:
+Działasz jako Główny Architekt Systemu, Lead Developer i Tester aplikacji **Atylla Pro** (FastAPI + Supabase PostgreSQL + Expo SDK 56 / React Native 0.85 / React 19 / PWA). Rozwijasz aplikację dla trenerów personalnych (docelowo profil Darka), dbając o bezbłędną logikę rozliczeń finansowych, wydajność kalendarza, spójność danych oraz ochronę warstwy wizualnej.
 
-1. **Sprawdź stash** — `git stash list` w każdym repozytorium (główne + frontend). Użytkownik może pracować z różnymi modelami AI i edytorami, więc zmiany mogą czekać w stashu. Jeśli stash nie jest pusty, poinformuj użytkownika i zapytaj czy przywrócić.
-2. **Sprawdź status repo** — `git status --short` aby zobaczyć niezcommitowane modyfikacje.
-3. **Sprawdź wersję** — porównaj `frontend/package.json` / `frontend/app.json` z ostatnim commitem.
+---
 
-## Przywracanie backupu
+## 2. Architektura Systemu i Źródło Prawdy (SSOT)
 
-Gdy użytkownik poprosi o przywrócenie backupu:
-
-1. **Znajdź najnowszy backup** — przeszukaj folder `backup/` (w tym podfoldery) pod kątem plików `.bundle` i plików informacyjnych. Sortuj po dacie modyfikacji lub numerze wersji.
-2. **Jeśli nie masz pewności który backup** — zapytaj użytkownika przed przywróceniem.
-3. Przywróć z bundle: `git clone "sciezka/do/pliku.bundle" katalog-docelowy`
-
-## Backup
-
-Gdy użytkownik poprosi o backup, wykonaj:
-
-1. `git tag -a backup-v<wersja> -m "Backup: stabilna wersja v<wersja>"`
-2. `git branch backup/v<wersja>` (gałąź zapasowa)
-3. `git bundle create backup\atylla-pro-backup-v<wersja>.bundle --all` (w głównym repo)
-    - Jeśli frontend (submoduł) też wymaga backupu: `cd frontend; git bundle create ..\backup\atylla-pro-frontend-backup-v<wersja>.bundle --all`
-4. Poinformuj użytkownika o utworzonych artefaktach (tag, branch, plik bundle)
-
-Bundle pozwala w każdej chwili odtworzyć repozytorium poleceniem:
-`git clone atylla-pro-backup-v<wersja>.bundle atylla-pro-restore`
-
-## Wersjonowanie i Wdrożenie (Deployment)
-
-Po każdej zmianie w kodzie (nawet małej) podnieś numer wersji w formacie `X.Y.Z` (MAJOR.MINOR.PATCH):
-- **PATCH** (`Z`): drobne poprawki, bugfixy, kosmetyka UI
-- **MINOR** (`Y`): nowa funkcjonalność, nowy ekran, nowy endpoint
-- **MAJOR** (`X`): przełomowe zmiany architektury, migracje
-
-Miejsca do aktualizacji przy każdym bucie wersji:
-- Zmień `export const APP_VERSION = 'X.Y.Z';` w [version.js](file:///c:/Projects/atylla-pro/frontend/src/version.js). Pozostałe ekrany i layouty automatycznie zaimportują tę wersję z tego pliku.
-- Zmień pole `version` w `frontend/package.json` oraz `expo.version` w `frontend/app.json` (lub pozwól skryptowi wdrożeniowemu zrobić to automatycznie).
-
-### Automatyczne Wdrażanie (Build & Deploy)
-
-Do wdrożenia nowej wersji aplikacji służy zautomatyzowany skrypt PowerShell [deploy.ps1](file:///c:/Projects/atylla-pro/deploy.ps1):
-```powershell
-# Z automatycznym podbiciem wersji (zmienia version.js, package.json, app.json, buduje PWA, kopiuje pliki, aktualizuje sw.js/index.html i pushuje na GitHub)
-./deploy.ps1 -Version "1.0.26"
-
-# Bez zmiany wersji (używa obecnej z version.js, buduje, kopiuje i deployuje)
-./deploy.ps1
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                 FRONTEND (Expo SDK 56 / PWA)                │
+│  - React Native 0.85 / React 19 (New Architecture)          │
+│  - Współdzielony Cache: global.cachedClients,               │
+│    global.cachedWorkoutTypes, global.cachedExercisesByGroup  │
+│  - Widoki: Kalendarz, Klienci, Rozliczenia, Pomiary, Dziennik│
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTPS / REST (JWT Auth)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     BACKEND (FastAPI API)                   │
+│  - Python 3.12, Uvicorn, Pydantic v2                        │
+│  - Moduły: Auth, Calendar, Workouts, Measurements, Clients, │
+│            Config, Email (Matplotlib Charts)                │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Supabase Client / PostgREST
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 BAZA DANYCH (Supabase PostgreSQL)           │
+│  - Tabele: users, clients, calendar_events, workout_logs,   │
+│            measurements, packages, settlements, configs     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Architektura Cache (Optymalizacja Wydajności)
+### Złote Zasady Logiki Biznesowej:
+1. **Single Source of Truth (SSOT):** Baza danych przechowuje wyłącznie *twarde fakty* (ID treningu startowego `start_training_id`, offset, rozmiar pakietu). Wszelkie numeracje (np. "3/10") są wyliczane **dynamicznie w locie** na podstawie chronologii zdarzeń w kalendarzu.
+2. **Poka-yoke (Idiotoodporność):** Interfejs zapobiega błędom. Ukrywamy lub blokujemy akcje niemożliwe.
+3. **Ochrona Karoserii UI:** Kategoryczny zakaz niszczenia warstwy wizualnej (layout, flexbox, modale, motyw psa). W plikach takich jak `PaymentsScreen.js` (900 linii) wolno jedynie chirurgicznie podmieniać logikę biznesową.
+4. **Izolacja Środowiska Testowego:** Wszelkie operacje modyfikujące i testy przeprowadzaj WYŁĄCZNIE na koncie testowym: `staws22-1@gmail.com`. Nigdy nie modyfikuj bezpośrednio danych produkcyjnych trenera (`treneratyll@gmail.com`).
 
-Aby zapobiec niepotrzebnym zapytaniom sieciowym i opóźnieniom (loading spinners):
-1. **Współdzielony Cache**: Używaj globalnych obiektów cache `global.cachedClients`, `global.cachedWorkoutTypes` oraz `global.cachedExercisesByGroup`.
-2. **Synchronizacja Ekrany**: Jeśli jeden ekran pobierze listę klientów lub typy treningów, zapisuje je do globalnego cache. Inne ekrany (np. `TrainingScreen`, `PaymentsScreen`) powinny najpierw sprawdzić, czy dane są w cache, a jeśli tak — załadować je natychmiastowo i asynchronicznie odświeżyć w tle.
+---
 
+## 3. Procedury Operacyjne i Git
+
+### A. Rozpoczęcie Sesji (Stash & Status Check)
+Przed przystąpieniem do jakichkolwiek modyfikacji wykonaj:
+1. **Sprawdź stash**: `git stash list` (zarówno w głównym repozytorium, jak i w podkatalogach). Jeśli stash nie jest pusty, poinformuj użytkownika.
+2. **Sprawdź status repozytorium**: `git status --short`.
+3. **Sprawdź wersję**: Porównaj `frontend/package.json` oraz `frontend/src/version.js`.
+
+### B. Wersjonowanie i Automatyczne Wdrażanie (Deployment)
+Po każdej zmianie w kodzie podnieś numer wersji w formacie `X.Y.Z` (MAJOR.MINOR.PATCH):
+- **PATCH (`Z`)**: bugfixy, drobna kosmetyka UI.
+- **MINOR (`Y`)**: nowa funkcjonalność, nowy ekran, nowy endpoint.
+- **MAJOR (`X`)**: przełomowe zmiany architektury.
+
+Miejsca aktualizacji wersji:
+- `export const APP_VERSION = 'X.Y.Z';` w `frontend/src/version.js`.
+- Pole `version` w `frontend/package.json` oraz `expo.version` w `frontend/app.json`.
+
+Do wdrożenia nowej wersji służy automatyczny skrypt PowerShell:
+```powershell
+./deploy.ps1 -Version "1.0.31"
+```
+Skrypt automatycznie podbija wersję, buduje wersję webową PWA, kopiuje pliki do `backend/static/`, aktualizuje Service Workera (`sw.js`) i pushuje zmiany do repozytorium.
+
+### C. Procedura Tworzenia i Przywracania Kopii (Git Bundles)
+- Tworzenie pełnego backupu:
+  ```powershell
+  git tag -a backup-v<wersja> -m "Backup: stabilna wersja v<wersja>"
+  git bundle create backup/atylla-pro-backup-v<wersja>.bundle --all
+  ```
+- Odtwarzanie z pliku bundle:
+  ```powershell
+  git clone backup/atylla-pro-backup-v<wersja>.bundle atylla-pro-restore
+  ```
+
+---
+
+## 4. Architektura Pamięci Podręcznej (Cache)
+
+Aby wyeliminować niepotrzebne zapytania sieciowe i loading spinners:
+1. **Globalny Cache:** Używaj obiektów `global.cachedClients`, `global.cachedWorkoutTypes` oraz `global.cachedExercisesByGroup`.
+2. **Asynchroniczne Odświeżanie:** Ekrany najpierw natychmiast renderują dane z cache, a w tle pobierają świeże dane z FastAPI.
