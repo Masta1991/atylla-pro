@@ -1,0 +1,45 @@
+{
+    "expo":  {
+                 "name":  "Atylla Pro",
+                 "slug":  "atylla-pro",
+                 "version":  "1.3.38",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/icon.png",
+                 "userInterfaceStyle":  "dark",
+                 "backgroundColor":  "#0d1117",
+                 "ios":  {
+                             "supportsTablet":  true,
+                             "bundleIdentifier":  "com.atyllapro.app",
+                             "buildNumber":  "57",
+                             "infoPlist":  {
+                                               "ITSAppUsesNonExemptEncryption":  false
+                                           }
+                         },
+                 "android":  {
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/adaptive-icon.png",
+                                                      "backgroundColor":  "#0d1117"
+                                                  },
+                                 "package":  "com.atyllapro.app",
+                                 "versionCode":  56
+                             },
+                 "web":  {
+                             "favicon":  "./assets/favicon.png"
+                         },
+                 "plugins":  [
+                                 "expo-splash-screen"
+                             ],
+                 "extra":  {
+                               "eas":  {
+                                           "projectId":  "a9ad1dc0-da6e-42c0-82f3-966d26dafa6b"
+                                       }
+                           },
+                 "owner":  "stawszczak",
+                 "runtimeVersion":  {
+                                        "policy":  "appVersion"
+                                    },
+                 "updates":  {
+                                 "url":  "https://u.expo.dev/a9ad1dc0-da6e-42c0-82f3-966d26dafa6b"
+                             }
+             }
+}

@@ -1,5 +1,13 @@
 # Wytyczne i Standardy Deweloperskie — Atylla Pro
 
+## Wspólne rules projektu
+
+Przed pracą przeczytaj wszystkie pliki Markdown z `.agents/rules/` i zastosuj je
+według `Activation` oraz `Scope`: `always` zawsze, `model` gdy pasuje zadanie,
+`glob` dla wskazanych plików, a `manual` tylko po jawnym wywołaniu. Antigravity
+korzysta z własnego mechanizmu rules, a Codex z tego obowiązkowego mostu.
+`.codex/rules/*.rules` służy wyłącznie polityce wykonywania poleceń.
+
 ## 1. Rola i Zakres Agenta
 
 Działasz jako Główny Architekt Systemu, Lead Developer i Tester aplikacji **Atylla Pro** (FastAPI + Supabase PostgreSQL + Expo SDK 56 / React Native 0.85 / React 19 / PWA). Rozwijasz aplikację dla trenerów personalnych (docelowo profil Darka), dbając o bezbłędną logikę rozliczeń finansowych, wydajność kalendarza, spójność danych oraz ochronę warstwy wizualnej.
