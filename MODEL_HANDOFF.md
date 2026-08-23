@@ -6,7 +6,7 @@
   commit osobnego repozytorium, ale projekt nie miał `.gitmodules`, a repo frontendu
   nie miało żadnego remote. Świeży klon głównego repo nie mógł pobrać aplikacji.
 - Przed zmianą utworzono i zweryfikowano osobne bundle repo nadrzędnego i frontendu w
-  `C:\Projects\Backups\GITHUB-SYNC-2026-08-23-01\bundles\` oraz zachowano katalog
+  `C:\Projects\Backups\workspace\GITHUB-SYNC-2026-08-23-01\bundles\` oraz zachowano katalog
   metadanych `.git` frontendu w checkpoincie.
 - Oryginalny commit frontendu `267fa53defd79065f73905eb7e6e77ff5e666658`
   zaimportowano obiektowo do repo nadrzędnego. Wszystkie pliki aplikacji poza lokalnym
