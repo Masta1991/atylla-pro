@@ -1,0 +1,1202 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  Alert, ActivityIndicator, RefreshControl, Modal, FlatList, TextInput, Platform
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+
+import { Ionicons } from '@expo/vector-icons';
+import { SPACING } from '../assets/theme';
+import * as api from '../services/api';
+import AppLayout from '../components/AppLayout';
+import DropdownPicker from '../components/DropdownPicker';
+import { useTheme } from '../context/ThemeContext';
+
+export default function PaymentsScreen({ navigation }) {
+  const { colors: C, themeColors } = useTheme();
+  const styles = React.useMemo(() => makeStyles(C, themeColors), [C, themeColors]);
+  
+  const [clients, setClients] = useState(global.cachedClients || []);
+  const [loading, setLoading] = useState(!global.cachedClients);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // History modal states
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [clientEvents, setClientEvents] = useState([]);
+  const [clientPackages, setClientPackages] = useState([]);
+
+  // Billing modals
+  const [startBillingModalVisible, setStartBillingModalVisible] = useState(false);
+  const [endBillingModalVisible, setEndBillingModalVisible] = useState(false);
+  
+  const [startEventId, setStartEventId] = useState('');
+  const [endEventId, setEndEventId] = useState('');
+  const [packageSize, setPackageSize] = useState('10');
+  const [packageOffset, setPackageOffset] = useState('0');
+
+  // Edit modal states
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editClient, setEditClient] = useState(null);
+  const [editArchivedAt, setEditArchivedAt] = useState(null);
+  const [editCount, setEditCount] = useState('');
+  const [editComment, setEditComment] = useState('');
+
+  // Increase package modal
+  const [increaseModalVisible, setIncreaseModalVisible] = useState(false);
+  const [increaseClient, setIncreaseClient] = useState(null);
+  const [increaseAmount, setIncreaseAmount] = useState('');
+  const [increaseComment, setIncreaseComment] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      const data = await api.getClients();
+      const fetched = data || [];
+      setClients(fetched);
+      global.cachedClients = fetched;
+    } catch (e) {
+      console.log('Load payments data error', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  const handleOpenStartBilling = async (client) => {
+    if ((client.package_current_count || 0) > 0) {
+      Alert.alert(
+        'Uwaga 🐶', 
+        'Ten podopieczny ma już aktywy pakiet. Nie możesz przypisać mu drugiego pakietu w tym samym czasie. Jeżeli w systemie jest błąd zamknij najpierw ten obecny.'
+      );
+      return;
+    }
+    try {
+      const evs = await api.getCalendarEvents(null, null, client.id);
+      const sorted = (evs || []).sort((a,b) => {
+          if (a.event_date === b.event_date) return b.event_hour - a.event_hour;
+          return new Date(b.event_date) - new Date(a.event_date);
+      });
+      setClientEvents(sorted);
+      setSelectedClient(client);
+      setStartEventId(sorted.find(e => !e.is_settled)?.id || '');
+      setPackageSize(String(client.package_size || 10));
+      setPackageOffset('0');
+      setStartBillingModalVisible(true);
+    } catch(e) {
+      Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
+    }
+  };
+
+  const executeStartBilling = async () => {
+    if (!selectedClient) return;
+
+    const isPackage = selectedClient.billing_type === 'package';
+    if (isPackage && !startEventId) {
+      if (Platform.OS === 'web') window.alert('Błąd: Dla pakietów SSOT musisz wskazać trening startowy.');
+      else Alert.alert('Błąd', 'Dla pakietów SSOT musisz wskazać trening startowy.');
+      return;
+    }
+
+    const startEv = startEventId ? clientEvents.find(e => e.id === startEventId) : null;
+    if (startEv && startEv.is_settled) {
+        if (Platform.OS === 'web') window.alert('Błąd: Nie możesz wybrać już rozliczonego treningu jako punkt startowy nowego pakietu.');
+        else Alert.alert('Błąd', 'Nie możesz wybrać już rozliczonego treningu jako punkt startowy nowego pakietu.');
+        return;
+    }
+    try {
+      setStartBillingModalVisible(false);
+      setLoading(true);
+
+      if (isPackage) {
+          await api.createClientPackage(selectedClient.id, {
+            size: parseInt(packageSize, 10) || 10,
+            start_training_id: startEventId,
+            offset: parseInt(packageOffset, 10) || 0
+          });
+      } else {
+          await api.updateClient(selectedClient.id, {
+              package_purchase_date: startEv?.event_date || new Date().toISOString().split('T')[0]
+          });
+      }
+
+      if (Platform.OS === 'web') window.alert('Sukces: Rozpoczęto nowe rozliczanie SSOT.');
+      else Alert.alert('Sukces', 'Rozpoczęto nowe rozliczanie SSOT.');
+      loadData();
+    } catch (e) {
+      if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+      else Alert.alert('Błąd', e.message);
+      setLoading(false);
+    }
+  };
+
+  const handleOpenEndBilling = async (client) => {
+    if (Platform.OS === 'web') window.alert('Uruchamiam handleOpenEndBilling dla: ' + client.name);
+    try {
+      const evs = await api.getCalendarEvents(null, null, client.id);
+      if (Platform.OS === 'web') window.alert('Pobrano eventy: ' + (evs ? evs.length : 0));
+      const sorted = (evs || []).sort((a,b) => {
+          if (a.event_date === b.event_date) return b.event_hour - a.event_hour;
+          return new Date(b.event_date) - new Date(a.event_date);
+      });
+      setClientEvents(sorted);
+      setSelectedClient(client);
+      setEndEventId(sorted.find(e => e.is_settled)?.id || '');
+      setEndBillingModalVisible(true);
+      if (Platform.OS === 'web') window.alert('Modal powinien być teraz widoczny!');
+    } catch(e) {
+      if (Platform.OS === 'web') window.alert('Błąd getCalendarEvents: ' + e.message);
+      else Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
+    }
+  };
+
+  const executeEndBilling = async () => {
+    if (!selectedClient) return;
+    
+    // Allow closing without selecting an event if there are NO settled events available
+    const settledEvents = clientEvents.filter(e => e.is_settled);
+    if (settledEvents.length > 0 && !endEventId) {
+        if (Platform.OS === 'web') window.alert('Błąd: Masz w kalendarzu rozliczone treningi, musisz wskazać jeden z nich jako zamykający.');
+        else Alert.alert('Błąd', 'Masz w kalendarzu rozliczone treningi, musisz wskazać jeden z nich jako zamykający.');
+        return;
+    }
+    
+    const isPackage = selectedClient.billing_type === 'package';
+    if (isPackage && !selectedClient.active_package_id) {
+        if (Platform.OS === 'web') window.alert('Błąd: Ten podopieczny nie ma obecnie aktywnego pakietu do zamknięcia.');
+        else Alert.alert('Błąd', 'Ten podopieczny nie ma obecnie aktywnego pakietu do zamknięcia.');
+        return;
+    }
+    if (!isPackage && !selectedClient.package_purchase_date) {
+        if (Platform.OS === 'web') window.alert('Błąd: Ten podopieczny nie ma aktywnego cyklu rozliczeniowego.');
+        else Alert.alert('Błąd', 'Ten podopieczny nie ma aktywnego cyklu rozliczeniowego.');
+        return;
+    }
+    
+    // Walidacja chronologii i statusu
+    const endEv = clientEvents.find(e => e.id === endEventId);
+    if (endEv && !endEv.is_settled) {
+        if (Platform.OS === 'web') window.alert('Błąd: Nie możesz zamknąć pakietu na treningu, który nie został jeszcze rozliczony.');
+        else Alert.alert('Błąd', 'Nie możesz zamknąć pakietu na treningu, który nie został jeszcze rozliczony.');
+        return;
+    }
+    if (endEv && selectedClient.package_purchase_date) {
+        if (new Date(endEv.event_date) < new Date(selectedClient.package_purchase_date)) {
+            if (Platform.OS === 'web') window.alert('Błąd SSOT: Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu.');
+            else Alert.alert('Błąd SSOT 🐶', 'Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu. Nie możesz zamknąć w przeszłość! Wybierz poprawny trening.');
+            return;
+        }
+    }
+
+    const commitArchiving = async () => {
+        setEndBillingModalVisible(false);
+        setLoading(true);
+        try {
+            if (isPackage) {
+                if (endEventId) {
+                    await api.endClientPackage(selectedClient.active_package_id, {
+                        end_training_id: endEventId
+                    });
+                } else {
+                    // Jeśli zamykamy pakiet bez żadnego odbytego treningu,
+                    // backend i tak uważa end_training_id=null za pakiet aktywny.
+                    // Dlatego w takiej sytuacji usuwamy pakiet całkowicie z historii.
+                    await api.deleteClientPackage(selectedClient.active_package_id);
+                }
+            } else {
+                const history = [...(selectedClient.payment_history || [])];
+                history.push({
+                    action: 'end',
+                    end_date: endEv?.event_date || new Date().toISOString().split('T')[0],
+                    purchase_date: selectedClient.package_purchase_date,
+                    archived_at: new Date().toISOString(),
+                    package_size: 0,
+                    completed_count: selectedClient.package_current_count || 0
+                });
+                await api.updateClient(selectedClient.id, {
+                    payment_history: history,
+                    package_purchase_date: null
+                });
+            }
+            if (Platform.OS === 'web') window.alert('Sukces: Pakiet został domknięty. Zarchiwizowano historię.');
+            else Alert.alert('Sukces', 'Pakiet został domknięty. Zarchiwizowano historię.');
+            loadData();
+        } catch (e) {
+            if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+            else Alert.alert('Błąd', e.message);
+            setLoading(false);
+        }
+    };
+
+    if (Platform.OS === 'web') {
+        if (window.confirm('Czy na pewno chcesz zarchiwizować ten cykl? (Możesz to cofnąć usuwając go z Historii)')) {
+            commitArchiving();
+        }
+    } else {
+        Alert.alert(
+            'Archiwizacja Pakietu 🐶',
+            'Zamykanie pakietu służy do zarchiwizowania zakończonego cyklu w Historii. Czy na pewno zarchiwizować?',
+            [
+                { text: 'Anuluj', style: 'cancel' },
+                { text: 'Tak, zarchiwizuj', style: 'destructive', onPress: commitArchiving }
+            ]
+        );
+    }
+  };
+
+  const openHistory = async (client) => {
+    setLoading(true);
+    try {
+        if (client.billing_type === 'package') {
+            const pkgs = await api.getClientPackages(client.id);
+            const evs = await api.getCalendarEvents(null, null, client.id);
+            const sorted = (pkgs || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+            setClientPackages(sorted);
+            setClientEvents(evs || []);
+        } else {
+            setClientPackages(client.payment_history || []);
+            setClientEvents([]);
+        }
+        setSelectedClient(client);
+        setHistoryModalVisible(true);
+    } catch(e) {
+        Alert.alert('Błąd', 'Nie można pobrać historii.');
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteHistoryItem = (item) => {
+      const executeDelete = async () => {
+          setHistoryModalVisible(false);
+          setLoading(true);
+          try {
+              if (selectedClient.billing_type === 'package') {
+                  await api.deleteClientPackage(item.id);
+              } else {
+                  const history = [...(selectedClient.payment_history || [])];
+                  const newHistory = history.filter(h => h.archived_at !== item.archived_at);
+                  await api.updateClient(selectedClient.id, { payment_history: newHistory });
+              }
+              if (Platform.OS === 'web') alert('Sukces: Wpis z historii został usunięty.');
+              else Alert.alert('Sukces', 'Wpis z historii został usunięty.');
+              loadData();
+          } catch(e) {
+              if (Platform.OS === 'web') alert('Błąd: ' + e.message);
+              else Alert.alert('Błąd', e.message);
+              setLoading(false);
+          }
+      };
+
+      if (Platform.OS === 'web') {
+          if (window.confirm('Dzień 0 (Twarde Usuwanie) 🐶\n\nTa operacja całkowicie usunie ten wpis z historii SSOT. Czy jesteś absolutnie pewien, że chcesz go wyzerować?')) {
+              executeDelete();
+          }
+      } else {
+          Alert.alert(
+              'Dzień 0 (Twarde Usuwanie) 🐶', 
+              'Ta operacja całkowicie usunie ten wpis z historii SSOT. Czy jesteś absolutnie pewien, że chcesz go wyzerować?',
+              [
+                  { text: 'Anuluj', style: 'cancel' },
+                  { text: 'Tak, skasuj', style: 'destructive', onPress: executeDelete }
+              ]
+          );
+      }
+  };
+
+  const handleHardReset = async (client) => {
+      const executeReset = async () => {
+          setLoading(true);
+          try {
+              await api.hardResetClient(client.id);
+              if (Platform.OS === 'web') alert('Sukces: Pakiety zostały bezpowrotnie zresetowane do zera.');
+              else Alert.alert('Sukces', 'Pakiety zostały bezpowrotnie zresetowane do zera.');
+              loadData();
+          } catch(e) {
+              if (Platform.OS === 'web') alert('Błąd: ' + e.message);
+              else Alert.alert('Błąd', e.message);
+              setLoading(false);
+          }
+      };
+
+      if (Platform.OS === 'web') {
+          if (window.confirm(`TWARDY RESET 🚨\n\nTa operacja wyzeruje absolutnie wszystkie powiązania pakietowe i daty startowe dla ${client.name}. Używaj tylko w sytuacjach awaryjnych! Kontynuować?`)) {
+              executeReset();
+          }
+      } else {
+          Alert.alert(
+              'TWARDY RESET 🚨',
+              `Ta operacja wyzeruje absolutnie wszystkie powiązania pakietowe i daty startowe dla ${client.name}. Używaj tylko w sytuacjach awaryjnych! Kontynuować?`,
+              [
+                  { text: 'Anuluj', style: 'cancel' },
+                  { text: 'Tak, Zeruj', style: 'destructive', onPress: executeReset }
+              ]
+          );
+      }
+  };
+
+  const openEditModal = (client) => {
+    setEditClient(client);
+    setEditArchivedAt(null);
+    setEditCount(String(client.package_current_count || 0));
+    setEditComment('');
+    setEditModalVisible(true);
+  };
+
+  const openIncreaseModal = (client) => {
+    setIncreaseClient(client);
+    setIncreaseAmount('');
+    setIncreaseComment('');
+    setIncreaseModalVisible(true);
+  };
+
+  const handleIncreasePackage = async () => {
+    if (!increaseClient) return;
+    const amount = parseInt(increaseAmount, 10);
+    if (!amount || amount <= 0) {
+      Alert.alert('Błąd', 'Podaj liczbę treningów do dodania (min. 1).');
+      return;
+    }
+    
+    const isPackage = increaseClient.billing_type === 'package';
+    if (!isPackage || !increaseClient.active_package_id) {
+        Alert.alert('Błąd', 'Zwiększanie rozmiaru dotyczy tylko aktywnych pakietów.');
+        return;
+    }
+
+    try {
+      setLoading(true);
+      setIncreaseModalVisible(false);
+      
+      const currentSize = increaseClient.package_size || 10;
+      await api.endClientPackage(increaseClient.active_package_id, {
+          size: currentSize + amount
+      });
+      
+      Alert.alert('Sukces', `Pakiet powiększony z ${currentSize} do ${currentSize + amount}.`);
+      loadData();
+    } catch (e) {
+      Alert.alert('Błąd', e.message);
+      setLoading(false);
+    }
+  };
+
+  const openHistoryEditModal = (client, historyItem) => {
+    setEditClient(client);
+    setEditArchivedAt(historyItem.archived_at);
+    setEditCount(String(historyItem.completed_count || 0));
+    setEditComment('');
+    setHistoryModalVisible(false);
+    setTimeout(() => {
+      setEditModalVisible(true);
+    }, 300);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editClient) return;
+    const newCount = parseInt(editCount, 10);
+    if (isNaN(newCount) || newCount < 0) {
+        Alert.alert('Błąd', 'Podaj poprawną liczbę odbytych treningów.');
+        return;
+    }
+    
+    try {
+      setLoading(true);
+      if (editArchivedAt) {
+        // Historia - nadpisujemy JSON
+        const history = [...(editClient.payment_history || [])];
+        const idx = history.findIndex(h => h.archived_at === editArchivedAt);
+        if (idx !== -1) {
+            history[idx].completed_count = newCount;
+            await api.updateClient(editClient.id, { payment_history: history });
+        }
+      } else {
+        // Aktywny pakiet / cykl
+        const currentCount = editClient.package_current_count || 0;
+        const diff = newCount - currentCount;
+        
+        if (diff < 0) {
+            Alert.alert('Błąd SSOT 🐶', 'Nie możesz ręcznie pomniejszyć licznika aktywnych treningów w nowej architekturze. Jeśli chcesz anulować przebyty trening, wejdź do Kalendarza i Odznacz go jako Odbyty lub usuń wydarzenie.');
+            setLoading(false);
+            return;
+        } else if (diff > 0) {
+            // Dodajemy sztuczne treningi "Korekta" z datą dzisiejszą, od godz 23 w dół
+            const today = new Date().toISOString().split('T')[0];
+            let hour = 23;
+            for (let i = 0; i < diff; i++) {
+                await api.createCalendarEvent({
+                    client_id: editClient.id,
+                    event_date: today,
+                    event_hour: hour,
+                    is_settled: true,
+                    status: 'active',
+                    note: editComment ? `[KOREKTA] ${editComment}` : '[KOREKTA] Ręczne dodanie treningów'
+                });
+                hour--;
+                if (hour < 0) hour = 23; // fallback, in practice diff shouldn't be > 24
+            }
+        }
+      }
+      setEditModalVisible(false);
+      Alert.alert('Sukces', 'Zaktualizowano dane.');
+      loadData();
+    } catch (e) {
+      Alert.alert('Błąd', e.message);
+      setLoading(false);
+    }
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <AppLayout navigation={navigation} title="Rozliczenia" showBack>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.background }}>
+          <ActivityIndicator size="large" color={C.accent} />
+        </View>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout navigation={navigation} title="Rozliczenia" showBack>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
+      >
+        <Text style={styles.title}>Status Płatności Podopiecznych</Text>
+        <Text style={styles.subtitle}>Sprawdź statusy pakietów oraz rozliczenia miesięczne swoich klientów.</Text>
+        
+        {clients.map(client => {
+          const isPackage = client.billing_type === 'package';
+          const isSingle = client.billing_type === 'single' || (!client.billing_type && !isPackage);
+          const size = client.package_size || 0;
+          const current = client.package_current_count || 0;
+          const isOverLimit = isPackage && current > size;
+          
+          return (
+            <View key={client.id} style={[styles.card, isOverLimit && styles.cardWarning]}>
+              <View style={styles.cardHeader}>
+                <View style={styles.clientMeta}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{client.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.clientName}>{client.name}</Text>
+                    <View style={[styles.badge, isPackage ? styles.badgePackage : styles.badgeSingle]}>
+                      <Text style={[styles.badgeText, isSingle && { color: '#8b949e' }]}>
+                        {isPackage ? 'PAKIET' : 'BEZ PAKIETU'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                <View style={styles.counterSection}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.counterText, isOverLimit && styles.counterTextWarning]}>
+                      {isSingle ? current : `${current}${isPackage ? ` / ${size}` : ''}`}
+                    </Text>
+                    {isPackage && (
+                      <>
+                        <TouchableOpacity onPress={() => openEditModal(client)} style={{ marginLeft: 6, padding: 4 }}>
+                          <Ionicons name="pencil" size={16} color={C.accent} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => openIncreaseModal(client)} style={{ marginLeft: 2, padding: 4 }}>
+                          <Ionicons name="add-circle-outline" size={18} color="#1dd1a1" />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                  <Text style={styles.counterLabel}>treningi</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardBody}>
+                <View style={styles.infoRow}>
+                  <Ionicons name="calendar-outline" size={16} color={themeColors.textSecondary} />
+                  <Text style={styles.infoText}>
+                    Od: <Text style={styles.infoValue}>{client.package_purchase_date || 'brak daty'}</Text>
+                  </Text>
+                </View>
+
+                {client.cancelled_settled_count > 0 && (
+                  <View style={[styles.infoRow, { marginTop: 4 }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={themeColors.danger} />
+                    <Text style={styles.infoText}>
+                      Z tego odwołane i rozliczone: <Text style={[styles.infoValue, { color: themeColors.danger }]}>{client.cancelled_settled_count}</Text>
+                    </Text>
+                  </View>
+                )}
+                
+                {isOverLimit && (
+                  <View style={styles.warningMessage}>
+                    <Ionicons name="warning-outline" size={16} color="#FF9800" />
+                    <Text style={styles.warningText}>{`Klient przekroczył pakiet o ${current - size} treningi!`}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={[styles.cardActions, { flexWrap: 'wrap', gap: 8 }]}>
+                {!client.package_purchase_date && (
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, { flex: 1, minWidth: '48%' }]}
+                    onPress={() => handleOpenStartBilling(client)}
+                  >
+                    <Ionicons name="play-circle-outline" size={18} color="#ffffff" />
+                    <Text style={styles.btnPrimaryText}>
+                      {isPackage ? 'Nowy Pakiet' : 'Nowe rozliczanie'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {client.package_purchase_date && (
+                  <TouchableOpacity
+                    style={[styles.btn, { flex: 1, minWidth: '48%', backgroundColor: themeColors.danger, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 6 }]}
+                    onPress={() => handleOpenEndBilling(client)}
+                  >
+                    <Ionicons name="stop-circle-outline" size={18} color="#ffffff" />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                      {isPackage ? 'Zakończ Pakiet' : 'Zakończ rozliczanie'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnSecondary, { flex: 1, minWidth: '100%' }]}
+                  onPress={() => openHistory(client)}
+                >
+                  <Ionicons name="time-outline" size={18} color={C.accent} />
+                  <Text style={styles.btnSecondaryText}>Historia</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btn, { flex: 1, minWidth: '100%', backgroundColor: 'transparent', borderColor: themeColors.danger, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 6, marginTop: 4 }]}
+                  onPress={() => handleHardReset(client)}
+                >
+                  <Ionicons name="warning-outline" size={16} color={themeColors.danger} />
+                  <Text style={{ color: themeColors.danger, fontWeight: '600', fontSize: 13 }}>
+                    Twardy Reset (Wyzeruj)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+
+        {clients.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={48} color={themeColors.textMuted} />
+            <Text style={styles.emptyText}>Brak klientów do wyświetlenia.</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* History Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={historyModalVisible}
+        onRequestClose={() => setHistoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Historia płatności</Text>
+              <TouchableOpacity onPress={() => setHistoryModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
+            
+            <FlatList
+              data={clientPackages}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                if (selectedClient?.billing_type === 'package') {
+                    const startEv = clientEvents.find(e => e.id === item.start_training_id);
+                    const endEv = clientEvents.find(e => e.id === item.end_training_id);
+                    
+                    return (
+                      <View style={styles.historyItem}>
+                        <View style={styles.historyMeta}>
+                          <View style={styles.infoRow}>
+                            <Ionicons name={item.end_training_id ? "archive-outline" : "ellipse"} size={14} color={item.end_training_id ? themeColors.textSecondary : "#28a745"} />
+                            <Text style={styles.historyDate}>
+                              Start: <Text style={{ fontWeight: '600', color: themeColors.text }}>{startEv ? `${startEv.event_date}` : 'Brak danych'}</Text>
+                            </Text>
+                          </View>
+                          <View style={[styles.infoRow, { marginTop: 4 }]}>
+                            <Ionicons name="stop-circle-outline" size={14} color={themeColors.textSecondary} />
+                            <Text style={styles.historyDate}>
+                              Koniec: <Text style={{ fontWeight: '600', color: themeColors.text }}>{endEv ? `${endEv.event_date}` : 'Pakiet otwarty'}</Text>
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={[styles.historyStats, { flexDirection: 'row', alignItems: 'center' }]}>
+                          <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
+                            <Text style={[styles.historyCountText, { fontSize: 13, color: themeColors.textMuted }]}>
+                              Offset: {item.offset}
+                            </Text>
+                            <Text style={styles.historyLabel}>Pula: {item.size}</Text>
+                          </View>
+                          <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
+                            <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                } else {
+                    return (
+                      <View style={styles.historyItem}>
+                        <View style={styles.historyMeta}>
+                          <View style={styles.infoRow}>
+                            <Ionicons name="archive-outline" size={14} color={themeColors.textSecondary} />
+                            <Text style={styles.historyDate}>
+                              Start: <Text style={{ fontWeight: '600', color: themeColors.text }}>{item.purchase_date}</Text>
+                            </Text>
+                          </View>
+                          <View style={[styles.infoRow, { marginTop: 4 }]}>
+                            <Ionicons name="stop-circle-outline" size={14} color={themeColors.textSecondary} />
+                            <Text style={styles.historyDate}>
+                              Koniec: <Text style={{ fontWeight: '600', color: themeColors.text }}>{item.end_date}</Text>
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={[styles.historyStats, { flexDirection: 'row', alignItems: 'center' }]}>
+                          <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
+                            <Text style={[styles.historyCountText, { fontSize: 13, color: themeColors.textMuted }]}>
+                              Rozliczono: {item.completed_count}
+                            </Text>
+                            <Text style={styles.historyLabel}>{new Date(item.archived_at).toLocaleDateString()}</Text>
+                          </View>
+                          <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
+                            <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                }
+              }}
+              ListEmptyComponent={() => (
+                <View style={styles.modalEmpty}>
+                  <Ionicons name="receipt-outline" size={36} color={themeColors.textMuted} />
+                  <Text style={styles.modalEmptyText}>Brak paczek dla tego klienta (Dzień 0).</Text>
+                </View>
+              )}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={editModalVisible}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edytuj Licznik</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>{editClient?.name}</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Zużyte treningi</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={editCount}
+                onChangeText={setEditCount}
+                placeholder="Np. 5"
+                placeholderTextColor={themeColors.textMuted}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Komentarz (powód zmiany)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                multiline
+                numberOfLines={3}
+                value={editComment}
+                onChangeText={setEditComment}
+                placeholder="Wpisz powód korekty..."
+                placeholderTextColor={themeColors.textMuted}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary, { marginTop: 16 }]}
+              onPress={handleSaveEdit}
+            >
+              <Text style={styles.btnPrimaryText}>Zapisz Zmiany</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Start Billing Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={startBillingModalVisible}
+        onRequestClose={() => setStartBillingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: 'auto' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Rozpocznij {selectedClient?.billing_type === 'package' ? 'Nowy Pakiet' : 'Nowe Rozliczanie'}</Text>
+              <TouchableOpacity onPress={() => setStartBillingModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>1. Wskaż trening startowy</Text>
+              <DropdownPicker
+                  placeholder="Wybierz trening z kalendarza..."
+                  selectedValue={startEventId}
+                  onValueChange={setStartEventId}
+                  style={styles.pickerWrap}
+                  dropdownIconColor={themeColors.textSecondary}
+                  items={clientEvents.filter(e => !e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Nierozliczony)`, value: e.id, color: themeColors.text }))}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                <View style={[styles.inputGroup, { flex: 1 }]}>
+                  <Text style={styles.label}>2. Wielkość puli</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={packageSize}
+                    onChangeText={setPackageSize}
+                    keyboardType="numeric"
+                    placeholder="Np. 10"
+                    placeholderTextColor={themeColors.textMuted}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { flex: 1 }]}>
+                  <Text style={styles.label}>3. Startuj od (Offset)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={packageOffset}
+                    onChangeText={setPackageOffset}
+                    keyboardType="numeric"
+                    placeholder="Domyślnie 0"
+                    placeholderTextColor={themeColors.textMuted}
+                  />
+                </View>
+            </View>
+
+            <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 16 }]} onPress={executeStartBilling}>
+              <Text style={styles.btnPrimaryText}>Otwórz Pakiet (SSOT)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* End Billing Modal */}
+      <Modal
+        animationType="none"
+        transparent={true}
+        visible={endBillingModalVisible}
+        onRequestClose={() => setEndBillingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: 'auto' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Zakończ {selectedClient?.billing_type === 'package' ? 'Pakiet' : 'Rozliczanie'}</Text>
+              <TouchableOpacity onPress={() => setEndBillingModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Zaznacz trening końcowy z kalendarza</Text>
+              {clientEvents.filter(e => e.is_settled).length === 0 ? (
+                <Text style={{ fontSize: 13, color: themeColors.textMuted, fontStyle: 'italic', paddingVertical: 10 }}>
+                  Brak odbytych (rozliczonych) treningów do wyboru. Pakiet zostanie zamknięty z dzisiejszą datą.
+                </Text>
+              ) : (
+                <DropdownPicker
+                    placeholder="Wybierz trening kończący ten cykl..."
+                    selectedValue={endEventId}
+                    onValueChange={setEndEventId}
+                    style={styles.pickerWrap}
+                    dropdownIconColor={themeColors.textSecondary}
+                    items={clientEvents.filter(e => e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Rozliczony)`, value: e.id, color: themeColors.text }))}
+                />
+              )}
+              <Text style={{ fontSize: 12, color: themeColors.textMuted, marginTop: 6 }}>
+                Po wskazaniu ostatniego treningu paczka zostanie hermetycznie zamknięta (zarchiwizowana).
+              </Text>
+            </View>
+
+            <TouchableOpacity style={[styles.btn, { backgroundColor: themeColors.danger, marginTop: 16, paddingVertical: 14, borderRadius: 10, alignItems: 'center' }]} onPress={executeEndBilling}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Zamknij i Zarchiwizuj Pakiet</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Increase Package Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={increaseModalVisible}
+        onRequestClose={() => setIncreaseModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: 'auto' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Zwiększ Pakiet</Text>
+              <TouchableOpacity onPress={() => setIncreaseModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>{increaseClient?.name}</Text>
+            
+            <View style={[styles.infoRow, { marginBottom: 16, backgroundColor: themeColors.surfaceLight, padding: 12, borderRadius: 10 }]}>
+              <Ionicons name="information-circle-outline" size={16} color={C.accent} />
+              <Text style={{ color: themeColors.textSecondary, fontSize: 13, flex: 1 }}>
+                Obecny pakiet: {increaseClient?.package_current_count || 0} / {increaseClient?.package_size || 0} treningów
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Liczba treningów do dodania</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={increaseAmount}
+                onChangeText={setIncreaseAmount}
+                placeholder="Np. 10"
+                placeholderTextColor={themeColors.textMuted}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Komentarz (wymagany)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                multiline
+                numberOfLines={3}
+                value={increaseComment}
+                onChangeText={setIncreaseComment}
+                placeholder="Np. Klient dokupił 10 treningów..."
+                placeholderTextColor={themeColors.textMuted}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary, { marginTop: 16, backgroundColor: '#1dd1a1' }]}
+              onPress={handleIncreasePackage}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#ffffff" />
+              <Text style={styles.btnPrimaryText}>Dodaj do pakietu</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </AppLayout>
+  );
+}
+
+function makeStyles(C, TC) {
+  return StyleSheet.create({
+    container: {
+      paddingHorizontal: SPACING.md,
+      paddingTop: SPACING.md,
+      paddingBottom: 130,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: TC.text,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: TC.textSecondary,
+      marginBottom: SPACING.lg,
+    },
+    card: {
+      backgroundColor: TC.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: TC.border,
+      padding: SPACING.md,
+      marginBottom: SPACING.md,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    cardWarning: {
+      borderColor: '#FF9800',
+      backgroundColor: TC.surface,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: TC.border,
+      paddingBottom: 12,
+      marginBottom: 12,
+    },
+    clientMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: C.accent + '20',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarText: {
+      color: C.accent,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    clientName: {
+      color: TC.text,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    badge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 6,
+      marginTop: 4,
+    },
+    badgePackage: {
+      backgroundColor: C.accent + '15',
+    },
+    badgeSingle: {
+      backgroundColor: TC.surfaceLight,
+      borderWidth: 1,
+      borderColor: TC.border,
+    },
+    badgeMonthly: {
+      backgroundColor: '#2196F320',
+    },
+    badgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: C.accent,
+    },
+    counterSection: {
+      alignItems: 'flex-end',
+    },
+    counterText: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: C.accent,
+    },
+    counterTextWarning: {
+      color: '#FF9800',
+    },
+    counterLabel: {
+      fontSize: 10,
+      color: TC.textSecondary,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+    },
+    cardBody: {
+      marginBottom: 16,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    infoText: {
+      fontSize: 13,
+      color: TC.textSecondary,
+    },
+    infoValue: {
+      color: TC.text,
+      fontWeight: '600',
+    },
+    warningMessage: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: '#FF980015',
+      padding: 8,
+      borderRadius: 8,
+      marginTop: 10,
+    },
+    warningText: {
+      fontSize: 12,
+      color: '#FF9800',
+      fontWeight: '600',
+    },
+    cardActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    btn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderRadius: 12,
+      paddingVertical: 12,
+    },
+    btnPrimary: {
+      backgroundColor: C.accent,
+    },
+    btnPrimaryText: {
+      color: '#ffffff',
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    btnSecondary: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: C.accent,
+    },
+    btnSecondaryText: {
+      color: C.accent,
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+      gap: 12,
+    },
+    emptyText: {
+      color: TC.textSecondary,
+      fontSize: 14,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: TC.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: SPACING.lg,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: TC.text,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: C.accent,
+      fontWeight: '600',
+      marginBottom: SPACING.md,
+    },
+    closeBtn: {
+      padding: 4,
+    },
+    historyItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: TC.surfaceLight,
+      padding: SPACING.md,
+      borderRadius: 12,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: TC.border,
+    },
+    historyMeta: {
+      gap: 4,
+    },
+    historyDate: {
+      fontSize: 13,
+      color: TC.textSecondary,
+    },
+    historyArchived: {
+      fontSize: 10,
+      color: TC.textMuted,
+    },
+    historyStats: {
+      alignItems: 'flex-end',
+    },
+    historyCountText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: TC.text,
+    },
+    historyLabel: {
+      fontSize: 8,
+      color: TC.textSecondary,
+      textTransform: 'uppercase',
+    },
+    modalEmpty: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+      gap: 8,
+    },
+    modalEmptyText: {
+      color: TC.textSecondary,
+      fontSize: 13,
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: TC.text,
+      marginBottom: 8,
+    },
+    input: {
+      backgroundColor: TC.surfaceLight,
+      borderWidth: 1,
+      borderColor: TC.border,
+      borderRadius: 12,
+      padding: 12,
+      color: TC.text,
+      fontSize: 15,
+    },
+    textArea: {
+      height: 80,
+      textAlignVertical: 'top',
+    },
+  });
+}
