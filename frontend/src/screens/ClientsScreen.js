@@ -105,13 +105,26 @@ export default function ClientsScreen({ navigation }) {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadClients} tintColor={C.accent} />}
       >
-        {clients.map(c => (
+        {clients.map(c => {
+          const isPkg = c.billing_type === 'package';
+          const cur = c.package_current_count || 0;
+          const size = c.package_size || 0;
+          const overflow = isPkg && size > 0 && cur > size;
+          return (
           <View key={c.id} style={styles.card}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{c.name?.charAt(0)?.toUpperCase() || '?'}</Text>
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardName}>{c.name}</Text>
+              <View style={styles.pkgRow}>
+                <View style={[styles.pkgChip, overflow && styles.pkgChipOver]}>
+                  <Text style={styles.pkgChipText}>
+                    {isPkg ? (size > 0 ? `${cur}/${size}` : `${cur}`) : `miesięczny: ${cur}`}
+                  </Text>
+                </View>
+                {overflow && <Text style={styles.overText}>dopłata +{cur - size}</Text>}
+              </View>
               {c.default_workout_type_id && workoutTypes[c.default_workout_type_id] ? (
                 <Text style={styles.cardDetail}>Rodzaj: {workoutTypes[c.default_workout_type_id]}</Text>
               ) : null}
@@ -130,7 +143,8 @@ export default function ClientsScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-        ))}
+          );
+        })}
         {clients.length === 0 && (
           <Text style={styles.empty}>Brak klientów</Text>
         )}
@@ -150,6 +164,11 @@ function makeStyles(C, TC) { return StyleSheet.create({
   cardInfo: { flex: 1 },
   cardName: { color: TC.text, fontSize: 16, fontWeight: '700' },
   cardDetail: { color: TC.textSecondary, fontSize: 12, marginTop: 2 },
+  pkgRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  pkgChip: { backgroundColor: C.accent + '20', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  pkgChipOver: { backgroundColor: TC.danger + '25' },
+  pkgChipText: { color: C.accent, fontSize: 12, fontWeight: '800' },
+  overText: { color: TC.danger, fontSize: 11, fontWeight: '700' },
   measureBtn: { color: C.accent, fontSize: 13, fontWeight: '600' },
   cardActions: { alignItems: 'flex-end', gap: 6 },
   editBtn: { backgroundColor: C.accent + '20', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
