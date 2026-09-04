@@ -6,6 +6,7 @@ import { Svg, Path, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../assets/theme';
 import * as api from '../services/api';
+import { useDeviceType } from '../ui/device';
 import { useTheme } from '../context/ThemeContext';
 import { APP_VERSION } from '../version';
 
@@ -411,7 +412,10 @@ function CalendarScreen({ navigation, route }) {
     }
   }, []);
   const { width: SCREEN_WIDTH } = useWindowDimensions();
-  const dayW = viewMode === 'week' ? (SCREEN_WIDTH - HOUR_W) / 3 : (SCREEN_WIDTH - HOUR_W);
+  const deviceType = useDeviceType();
+  // Telefon: 3 dni ze scrollem (bez zmian). Tablet: cały tydzień Pon–Sob (6 dni) naraz.
+  const visibleDays = viewMode === 'week' ? (deviceType === 'tablet' ? 6 : 3) : 1;
+  const dayW = viewMode === 'week' ? (SCREEN_WIDTH - HOUR_W) / visibleDays : (SCREEN_WIDTH - HOUR_W);
   const headerScrollRef = useRef(null);
   const isCurrentWeek = isSameWeek(monday, today);
   const getDisplayDateLabel = () => {
@@ -458,6 +462,8 @@ function CalendarScreen({ navigation, route }) {
   const hGridRef = useRef(null);
 
   useEffect(() => {
+    // Auto-scroll do bieżącego dnia tylko na telefonie (tablet widzi cały tydzień).
+    if (deviceType !== 'phone') return;
     if (viewMode === 'week' && isCurrentWeek && hGridRef.current && headerScrollRef.current) {
       let offsetIdx = 0;
       const d = new Date().getDay();
@@ -471,7 +477,7 @@ function CalendarScreen({ navigation, route }) {
         headerScrollRef.current?.scrollTo({ x, animated: false });
       }, 100);
     }
-  }, [viewMode, isCurrentWeek, dayW]);
+  }, [viewMode, isCurrentWeek, dayW, deviceType]);
 
   const handleMoveStart = useCallback((date, hour, ev) => {
     setMovingSlot({ date, hour, ev });
