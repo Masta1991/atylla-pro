@@ -1,0 +1,5 @@
+1. bez pakietu nie dziala w aplikacji 
+2. dodac pakiety laczone
+3. chcemy widziec odrazu cyferki na kafelkach bez wzgeldu czy trening rozliczony czy nie 
+4. w rozliczeniach nie pokazuje sie docelowa hsitorai treningow iule ich bylo i kiedy 
+5. w rozliczeniach moge wybrac termin do zamkniecia pakietu z dnia w ktrym juz inny pakeit obowiazywal poprawic to 
