@@ -340,7 +340,7 @@ export default function PaymentsScreen({ navigation, route }) {
             setClientEvents(evs || []);
         } else {
             const evs = await fetchUnionEvents(client).catch(() => []);
-            // Unia historii miesięcznych członków puli.
+            // Unia historii miesięcznych członków puli + karta bieżącego (otwartego) cyklu na górze.
             const ownHist = client.payment_history || [];
             const othersHist = [];
             for (const mid of (client.shared_with || [])) {
@@ -348,7 +348,16 @@ export default function PaymentsScreen({ navigation, route }) {
               const mc = clients.find(c => c.id === mid);
               othersHist.push(...(((mc || {}).payment_history) || []));
             }
-            setClientPackages([...ownHist, ...othersHist]);
+            const hist = [...ownHist, ...othersHist];
+            if (client.package_purchase_date) {
+              hist.unshift({
+                purchase_date: client.package_purchase_date,
+                end_date: null,
+                completed_count: client.package_current_count || 0,
+                _open: true,
+              });
+            }
+            setClientPackages(hist);
             setClientEvents(evs || []);
         }
         setSelectedClient(client);
@@ -782,7 +791,7 @@ export default function PaymentsScreen({ navigation, route }) {
                   : item.purchase_date;
                 const endLabel = isPkg
                   ? ((clientEvents.find(e => e.id === item.end_training_id)?.event_date) || 'Pakiet otwarty')
-                  : item.end_date;
+                  : (item.end_date || 'Cykl otwarty');
                 const stateStyle = (s) => s === 'done'
                   ? { color: '#1dd1a1' }
                   : (s === 'cancel-settled' ? { color: '#e67e22' } : { color: themeColors.danger });
@@ -840,9 +849,11 @@ export default function PaymentsScreen({ navigation, route }) {
                       )}
                     </TouchableOpacity>
                     <View style={[{ justifyContent: 'center' }]}>
-                      <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
-                        <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
-                      </TouchableOpacity>
+                      {!item._open && (
+                        <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
+                          <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 );

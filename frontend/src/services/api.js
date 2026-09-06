@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE = 'https://atylla-pro-production.up.railway.app';
 // const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'https://atylla-pro-production.up.railway.app';
 
 let authToken = null;
 let refreshToken = null;

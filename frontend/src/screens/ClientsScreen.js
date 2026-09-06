@@ -128,7 +128,9 @@ export default function ClientsScreen({ navigation }) {
               <View style={styles.pkgRow}>
                 <View style={[styles.pkgChip, overflow && styles.pkgChipOver]}>
                   <Text style={styles.pkgChipText}>
-                    {isPkg ? (size > 0 ? `${cur}/${size}` : `${cur}`) : `miesięczny: ${cur}`}
+                    {!c.package_purchase_date
+                      ? 'brak pakietu'
+                      : (isPkg ? (size > 0 ? `pakiet: ${cur}/${size}` : `pakiet: ${cur}`) : `miesięczny: ${cur}`)}
                     {sharedNames.length > 0 ? ' 👥' : ''}
                   </Text>
                 </View>
@@ -150,8 +152,8 @@ export default function ClientsScreen({ navigation }) {
                     <TouchableOpacity onPress={() => handleDelete(c.id, c.name)} style={styles.deleteBtn}>
                       <Text style={styles.deleteBtnText}>Usuń</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('Measurements', { clientId: c.id, clientName: c.name })}>
-                      <Text style={styles.measureBtn}>Pomiary →</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Measurements', { clientId: c.id, clientName: c.name })} style={styles.editBtn}>
+                      <Text style={styles.editBtnText}>Pomiary</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

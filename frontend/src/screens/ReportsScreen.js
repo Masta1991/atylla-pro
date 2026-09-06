@@ -202,9 +202,9 @@ export default function ReportsScreen({ navigation }) {
     const totalAll = allDays.size;
 
     // Frekwencja: ostatnie 8 tygodni jako słupki z liczbami (czytelne dla każdego).
+    // Liczy DNI treningowe (unikalne daty), nie logi ćwiczeń.
     const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const dayCounts = {};
-    (fullHistory || []).forEach(w => { dayCounts[w.session_date] = (dayCounts[w.session_date] || 0) + 1; });
+    const trainedDaySet = new Set((fullHistory || []).map(w => w.session_date));
     const nowD = new Date();
     const monD = new Date(nowD);
     monD.setDate(monD.getDate() - ((monD.getDay() + 6) % 7));
@@ -216,7 +216,7 @@ export default function ReportsScreen({ navigation }) {
       for (let d = 0; d < 7; d++) {
         const dt = new Date(start);
         dt.setDate(dt.getDate() + d);
-        cnt += dayCounts[isoOf(dt)] || 0;
+        if (trainedDaySet.has(isoOf(dt))) cnt += 1;
       }
       freqWeeks.push({ label: `${String(start.getDate()).padStart(2, '0')}.${String(start.getMonth() + 1).padStart(2, '0')}`, count: cnt });
     }
@@ -294,27 +294,37 @@ export default function ReportsScreen({ navigation }) {
       if (Platform.OS === 'web') {
         try {
           setIsCapturing(true);
-          await new Promise(resolve => setTimeout(resolve, 300)); // wait for re-render
+          await new Promise(resolve => setTimeout(resolve, 800)); // wait for re-render
 
           const htmlToImage = require('html-to-image');
           const captureOpts = { backgroundColor: themeColors.background, pixelRatio: 2 };
-          
+
+          // Telefon wolniej dociąga gify — czekamy aż wszystkie <img> w raporcie będą gotowe.
+          const awaitImages = async (node) => {
+            if (!node || !node.querySelectorAll) return;
+            const imgs = [...node.querySelectorAll('img')];
+            await Promise.all(imgs.map(im => (im.decode ? im.decode().catch(() => {}) : Promise.resolve())));
+          };
+
           const files = [];
-          
+
           const node1 = document.getElementById('report-part-1');
           if (node1) {
+            await awaitImages(node1);
             const blob1 = await htmlToImage.toBlob(node1, captureOpts);
             if (blob1) files.push(new File([blob1], 'raport_podsumowanie.png', { type: 'image/png' }));
           }
 
           const node2 = document.getElementById('report-part-2');
           if (node2) {
+            await awaitImages(node2);
             const blob2 = await htmlToImage.toBlob(node2, captureOpts);
             if (blob2) files.push(new File([blob2], 'raport_kalendarz.png', { type: 'image/png' }));
           }
 
           const node3 = document.getElementById('report-part-3');
           if (node3) {
+            await awaitImages(node3);
             const blob3 = await htmlToImage.toBlob(node3, captureOpts);
             if (blob3) files.push(new File([blob3], 'raport_wykresy.png', { type: 'image/png' }));
           }
