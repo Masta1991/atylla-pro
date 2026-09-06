@@ -22,3 +22,9 @@
 
 ## 2026-09-05 — UI E2E na 3001 (kółko testowe, zero zapisow)
 - Haslo testowe w C:/Projects/temp/.env (POZA repo). Playwright: login OK, kalendarz z danymi, szuflada rozliczonego (bez Nieobecnosc/Rozlicz - OK), szuflada nierozliczonego (Nieobecnosc -> Z/Bez/Powrot -> Powrot OK), ekran DZIEN (wiersze + akcje + Zatwierdz OK). Screenshoty w Temp/opencode/ui-e2e. Menu hamburger nieotwieralne headless (nie zweryfikowano wizualnie historii/end-modala/klientow - bundle OK, logika API OK). Zero bledow konsoli.
+
+## 2026-09-06 — v1.6.0: deploy (Railway przebudowuje)
+- Paczka: DayClose/zamykanie dnia, tryb PAKIET zamiast EDYCJI (bottom bar + AppLayout + deep-link), pakiety laczone (wspolna pula + partner treningu, migracja 001 wykonana na Supabase przed deployem), fix twardego resetu (PGRST204 active_package_id + unlink puli), fix 401-silent (wylogowanie na Login), historia przyszlosci, chip licznika, raporty (serie/odznaki/widgety/gify/kalendarz miesiaca/eksport WhatsApp), menu.
+- Migracja 001_shared_packages.sql MUSIALA byc wykonana recznie w dashboardzie (brak DDL lokalnie) — wykonana 06.09 przed deployem, zweryfikowana (3 kolumny).
+- Dane testowe: Agnieszka (144 logi, 36 sesji) na koncie testowym; reszta testow posprzatana.
+- Deploy: ./deploy.ps1 -Version 1.6.0 (commit d448ac9, tagi v1.6.0/backup-v1.6.0, push master, bundle backup/atylla-pro-backup-v1.6.0.bundle zweryfikowany ~99 MB).
