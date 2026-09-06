@@ -20,6 +20,7 @@ export default function ClientsScreen({ navigation }) {
   const [clients, setClients] = useState(global.cachedClients || []);
   const [workoutTypes, setWorkoutTypes] = useState(global.cachedWorkoutTypesMap || {});
   const [loading, setLoading] = useState(!global.cachedClients);
+  const [openId, setOpenId] = useState(null); // rozwijana karta klienta (jak 2.0)
 
   useEffect(() => {
     async function loadCachedData() {
@@ -110,39 +111,53 @@ export default function ClientsScreen({ navigation }) {
           const cur = c.package_current_count || 0;
           const size = c.package_size || 0;
           const overflow = isPkg && size > 0 && cur > size;
+          const isOpen = openId === c.id;
+          const sharedNames = (c.shared_with || [])
+            .map(id => (clients.find(x => x.id === id) || {}).name)
+            .filter(Boolean);
           return (
-          <View key={c.id} style={styles.card}>
+          <TouchableOpacity key={c.id} style={styles.card} onPress={() => setOpenId(isOpen ? null : c.id)} activeOpacity={0.85}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{c.name?.charAt(0)?.toUpperCase() || '?'}</Text>
             </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardName}>{c.name}</Text>
+              {c.default_workout_type_id && workoutTypes[c.default_workout_type_id] ? (
+                <Text style={styles.cardDetail}>Rodzaj: {workoutTypes[c.default_workout_type_id]}</Text>
+              ) : null}
               <View style={styles.pkgRow}>
                 <View style={[styles.pkgChip, overflow && styles.pkgChipOver]}>
                   <Text style={styles.pkgChipText}>
                     {isPkg ? (size > 0 ? `${cur}/${size}` : `${cur}`) : `miesięczny: ${cur}`}
+                    {sharedNames.length > 0 ? ' 👥' : ''}
                   </Text>
                 </View>
                 {overflow && <Text style={styles.overText}>dopłata +{cur - size}</Text>}
               </View>
-              {c.default_workout_type_id && workoutTypes[c.default_workout_type_id] ? (
-                <Text style={styles.cardDetail}>Rodzaj: {workoutTypes[c.default_workout_type_id]}</Text>
-              ) : null}
-              {c.email ? <Text style={styles.cardDetail}>{c.email}</Text> : null}
-              {c.join_date ? <Text style={styles.cardDetail}>Od: {c.join_date}</Text> : null}
+              {sharedNames.length > 0 && (
+                <Text style={styles.cardDetail}>Wspólny z: {sharedNames.join(', ')}</Text>
+              )}
+              {isOpen && (
+                <View style={styles.expanded}>
+                  {c.email ? <Text style={styles.cardDetail}>{c.email}</Text> : null}
+                  {c.phone ? <Text style={styles.cardDetail}>Tel: {c.phone}</Text> : null}
+                  {c.join_date ? <Text style={styles.cardDetail}>Od: {c.join_date}</Text> : null}
+                  {c.notes ? <Text style={styles.cardDetail} numberOfLines={2}>Notka: {c.notes}</Text> : null}
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity onPress={() => navigation.navigate('ClientForm', { client: c })} style={styles.editBtn}>
+                      <Text style={styles.editBtnText}>Edytuj</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(c.id, c.name)} style={styles.deleteBtn}>
+                      <Text style={styles.deleteBtnText}>Usuń</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('Measurements', { clientId: c.id, clientName: c.name })}>
+                      <Text style={styles.measureBtn}>Pomiary →</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
-            <View style={styles.cardActions}>
-              <TouchableOpacity onPress={() => navigation.navigate('ClientForm', { client: c })} style={styles.editBtn}>
-                <Text style={styles.editBtnText}>Edytuj</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(c.id, c.name)} style={styles.deleteBtn}>
-                <Text style={styles.deleteBtnText}>Usuń</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('Measurements', { clientId: c.id, clientName: c.name })}>
-                <Text style={styles.measureBtn}>Pomiary →</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </TouchableOpacity>
           );
         })}
         {clients.length === 0 && (
@@ -170,7 +185,8 @@ function makeStyles(C, TC) { return StyleSheet.create({
   pkgChipText: { color: C.accent, fontSize: 12, fontWeight: '800' },
   overText: { color: TC.danger, fontSize: 11, fontWeight: '700' },
   measureBtn: { color: C.accent, fontSize: 13, fontWeight: '600' },
-  cardActions: { alignItems: 'flex-end', gap: 6 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  expanded: { marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: TC.border },
   editBtn: { backgroundColor: C.accent + '20', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
   editBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   deleteBtn: { backgroundColor: TC.danger + '20', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   Alert, ActivityIndicator, RefreshControl, Modal, FlatList, TextInput, Platform
@@ -12,7 +12,7 @@ import AppLayout from '../components/AppLayout';
 import DropdownPicker from '../components/DropdownPicker';
 import { useTheme } from '../context/ThemeContext';
 
-export default function PaymentsScreen({ navigation }) {
+export default function PaymentsScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
   const styles = React.useMemo(() => makeStyles(C, themeColors), [C, themeColors]);
   
@@ -25,6 +25,9 @@ export default function PaymentsScreen({ navigation }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientEvents, setClientEvents] = useState([]);
   const [clientPackages, setClientPackages] = useState([]);
+  const [clientAbsences, setClientAbsences] = useState([]);
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
+  const [endCandidates, setEndCandidates] = useState([]);
 
   // Billing modals
   const [startBillingModalVisible, setStartBillingModalVisible] = useState(false);
@@ -34,6 +37,26 @@ export default function PaymentsScreen({ navigation }) {
   const [endEventId, setEndEventId] = useState('');
   const [packageSize, setPackageSize] = useState('10');
   const [packageOffset, setPackageOffset] = useState('0');
+  const [sharedEnabled, setSharedEnabled] = useState(false);
+  const [sharedIds, setSharedIds] = useState([]);
+
+  // Unia eventów klienta + członków wspólnej puli (do liczenia i pickerów).
+  const fetchUnionEvents = async (client) => {
+    const ids = [client.id, ...((client.shared_with || []).filter(id => id !== client.id))];
+    const all = [];
+    for (const id of ids) {
+      try {
+        const evs = await api.getCalendarEvents(null, null, id);
+        all.push(...(evs || []));
+      } catch (e) {}
+    }
+    const seen = new Set();
+    return all.filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)));
+  };
+
+  const toggleSharedId = (id) => {
+    setSharedIds((prev) => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
 
   // Edit modal states
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -68,6 +91,20 @@ export default function PaymentsScreen({ navigation }) {
     }, [loadData])
   );
 
+  // Deep-link z kalendarza (tryb PAKIET): otworz rozliczenia wskazanego klienta.
+  const deepLinkHandled = useRef(null);
+  const deepClientId = route?.params?.clientId;
+  useEffect(() => {
+    if (deepClientId && clients.length > 0 && deepLinkHandled.current !== deepClientId) {
+      const target = clients.find(c => c.id === deepClientId);
+      if (target) {
+        deepLinkHandled.current = deepClientId;
+        navigation.setParams({ clientId: null });
+        openHistory(target);
+      }
+    }
+  }, [deepClientId, clients]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     loadData();
@@ -82,7 +119,7 @@ export default function PaymentsScreen({ navigation }) {
       return;
     }
     try {
-      const evs = await api.getCalendarEvents(null, null, client.id);
+      const evs = await fetchUnionEvents(client);
       const sorted = (evs || []).sort((a,b) => {
           if (a.event_date === b.event_date) return b.event_hour - a.event_hour;
           return new Date(b.event_date) - new Date(a.event_date);
@@ -92,6 +129,8 @@ export default function PaymentsScreen({ navigation }) {
       setStartEventId(sorted.find(e => !e.is_settled)?.id || '');
       setPackageSize(String(client.package_size || 10));
       setPackageOffset('0');
+      setSharedEnabled(false);
+      setSharedIds([]);
       setStartBillingModalVisible(true);
     } catch(e) {
       Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
@@ -122,11 +161,13 @@ export default function PaymentsScreen({ navigation }) {
           await api.createClientPackage(selectedClient.id, {
             size: parseInt(packageSize, 10) || 10,
             start_training_id: startEventId,
-            offset: parseInt(packageOffset, 10) || 0
+            offset: parseInt(packageOffset, 10) || 0,
+            shared_client_ids: sharedEnabled ? sharedIds : []
           });
       } else {
           await api.updateClient(selectedClient.id, {
-              package_purchase_date: startEv?.event_date || new Date().toISOString().split('T')[0]
+              package_purchase_date: startEv?.event_date || new Date().toISOString().split('T')[0],
+              shared_monthly_with: sharedEnabled ? sharedIds : []
           });
       }
 
@@ -141,22 +182,39 @@ export default function PaymentsScreen({ navigation }) {
   };
 
   const handleOpenEndBilling = async (client) => {
-    if (Platform.OS === 'web') window.alert('Uruchamiam handleOpenEndBilling dla: ' + client.name);
     try {
-      const evs = await api.getCalendarEvents(null, null, client.id);
-      if (Platform.OS === 'web') window.alert('Pobrano eventy: ' + (evs ? evs.length : 0));
+      const evs = await fetchUnionEvents(client);
       const sorted = (evs || []).sort((a,b) => {
           if (a.event_date === b.event_date) return b.event_hour - a.event_hour;
           return new Date(b.event_date) - new Date(a.event_date);
       });
       setClientEvents(sorted);
       setSelectedClient(client);
-      setEndEventId(sorted.find(e => e.is_settled)?.id || '');
+      // Końcem pakietu może być tylko trening z AKTUALNEGO cyklu:
+      // po starcie aktywnego pakietu i nieużyty w innych pakietach.
+      let candidates = sorted.filter(e => e.is_settled);
+      if (client.billing_type === 'package') {
+        try {
+          const pkgs = await fetchUnionPackages(client);
+          const active = (pkgs || []).find(p => !p.end_training_id) || {};
+          const startEv = sorted.find(e => e.id === active.start_training_id);
+          const used = new Set();
+          (pkgs || []).forEach(p => {
+            if (p.id !== active.id) { used.add(p.start_training_id); used.add(p.end_training_id); }
+          });
+          if (startEv) {
+            candidates = candidates.filter(e =>
+              (e.event_date > startEv.event_date ||
+                (e.event_date === startEv.event_date && e.event_hour >= startEv.event_hour)) &&
+              !used.has(e.id));
+          }
+        } catch (e) {}
+      }
+      setEndCandidates(candidates);
+      setEndEventId(candidates[0]?.id || '');
       setEndBillingModalVisible(true);
-      if (Platform.OS === 'web') window.alert('Modal powinien być teraz widoczny!');
     } catch(e) {
-      if (Platform.OS === 'web') window.alert('Błąd getCalendarEvents: ' + e.message);
-      else Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
+      Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
     }
   };
 
@@ -254,18 +312,44 @@ export default function PaymentsScreen({ navigation }) {
     }
   };
 
+  // Unia pakietów klienta + członków wspólnej puli (ta sama historia u obojga).
+  const fetchUnionPackages = async (client) => {
+    const ids = [client.id, ...((client.shared_with || []).filter(id => id !== client.id))];
+    const all = [];
+    for (const id of ids) {
+      try {
+        const p = await api.getClientPackages(id);
+        all.push(...(p || []));
+      } catch (e) {}
+    }
+    const seen = new Set();
+    return all.filter(p => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  };
+
   const openHistory = async (client) => {
     setLoading(true);
     try {
+        const abs = await api.getAbsences().catch(() => []);
+        setClientAbsences((abs || []).filter(a => a.client_id === client.id));
+        setExpandedHistoryId(null);
         if (client.billing_type === 'package') {
-            const pkgs = await api.getClientPackages(client.id);
-            const evs = await api.getCalendarEvents(null, null, client.id);
+            const pkgs = await fetchUnionPackages(client);
+            const evs = await fetchUnionEvents(client);
             const sorted = (pkgs || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
             setClientPackages(sorted);
             setClientEvents(evs || []);
         } else {
-            setClientPackages(client.payment_history || []);
-            setClientEvents([]);
+            const evs = await fetchUnionEvents(client).catch(() => []);
+            // Unia historii miesięcznych członków puli.
+            const ownHist = client.payment_history || [];
+            const othersHist = [];
+            for (const mid of (client.shared_with || [])) {
+              if (mid === client.id) continue;
+              const mc = clients.find(c => c.id === mid);
+              othersHist.push(...(((mc || {}).payment_history) || []));
+            }
+            setClientPackages([...ownHist, ...othersHist]);
+            setClientEvents(evs || []);
         }
         setSelectedClient(client);
         setHistoryModalVisible(true);
@@ -274,6 +358,42 @@ export default function PaymentsScreen({ navigation }) {
     }
     setLoading(false);
   };
+
+  // Treningi pakietu/cyklu: daty odbytych, odwołanych rozliczonych i odwołanych bez rozliczenia.
+  // Zakres wyznacza TYLKO pakiet/cykl (start..koniec) — bez odcięcia "do dziś",
+  // żeby zaplanowane przyszłe treningi też się liczyły.
+  function packageTrainings(item, isPackage) {
+    const evs = (clientEvents || []).slice().sort((a, b) =>
+      a.event_date === b.event_date ? a.event_hour - b.event_hour : (a.event_date < b.event_date ? -1 : 1));
+    let from = '0000-00-00', to = null;
+    if (isPackage) {
+      const s = evs.find(e => e.id === item.start_training_id);
+      const en = evs.find(e => e.id === item.end_training_id);
+      if (s) from = s.event_date;
+      if (en) to = en.event_date;
+    } else {
+      if (item.purchase_date) from = item.purchase_date;
+      if (item.end_date) to = item.end_date;
+    }
+    const inRange = evs.filter(e => e.event_date >= from && (to === null || e.event_date <= to));
+    const abs = (clientAbsences || []).filter(a => a.absence_date >= from && (to === null || a.absence_date <= to));
+    const rows = inRange.map(e => ({
+      key: e.id, date: e.event_date, hour: e.event_hour,
+      partner: e.partner_name || null,
+      state: e.status === 'cancelled' ? (e.is_settled ? 'cancel-settled' : 'cancel') : (e.is_settled ? 'done' : 'planned'),
+    }));
+    const evKeys = new Set(inRange.map(e => `${e.event_date}|${e.event_hour}`));
+    abs.forEach((a, i) => {
+      if (!evKeys.has(`${a.absence_date}|${a.absence_hour}`)) {
+        rows.push({ key: `abs-${i}`, date: a.absence_date, hour: a.absence_hour, state: 'cancel-free' });
+      }
+    });
+    rows.sort((a, b) => a.date === b.date ? a.hour - b.hour : (a.date < b.date ? -1 : 1));
+    const done = rows.filter(r => r.state === 'done').length;
+    const cSettled = rows.filter(r => r.state === 'cancel-settled').length;
+    const cFree = rows.filter(r => r.state === 'cancel-free' || r.state === 'cancel').length;
+    return { rows, done, cSettled, cFree, from, to };
+  }
 
   const handleDeleteHistoryItem = (item) => {
       const executeDelete = async () => {
@@ -526,11 +646,29 @@ export default function PaymentsScreen({ navigation }) {
                   </Text>
                 </View>
 
+                {(client.shared_with || []).length > 0 && (
+                  <View style={[styles.infoRow, { marginTop: 4 }]}>
+                    <Ionicons name="people-outline" size={16} color={C.accent} />
+                    <Text style={styles.infoText}>
+                      Wspólny z: <Text style={[styles.infoValue, { color: C.accent }]}>{(client.shared_with || []).map(id => (clients.find(c => c.id === id) || {}).name).filter(Boolean).join(', ') || '…'}</Text>
+                    </Text>
+                  </View>
+                )}
+
                 {client.cancelled_settled_count > 0 && (
                   <View style={[styles.infoRow, { marginTop: 4 }]}>
                     <Ionicons name="information-circle-outline" size={16} color={themeColors.danger} />
                     <Text style={styles.infoText}>
                       Z tego odwołane i rozliczone: <Text style={[styles.infoValue, { color: themeColors.danger }]}>{client.cancelled_settled_count}</Text>
+                    </Text>
+                  </View>
+                )}
+
+                {client.cancelled_free_count > 0 && (
+                  <View style={[styles.infoRow, { marginTop: 4 }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={themeColors.textSecondary} />
+                    <Text style={styles.infoText}>
+                      Odwołane bez rozliczenia: <Text style={styles.infoValue}>{client.cancelled_free_count}</Text>
                     </Text>
                   </View>
                 )}
@@ -613,77 +751,101 @@ export default function PaymentsScreen({ navigation }) {
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
-            
-            <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Text style={[styles.modalSubtitle, { marginBottom: 0, lineHeight: 22 }]}>{selectedClient?.name}</Text>
+              {selectedClient?.billing_type === 'package' ? (
+                <View style={{ backgroundColor: C.accent, borderRadius: 11, paddingHorizontal: 10, height: 22, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
+                    {selectedClient?.package_current_count ?? 0}/{selectedClient?.package_size || 10}
+                  </Text>
+                </View>
+              ) : (selectedClient?.package_purchase_date ? (
+                <View style={{ backgroundColor: C.accent, borderRadius: 11, paddingHorizontal: 10, height: 22, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
+                    {selectedClient?.package_current_count ?? 0}
+                  </Text>
+                </View>
+              ) : null)}
+            </View>
             
             <FlatList
               data={clientPackages}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                if (selectedClient?.billing_type === 'package') {
-                    const startEv = clientEvents.find(e => e.id === item.start_training_id);
-                    const endEv = clientEvents.find(e => e.id === item.end_training_id);
-                    
-                    return (
-                      <View style={styles.historyItem}>
-                        <View style={styles.historyMeta}>
-                          <View style={styles.infoRow}>
-                            <Ionicons name={item.end_training_id ? "archive-outline" : "ellipse"} size={14} color={item.end_training_id ? themeColors.textSecondary : "#28a745"} />
-                            <Text style={styles.historyDate}>
-                              Start: <Text style={{ fontWeight: '600', color: themeColors.text }}>{startEv ? `${startEv.event_date}` : 'Brak danych'}</Text>
-                            </Text>
-                          </View>
-                          <View style={[styles.infoRow, { marginTop: 4 }]}>
-                            <Ionicons name="stop-circle-outline" size={14} color={themeColors.textSecondary} />
-                            <Text style={styles.historyDate}>
-                              Koniec: <Text style={{ fontWeight: '600', color: themeColors.text }}>{endEv ? `${endEv.event_date}` : 'Pakiet otwarty'}</Text>
-                            </Text>
-                          </View>
+              keyExtractor={(item, index) => item.id || `h-${index}`}
+              renderItem={({ item, index }) => {
+                const isPkg = selectedClient?.billing_type === 'package';
+                const hid = item.id || `h-${index}`;
+                const expanded = expandedHistoryId === hid;
+                const t = packageTrainings(item, isPkg);
+                const startLabel = isPkg
+                  ? ((clientEvents.find(e => e.id === item.start_training_id)?.event_date) || 'Brak danych')
+                  : item.purchase_date;
+                const endLabel = isPkg
+                  ? ((clientEvents.find(e => e.id === item.end_training_id)?.event_date) || 'Pakiet otwarty')
+                  : item.end_date;
+                const stateStyle = (s) => s === 'done'
+                  ? { color: '#1dd1a1' }
+                  : (s === 'cancel-settled' ? { color: '#e67e22' } : { color: themeColors.danger });
+                const stateLabel = (s) => s === 'done' ? 'odbyty'
+                  : (s === 'cancel-settled' ? 'odwołany • rozliczony'
+                  : (s === 'planned' ? 'nierozliczony' : 'odwołany • bez rozliczenia'));
+                return (
+                  <View style={styles.historyItem}>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => setExpandedHistoryId(expanded ? null : hid)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.historyMeta}>
+                        <View style={styles.infoRow}>
+                          <Ionicons name={isPkg && item.end_training_id ? "archive-outline" : (isPkg ? "ellipse" : "archive-outline")} size={14} color={(isPkg && !item.end_training_id) ? "#28a745" : themeColors.textSecondary} />
+                          <Text style={styles.historyDate}>
+                            Start: <Text style={{ fontWeight: '600', color: themeColors.text }}>{startLabel}</Text>
+                          </Text>
                         </View>
-                        <View style={[styles.historyStats, { flexDirection: 'row', alignItems: 'center' }]}>
-                          <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
-                            <Text style={[styles.historyCountText, { fontSize: 13, color: themeColors.textMuted }]}>
-                              Offset: {item.offset}
-                            </Text>
-                            <Text style={styles.historyLabel}>Pula: {item.size}</Text>
-                          </View>
-                          <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
-                            <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
-                          </TouchableOpacity>
+                        <View style={[styles.infoRow, { marginTop: 4 }]}>
+                          <Ionicons name="stop-circle-outline" size={14} color={themeColors.textSecondary} />
+                          <Text style={styles.historyDate}>
+                            Koniec: <Text style={{ fontWeight: '600', color: themeColors.text }}>{endLabel}</Text>
+                          </Text>
                         </View>
+                        <Text style={[styles.historyDate, { marginTop: 6 }]}>
+                          Treningi: {t.rows.length} • odbyte: {t.done} • odwołane rozl.: {t.cSettled} • odwołane bez: {t.cFree}
+                        </Text>
+                        {isPkg && (
+                          <Text style={[styles.historyCountText, { fontSize: 12, color: themeColors.textMuted, marginTop: 2 }]}>
+                            Pula: {item.size} • offset: {item.offset} {expanded ? '▲' : '▼'}
+                          </Text>
+                        )}
+                        {!isPkg && (
+                          <Text style={[styles.historyCountText, { fontSize: 12, color: themeColors.textMuted, marginTop: 2 }]}>
+                            Rozliczono: {item.completed_count} • {item.archived_at ? new Date(item.archived_at).toLocaleDateString() : ''} {expanded ? '▲' : '▼'}
+                          </Text>
+                        )}
                       </View>
-                    );
-                } else {
-                    return (
-                      <View style={styles.historyItem}>
-                        <View style={styles.historyMeta}>
-                          <View style={styles.infoRow}>
-                            <Ionicons name="archive-outline" size={14} color={themeColors.textSecondary} />
-                            <Text style={styles.historyDate}>
-                              Start: <Text style={{ fontWeight: '600', color: themeColors.text }}>{item.purchase_date}</Text>
-                            </Text>
-                          </View>
-                          <View style={[styles.infoRow, { marginTop: 4 }]}>
-                            <Ionicons name="stop-circle-outline" size={14} color={themeColors.textSecondary} />
-                            <Text style={styles.historyDate}>
-                              Koniec: <Text style={{ fontWeight: '600', color: themeColors.text }}>{item.end_date}</Text>
-                            </Text>
-                          </View>
+                      {expanded && (
+                        <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: themeColors.border, paddingTop: 6 }}>
+                          {t.rows.length === 0 && (
+                            <Text style={{ color: themeColors.textMuted, fontSize: 12 }}>Brak treningów w tym okresie.</Text>
+                          )}
+                          {t.rows.map(r => (
+                            <View key={r.key} style={[styles.infoRow, { paddingVertical: 3 }]}>
+                              <Text style={{ color: themeColors.text, fontSize: 12, fontWeight: '600', width: 92 }}>
+                                {r.date.slice(5).replace('-', '.')}{r.hour != null ? ` ${r.hour}:00` : ''}
+                              </Text>
+                              <Text style={[{ fontSize: 12 }, stateStyle(r.state)]}>{stateLabel(r.state)}{r.partner ? ` · z: ${r.partner}` : ''}</Text>
+                            </View>
+                          ))}
                         </View>
-                        <View style={[styles.historyStats, { flexDirection: 'row', alignItems: 'center' }]}>
-                          <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
-                            <Text style={[styles.historyCountText, { fontSize: 13, color: themeColors.textMuted }]}>
-                              Rozliczono: {item.completed_count}
-                            </Text>
-                            <Text style={styles.historyLabel}>{new Date(item.archived_at).toLocaleDateString()}</Text>
-                          </View>
-                          <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
-                            <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                }
+                      )}
+                    </TouchableOpacity>
+                    <View style={[{ justifyContent: 'center' }]}>
+                      <TouchableOpacity onPress={() => handleDeleteHistoryItem(item)} style={{ padding: 4 }}>
+                        <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
               }}
               ListEmptyComponent={() => (
                 <View style={styles.modalEmpty}>
@@ -769,7 +931,7 @@ export default function PaymentsScreen({ navigation }) {
             <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
             
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>1. Wskaż trening startowy</Text>
+              <Text style={styles.label}>1. {selectedClient?.billing_type === 'package' ? 'Wskaż trening startowy' : 'Trening początkowy (opcjonalnie)'}</Text>
               <DropdownPicker
                   placeholder="Wybierz trening z kalendarza..."
                   selectedValue={startEventId}
@@ -780,6 +942,7 @@ export default function PaymentsScreen({ navigation }) {
               />
             </View>
 
+            {selectedClient?.billing_type === 'package' && (
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
                   <Text style={styles.label}>2. Wielkość puli</Text>
@@ -804,9 +967,45 @@ export default function PaymentsScreen({ navigation }) {
                   />
                 </View>
             </View>
+            )}
+
+            {/* Wspólna pula: treningi wybranych osób schodzą z tej puli */}
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}
+              onPress={() => { setSharedEnabled(!sharedEnabled); if (sharedEnabled) setSharedIds([]); }}
+              activeOpacity={0.7}
+            >
+              <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: sharedEnabled ? C.accent : 'transparent' }}>
+                {sharedEnabled && <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>✓</Text>}
+              </View>
+              <Text style={[styles.label, { marginBottom: 0 }]}>Pakiet wspólny (wspólna pula)</Text>
+            </TouchableOpacity>
+            {sharedEnabled && (
+              <View style={{ marginTop: 8, maxHeight: 160 }}>
+                <Text style={[styles.label, { marginBottom: 4 }]}>Z kim dzielona pula:</Text>
+                <ScrollView style={{ maxHeight: 140 }} nestedScrollEnabled>
+                  {clients.filter(c => c.id !== selectedClient?.id).map(c => {
+                    const on = sharedIds.includes(c.id);
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+                        onPress={() => toggleSharedId(c.id)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: on ? C.accent : themeColors.textMuted, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.accent : 'transparent' }}>
+                          {on && <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>✓</Text>}
+                        </View>
+                        <Text style={{ color: themeColors.text, fontSize: 14 }}>{c.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 16 }]} onPress={executeStartBilling}>
-              <Text style={styles.btnPrimaryText}>Otwórz Pakiet (SSOT)</Text>
+              <Text style={styles.btnPrimaryText}>{selectedClient?.billing_type === 'package' ? 'Otwórz Pakiet (SSOT)' : 'Rozpocznij rozliczanie'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -832,7 +1031,7 @@ export default function PaymentsScreen({ navigation }) {
             
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Zaznacz trening końcowy z kalendarza</Text>
-              {clientEvents.filter(e => e.is_settled).length === 0 ? (
+              {endCandidates.filter(e => e.is_settled).length === 0 ? (
                 <Text style={{ fontSize: 13, color: themeColors.textMuted, fontStyle: 'italic', paddingVertical: 10 }}>
                   Brak odbytych (rozliczonych) treningów do wyboru. Pakiet zostanie zamknięty z dzisiejszą datą.
                 </Text>
@@ -843,7 +1042,7 @@ export default function PaymentsScreen({ navigation }) {
                     onValueChange={setEndEventId}
                     style={styles.pickerWrap}
                     dropdownIconColor={themeColors.textSecondary}
-                    items={clientEvents.filter(e => e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Rozliczony)`, value: e.id, color: themeColors.text }))}
+                    items={endCandidates.filter(e => e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Rozliczony)`, value: e.id, color: themeColors.text }))}
                 />
               )}
               <Text style={{ fontSize: 12, color: themeColors.textMuted, marginTop: 6 }}>
@@ -1134,7 +1333,7 @@ function makeStyles(C, TC) {
     historyItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       backgroundColor: TC.surfaceLight,
       padding: SPACING.md,
       borderRadius: 12,

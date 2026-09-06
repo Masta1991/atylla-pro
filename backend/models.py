@@ -22,6 +22,8 @@ class ClientBase(BaseModel):
     payment_history: Optional[List[dict]] = Field(default_factory=list)
     active_package_id: Optional[UUID] = None
     cancelled_settled_count: Optional[int] = None
+    cancelled_free_count: Optional[int] = None
+    shared_monthly_with: Optional[List[UUID]] = Field(default_factory=list)
 
 class ClientCreate(ClientBase):
     pass
@@ -41,11 +43,14 @@ class ClientUpdate(BaseModel):
     payment_history: Optional[List[dict]] = None
     active_package_id: Optional[UUID] = None
     cancelled_settled_count: Optional[int] = None
+    cancelled_free_count: Optional[int] = None
+    shared_monthly_with: Optional[List[UUID]] = None
 
 class ClientResponse(ClientBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    shared_with: Optional[List[UUID]] = None  # domknięcie współdzielenia (liczone, nie kolumna)
     model_config = {"from_attributes": True}
 
 
@@ -64,6 +69,7 @@ class CalendarEventBase(BaseModel):
     added_groups: Optional[List[str]] = Field(default_factory=list)
     is_replacement: bool = False
     replaced_client_id: Optional[UUID] = None
+    partner_client_id: Optional[UUID] = None  # drugi uczestnik wspólnego treningu
 
 class CalendarEventCreate(CalendarEventBase):
     pass
@@ -83,6 +89,7 @@ class CalendarEventUpdate(BaseModel):
     added_groups: Optional[List[str]] = None
     is_replacement: Optional[bool] = None
     replaced_client_id: Optional[UUID] = None
+    partner_client_id: Optional[UUID] = None
 
 class AdjustHistoryPackageRequest(BaseModel):
     archived_at: str
@@ -110,6 +117,10 @@ class CalendarEventResponse(CalendarEventBase):
     training_plans: Optional[dict] = None
     workout_types: Optional[dict] = None
     clients: Optional[dict] = None
+    is_start_of_package: Optional[bool] = None
+    billing_flag: Optional[str] = None  # LAST | OVERFLOW (pakiet), None w pozostałych
+    tile_number: Optional[int] = None  # pozycja w pakiecie/cyklu (od razu, bez rozliczenia)
+    partner_name: Optional[str] = None  # imię współćwiczącego (liczone, nie kolumna)
     model_config = {"from_attributes": True}
 
 
@@ -260,11 +271,13 @@ class ClientPackageBase(BaseModel):
     start_training_id: UUID
     end_training_id: Optional[UUID] = None
     offset: int = 0
+    shared_client_ids: List[UUID] = Field(default_factory=list)  # wspólna pula
 
 class ClientPackageCreate(BaseModel):
     size: int
     start_training_id: UUID
     offset: int = 0
+    shared_client_ids: List[UUID] = Field(default_factory=list)
 
 class ClientPackageUpdate(BaseModel):
     end_training_id: Optional[UUID] = None

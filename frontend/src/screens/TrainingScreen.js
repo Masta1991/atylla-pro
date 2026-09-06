@@ -24,6 +24,7 @@ export default function TrainingScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
 
   const [selectedClient, setSelectedClient] = useState('');
+  const [partnerClient, setPartnerClient] = useState('');
   const [selectedDate, setSelectedDate] = useState(passedDate || (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -170,6 +171,7 @@ export default function TrainingScreen({ navigation, route }) {
             activeType = existingEvent.workout_type_id || '';
             activePlan = existingEvent.plan_id || '';
             setIsSettled(!!existingEvent.is_settled);
+            setPartnerClient(existingEvent.partner_client_id || '');
             if (existingEvent.note) {
               setNote(existingEvent.note);
             }
@@ -506,6 +508,7 @@ export default function TrainingScreen({ navigation, route }) {
 
     const payload = {
       client_id: selectedClient,
+      partner_client_id: partnerClient || null,
       workout_type_id: selectedType || null,
       plan_id: selectedPlan || null,
       event_date: selectedDate,
@@ -553,6 +556,7 @@ export default function TrainingScreen({ navigation, route }) {
     const performAutoSave = async () => {
       const payload = {
         client_id: selectedClient,
+        partner_client_id: partnerClient || null,
         workout_type_id: selectedType || null,
         plan_id: selectedPlan || null,
         event_date: selectedDate,
@@ -648,6 +652,22 @@ export default function TrainingScreen({ navigation, route }) {
               <TextInput style={[styles.input, { height: 50, borderWidth: 0 }]} value={selectedHour} onChangeText={setSelectedHour} placeholder="6-21" placeholderTextColor={themeColors.textMuted} keyboardType="numeric" />
             </View>
           </View>
+        </View>
+
+        {/* Wspólny trening: druga osoba na tym slocie (tylko info, bez zniżki) */}
+        <View style={{ marginTop: 4 }}>
+          <Text style={styles.label}>Współćwiczący (opcjonalnie)</Text>
+          <DropdownPicker
+            placeholder="Trening indywidualny"
+            selectedValue={partnerClient}
+            onValueChange={setPartnerClient}
+            style={styles.pickerWrap}
+            dropdownIconColor={themeColors.textSecondary}
+            items={[
+              { label: "Trening indywidualny", value: "", color: themeColors.textMuted },
+              ...clients.filter(c => c.id !== selectedClient).map(c => ({ label: c.name, value: c.id, color: themeColors.text }))
+            ]}
+          />
         </View>
 
         {/* Workout Type & Main Group in one row */}
