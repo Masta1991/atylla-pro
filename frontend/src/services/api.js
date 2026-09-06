@@ -77,6 +77,16 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
+    // Wygasla sesja bez mozliwosci odswiezenia (brak refresh tokenu albo
+    // odswiezenie sie nie powiodlo): wymus wylogowanie na ekran Login
+    // zamiast cichego pustego kalendarza.
+    if ((res.status === 401 || res.status === 403) && !path.startsWith('/auth/') && (authToken || refreshToken)) {
+      clearAuthToken();
+      await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.removeItem('refresh_token');
+      if (onSessionExpired) onSessionExpired();
+      throw new Error('Sesja wygasla, zaloguj sie ponownie.');
+    }
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   return res.status !== 204 ? res.json() : null;
@@ -237,6 +247,15 @@ export function settleWorkout(date, hour) {
   return request(`/calendar/${date}/${hour}/settle`, { method: 'POST' });
 }
 
+export function getDaySummary(day) {
+  return request(`/day/summary/${day}`);
+}
+
+export function approveDay(day, decisions) {
+  invalidateCache('clients');
+  return request('/day/approve', { method: 'POST', body: { day, decisions } });
+}
+
 
 
 // ── Workouts ────────────────────────────────────────────────────────────────
@@ -276,6 +295,7 @@ export async function saveCalendarWorkout(data) {
     event_date: data.event_date,
     event_hour: data.event_hour,
     client_id: data.client_id,
+    partner_client_id: data.partner_client_id || null,
     workout_type_id: data.workout_type_id || null,
     plan_id: data.plan_id || null,
     status: 'active',

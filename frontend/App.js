@@ -26,6 +26,7 @@ import MuscleExercisesScreen from './src/screens/MuscleExercisesScreen';
 import TypeExercisesScreen from './src/screens/TypeExercisesScreen';
 import PlanManagerScreen from './src/screens/PlanManagerScreen';
 import AbsencesScreen from './src/screens/AbsencesScreen';
+import DayCloseScreen from './src/screens/DayCloseScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +69,7 @@ function AppNavigator() {
           <Stack.Screen name="TypeExercises" component={TypeExercisesScreen} />
           <Stack.Screen name="PlanManager" component={PlanManagerScreen} />
           <Stack.Screen name="Absences" component={AbsencesScreen} />
+          <Stack.Screen name="DayClose" component={DayCloseScreen} />
           <Stack.Screen name="HistoryFilter" component={HistoryFilterScreen} />
         </>
       )}

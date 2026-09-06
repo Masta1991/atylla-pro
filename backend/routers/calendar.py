@@ -9,6 +9,28 @@ from models import (
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
+def _str_ids(v):
+    out = []
+    for x in (v or []):
+        try:
+            out.append(str(x))
+        except Exception:
+            pass
+    return out
+
+
+def _partner_names(supabase, events):
+    """Imiona współćwiczących hurtem; puste pre-migracja (brak kolumny)."""
+    pids = {str(e.get("partner_client_id")) for e in events if e.get("partner_client_id")}
+    if not pids:
+        return {}
+    try:
+        res = supabase.table("clients").select("id,name").in_("id", list(pids)).execute()
+        return {str(r["id"]): r.get("name") for r in (res.data or [])}
+    except Exception:
+        return {}
+
+
 # ── Absences ─────────────────────────────────────────────────────────────────
 
 @router.get("/absences", response_model=List[AbsenceResponse])
@@ -67,6 +89,60 @@ def assign_chronological_numbers(events, supabase):
         
     pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).limit(5000).execute()
     packages = pkgs_res.data or []
+    # Pakiety współdzielone, w których członek (nie właściciel) ma eventy w zakresie.
+    try:
+        extra_res = supabase.table("client_packages").select("*").filter(
+            "shared_client_ids", "ov", "{" + ",".join(client_ids) + "}").limit(5000).execute()
+        seen = {p["id"] for p in packages}
+        for p in (extra_res.data or []):
+            if p["id"] not in seen:
+                seen.add(p["id"])
+                packages.append(p)
+    except Exception:
+        pass
+    # Miesięczne współdzielenie: {cid: [member ids]} (puste pre-migracja).
+    monthly_shares = {}
+    try:
+        sh_res = supabase.table("clients").select("id,shared_monthly_with").in_("id", client_ids).execute()
+        for r in (sh_res.data or []):
+            ids = _str_ids(r.get("shared_monthly_with"))
+            if ids:
+                monthly_shares[str(r["id"])] = ids
+        rev_res = supabase.table("clients").select("id,shared_monthly_with").filter(
+            "shared_monthly_with", "ov", "{" + ",".join(client_ids) + "}").execute()
+        for r in (rev_res.data or []):
+            ids = _str_ids(r.get("shared_monthly_with"))
+            if ids:
+                monthly_shares.setdefault(str(r["id"]), ids)
+    except Exception:
+        pass
+
+    # Członkowie wspólnych pul — ich pełna historia też wchodzi do unii.
+    # (Przed pobraniem absencji i eventów.)
+    _extra_ids = set()
+    for _p in packages:
+        _owner = str(_p["client_id"])
+        for _mid in _str_ids(_p.get("shared_client_ids")):
+            if _mid != _owner:
+                _extra_ids.add(_mid)
+    for _cid, _mids in monthly_shares.items():
+        _extra_ids.add(str(_cid))
+        _extra_ids.update(_mids)
+    _fetch_ids = list(set(client_ids) | _extra_ids)
+
+    # Nieobecności: trening nierozliczony z absencją = odwołany w porę,
+    # wypada z numeracji (jak usunięty). Rozliczony z absencją zostaje.
+    # Zakres: klienci z zapytania + członkowie wspólnych pul.
+    abs_set = set()
+    try:
+        abs_res = supabase.table("absences").select("client_id,absence_date,absence_hour").in_("client_id", _fetch_ids).limit(5000).execute()
+        for a in (abs_res.data or []):
+            abs_set.add((a["client_id"], a["absence_date"], a.get("absence_hour")))
+    except Exception:
+        pass
+
+    def has_timely_absence(cid, ev_date, ev_hour):
+        return (cid, ev_date, ev_hour) in abs_set or (cid, ev_date, None) in abs_set
     
     # Retrieve all client calendar events with pagination to avoid 1000-row PostgREST truncation
     all_events_data = []
@@ -75,7 +151,7 @@ def assign_chronological_numbers(events, supabase):
     while True:
         paged_res = supabase.table("calendar_events") \
             .select("id, client_id, event_date, event_hour, status, is_settled, clients!calendar_events_client_id_fkey(billing_type, package_purchase_date, payment_history)") \
-            .in_("client_id", client_ids) \
+            .in_("client_id", _fetch_ids) \
             .order("event_date") \
             .order("event_hour") \
             .range(page * page_size, (page + 1) * page_size - 1) \
@@ -105,23 +181,55 @@ def assign_chronological_numbers(events, supabase):
         client_packages[cid].append(p)
         
     event_counts = {}
-    
+    # Pozycja treningu w pakiecie (1-based, liczona po kolei w cyklu,
+    # także dla nierozliczonych — do flag OSTATNI / POZA PAKIETEM na kafelku).
+    event_positions = {}
+
+    # Właściciele aktywnych pakietów + członkowie cudzych pul (own-wins:
+    # członek z własnym aktywnym pakietem rozlicza się sam).
+    _owner_has_active = set()
+    for _p in packages:
+        if _p.get("end_training_id") is None:
+            _owner_has_active.add(str(_p["client_id"]))
+    _pooled_cids = set()
+    for _p in packages:
+        _o = str(_p["client_id"])
+        for _mid in _str_ids(_p.get("shared_client_ids")):
+            if _mid != _o and _mid not in _owner_has_active:
+                _pooled_cids.add(_mid)
+    _handled_single = set()
+
     for cid, evs in all_client_events.items():
         cinfo = client_info.get(cid, {})
         b_type = cinfo.get("billing_type")
-        
+
         if b_type == "package":
             pkgs = client_packages.get(cid, [])
+            # Unia eventów właściciel + członkowie wspólnej puli (solo = tylko własne).
+            # Członek z własnym aktywnym pakietem rozlicza się sam (own-wins).
+            _members = [cid]
+            for _p in pkgs:
+                for _mid in _str_ids(_p.get("shared_client_ids")):
+                    if _mid == cid or _mid in _members:
+                        continue
+                    if _mid in _owner_has_active:
+                        continue
+                    _members.append(_mid)
+            evs = []
+            for _m in _members:
+                evs.extend(all_client_events.get(_m, []))
+            evs.sort(key=lambda _e: (_e["event_date"], _e["event_hour"]))
             ev_id_to_idx = {e["id"]: i for i, e in enumerate(evs)}
-            
+
             def get_pkg_start_idx(p):
                 return ev_id_to_idx.get(p["start_training_id"], 999999)
             pkgs.sort(key=get_pkg_start_idx)
-            
+
             for i, pkg in enumerate(pkgs):
                 start_id = pkg["start_training_id"]
                 end_id = pkg.get("end_training_id")
                 offset = pkg.get("offset", 0)
+                pkg_size = pkg.get("size", 10)
                 
                 start_idx = ev_id_to_idx.get(start_id)
                 if start_idx is None:
@@ -137,26 +245,62 @@ def assign_chronological_numbers(events, supabase):
                         end_idx = next_start_idx - 1
                 
                 current_count = offset
+                position = 0
                 for idx in range(start_idx, end_idx + 1):
                     if idx >= len(evs):
                         break
                     e = evs[idx]
-                    
+
                     if e.get("status") == "deleted":
                         continue
-                        
+                    # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
+                    # W unii: absencja liczona per właściciel eventu.
+                    if not e.get("is_settled") and has_timely_absence(e["client_id"], e["event_date"], e["event_hour"]):
+                        continue
+
                     e_id = e["id"]
-                    
+
+                    # Pozycja = kolejnosc WSZYSTKICH zapisow w cyklu (nie tylko rozliczonych),
+                    # zeby kazdy trening mial od razu swoj docelowy numer.
+                    position += 1
+                    event_positions[e_id] = position
+                    event_positions[f"{e_id}_size"] = pkg_size
+
                     if e["is_settled"]:
                         current_count += 1
-                        
-                        pkg_size = pkg.get("size", 10)
+
                         event_counts[e_id] = current_count
                         event_counts[f"{e_id}_size"] = pkg_size
         else:
-            purchase_date = cinfo.get("package_purchase_date")
-            history = cinfo.get("payment_history") or []
-            
+            # Członek wspólnej puli pakietowej rozlicza się w unii (wyżej) — tu pomijamy,
+            # żeby cykl single nie nadpisał pozycji z puli.
+            if str(cid) in _pooled_cids:
+                continue
+            # Grupa miesięczna: unia eventów + wspólna historia i starty.
+            _grp = {str(cid)}
+            for _m in monthly_shares.get(str(cid), []):
+                _grp.add(str(_m))
+            for _oid, _mids in monthly_shares.items():
+                if str(cid) in [str(_x) for _x in _mids]:
+                    _grp.add(str(_oid))
+            _gkey = frozenset(_grp)
+            if _gkey in _handled_single:
+                continue
+            _handled_single.add(_gkey)
+            evs = []
+            for _m in sorted(_grp):
+                evs.extend(all_client_events.get(_m, []))
+            evs.sort(key=lambda _e: (_e["event_date"], _e["event_hour"]))
+            _ghistory = []
+            _gpds = []
+            for _m in sorted(_grp):
+                _mi = client_info.get(_m, {})
+                _ghistory.extend(_mi.get("payment_history") or [])
+                if _mi.get("package_purchase_date"):
+                    _gpds.append(_mi["package_purchase_date"])
+            purchase_date = min(_gpds) if _gpds else cinfo.get("package_purchase_date")
+            history = _ghistory
+
             start_dates = []
             for h in history:
                 if h.get("action") == "end":
@@ -166,10 +310,13 @@ def assign_chronological_numbers(events, supabase):
             if purchase_date:
                 start_dates.append(purchase_date)
             start_dates = sorted(list(set(start_dates)))
-            
+
             event_order_single = {}
             for e in evs:
                 ev_date = e["event_date"]
+                # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
+                if e.get("status") != "deleted" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
+                    continue
                 cycle_key = "single"
                 belongs_to_history = False
                 for h in history:
@@ -198,24 +345,28 @@ def assign_chronological_numbers(events, supabase):
                     
             for ck, e_ids in event_order_single.items():
                 current_count = 0
-                for e_id in e_ids:
+                for pos_idx, e_id in enumerate(e_ids):
+                    # Pozycja w cyklu (do numeru na kafelku od razu).
+                    event_positions[e_id] = pos_idx + 1
                     # Find the event to check if it's settled
                     ev = next((x for x in evs if x["id"] == e_id), None)
                     if ev and ev.get("is_settled"):
                         current_count += 1
                         event_counts[e_id] = current_count
 
+    _all_start_ids = {p["start_training_id"] for p in packages if p.get("start_training_id")}
+    _all_end_ids = {p.get("end_training_id") for p in packages if p.get("end_training_id")}
+
     for ev in events:
         cid = ev.get("client_id")
         if cid and ev.get("clients"):
             b_type = ev["clients"].get("billing_type")
             e_id = ev["id"]
-            
+
             has_active_or_history = False
-            
+
             if b_type == "package":
-                pkgs = client_packages.get(cid, [])
-                is_start = any(p["start_training_id"] == e_id for p in pkgs)
+                is_start = e_id in _all_start_ids
                 ev["is_start_of_package"] = is_start
 
                 if e_id in event_counts:
@@ -225,6 +376,22 @@ def assign_chronological_numbers(events, supabase):
                 else:
                     ev["clients"]["package_current_count"] = 0
                     has_active_or_history = False
+
+                # Numer na kafelek od razu (pozycja w pakiecie).
+                if e_id in event_positions:
+                    ev["tile_number"] = event_positions[e_id]
+
+                # Flagi kafelka na podstawie PAKIETU (znaczniki start/end),
+                # numeracja tylko jako fallback dla otwartych pakietów i nadwyżek.
+                if e_id in event_positions:
+                    pos = event_positions[e_id]
+                    size = event_positions.get(f"{e_id}_size", 10)
+                    is_end = e_id in _all_end_ids
+                    if size > 0:
+                        if is_end or pos == size:
+                            ev["billing_flag"] = "LAST"
+                        elif pos > size:
+                            ev["billing_flag"] = "OVERFLOW"
             else:
                 if e_id in event_counts:
                     ev["clients"]["package_current_count"] = event_counts[e_id]
@@ -232,9 +399,18 @@ def assign_chronological_numbers(events, supabase):
                 else:
                     ev["clients"]["package_current_count"] = 0
                     has_active_or_history = False
+                # Numer na kafelek od razu (pozycja w cyklu).
+                if e_id in event_positions:
+                    ev["tile_number"] = event_positions[e_id]
                     
             ev["clients"]["has_active_billing_or_history"] = has_active_or_history
-                
+
+    pmap = _partner_names(supabase, events)
+    for ev in events:
+        pid = ev.get("partner_client_id")
+        if pid and str(pid) in pmap:
+            ev["partner_name"] = pmap[str(pid)]
+
     return events
 
 

@@ -8,13 +8,14 @@ import { useTheme } from '../context/ThemeContext';
 
 const MENU_ITEMS = [
   { label: 'Klienci', icon: 'people', screen: 'Clients' },
+  { label: 'Rozliczenia', icon: 'card-outline', screen: 'Payments' },
+  { label: 'Zamknij dzień', icon: 'checkmark-done-outline', screen: 'DayClose' },
+  { label: 'Strefa Trenera', icon: 'trending-up', screen: 'Results' },
   { label: 'Absencje', icon: 'calendar-clear-outline', screen: 'Absences' },
   { label: 'Pomiary', icon: 'body', screen: 'Measurements' },
   { label: 'Raporty', icon: 'bar-chart', screen: 'Reports' },
-  { label: 'Rozliczenia', icon: 'card-outline', screen: 'Payments' },
   { label: 'Menadżer', icon: 'copy', screen: 'Manager' },
   { label: 'Plany treningowe', icon: 'clipboard', screen: 'Plans' },
-  { label: 'Strefa Trenera', icon: 'trending-up', screen: 'Results' },
   { label: 'Ustawienia', icon: 'settings', screen: 'Settings' },
 ];
 

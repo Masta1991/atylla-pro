@@ -149,11 +149,11 @@ function AppLayout({ navigation, title, children, hideBottom, showBack }) {
 
           <TouchableOpacity
             style={[styles.bottomSideBtn, { left: screenWidth / 4 - 35 }]}
-            onPress={() => navigation.navigate('Calendar', { activateHistory: true })}
+            onPress={() => navigation.navigate('DayClose')}
             activeOpacity={0.6}
           >
-            <MaterialCommunityIcons name="history" size={32} color={bottomIconColor} />
-            <Text style={[styles.bottomText, { color: bottomTextColor }]}>HISTORIA</Text>
+            <MaterialCommunityIcons name="check-decagram-outline" size={32} color={bottomIconColor} />
+            <Text style={[styles.bottomText, { color: bottomTextColor }]}>DZIEŃ</Text>
           </TouchableOpacity>
 
           <View style={[styles.homeButtonWrapper, { left: screenWidth / 2 - 40 }]}>
@@ -172,15 +172,11 @@ function AppLayout({ navigation, title, children, hideBottom, showBack }) {
 
           <TouchableOpacity
             style={[styles.bottomSideBtn, { right: screenWidth / 4 - 35 }]}
-            onPress={() => {
-              const d = new Date();
-              const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              navigation.navigate('Training', { date: todayStr });
-            }}
+            onPress={() => navigation.navigate('Calendar', { activatePackage: true })}
             activeOpacity={0.6}
           >
-            <MaterialCommunityIcons name="square-edit-outline" size={32} color={bottomIconColor} />
-            <Text style={[styles.bottomText, { color: bottomTextColor }]}>EDYCJA</Text>
+            <MaterialCommunityIcons name="wallet-outline" size={32} color={bottomIconColor} />
+            <Text style={[styles.bottomText, { color: bottomTextColor }]}>PAKIET</Text>
           </TouchableOpacity>
 
           <View style={styles.versionBadge}>
@@ -202,7 +198,7 @@ function makeStyles(accent, barBg, TC, insets) { return StyleSheet.create({
   screenTitle: { color: TC.textSecondary, fontSize: 16, fontWeight: '600' },
   content: { flex: 1, paddingBottom: 80 },
   iosBottom: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 90,
+    position: Platform.OS === 'web' ? 'fixed' : 'absolute', bottom: 0, left: 0, right: 0, height: 90,
     backgroundColor: 'transparent', zIndex: 100, overflow: 'visible',
   },
   bottomSideBtn: { position: 'absolute', top: 12, width: 70, alignItems: 'center' },

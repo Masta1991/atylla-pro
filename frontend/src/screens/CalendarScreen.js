@@ -23,8 +23,7 @@ const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob'];
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6);
 const MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 const HOUR_W = 50;
-const CELL_H = 56;
-const LONG_PRESS_DELAY = 300;
+const CELL_H = 68;
 
 function MonthPopup({ visible, onClose, currentMonday, onSelect, accent, styles }) {
   const mon = new Date(currentMonday);
@@ -137,11 +136,9 @@ function HistoryPopup({ visible, onClose, clientId, clientName, logs, loading, a
   );
 }
 
-function CalendarSlot({ dateStr, hour, ev, absences, dayW, editMode, historyMode, onShowHistory, navigation, onDelete, onDeleteTap, onMoveStart, onMoveTo, isMoving, isMoveTarget, accent, styles, onSelectSlot }) {
+function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyMode, onShowHistory, navigation, onMoveTo, isMoving, isMoveTarget, accent, styles, onSelectSlot }) {
   const { themeColors } = useTheme();
   const slotRef = useRef(null);
-  const longPressTimer = useRef(null);
-  const isPressed = useRef(false);
 
   // Find any absence for this date+hour (not just matching current event's client)
   const slotAbsences = absences?.filter(a =>
@@ -151,28 +148,6 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, editMode, historyMode
   const isAbsent = slotAbsences?.length > 0;
   const absentClientName = slotAbsences?.[0]?.clients?.name;
   const absentTooltip = isAbsent ? `Trening odwołany: ${absentClientName || '—'}` : null;
-
-  const clearTimer = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  const handlePressIn = () => {
-    if (!editMode || !ev || isMoveTarget) return;
-    isPressed.current = true;
-    longPressTimer.current = setTimeout(() => {
-      if (isPressed.current) {
-        onMoveStart(dateStr, hour, ev);
-      }
-    }, LONG_PRESS_DELAY);
-  };
-
-  const handlePressOut = () => {
-    isPressed.current = false;
-    clearTimer();
-  };
 
   const handleSlotTap = () => {
     if (isMoveTarget) {
@@ -185,37 +160,19 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, editMode, historyMode
       }
       return;
     }
-    // Szuflada zarządzania: przełóż / zmień / odwołaj / rozlicz / historia / usuń
-    // bez wchodzenia w osobne ekrany.
-    if (!editMode && onSelectSlot) {
-      onSelectSlot(dateStr, hour, ev);
+    // Tryb pakietu: tap na kafelek przenosi do rozliczen tego klienta.
+    if (packageMode) {
+      if (ev && ev.client_id) {
+        navigation.navigate('Payments', { clientId: ev.client_id });
+      }
       return;
     }
-    if (!editMode) {
-      if (isAbsent && !ev) {
-        const replaceId = slotAbsences?.[0]?.client_id;
-        if (Platform.OS === 'web') {
-          if (window.confirm('Planowany trening z harmonogramu został usunięty (absencja klienta).\n\nCzy chcesz dodać jednorazowe zastępstwo na ten termin?')) {
-            navigation.navigate('Training', { date: dateStr, hour, replaceClientId: replaceId });
-          }
-        } else {
-          Alert.alert(
-            'Trening Usunięty',
-            'Planowany trening z harmonogramu został usunięty (absencja klienta).\n\nCzy chcesz dodać na jego miejsce jednorazowe zastępstwo?',
-            [
-              { text: 'Rozumiem', style: 'cancel' },
-              { text: 'Dodaj zastępstwo', onPress: () => navigation.navigate('Training', { date: dateStr, hour, replaceClientId: replaceId }) }
-            ]
-          );
-        }
-      } else {
-        navigation.navigate('Training', { date: dateStr, hour });
-      }
+    // Szuflada zarządzania (domyślny tryb): przełóż / zmień / odwołaj /
+    // rozlicz / historia / usuń bez wchodzenia w osobne ekrany.
+    if (onSelectSlot) {
+      onSelectSlot(dateStr, hour, ev);
     }
   };
-
-  // Usuwanie idzie wspólną ścieżką z szufladą (prop onDeleteTap z ekranu).
-  const handleDeleteTap = () => onDeleteTap && onDeleteTap(dateStr, hour, ev);
 
   let billingLabel = null;
   if (ev && ev.note) {
@@ -246,32 +203,35 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, editMode, historyMode
         />
       )}
 
-      {editMode && showEv && !isMoveTarget && !isMoving && (
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={handleDeleteTap}
-          activeOpacity={0.6}
-          hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
-        >
-          <Ionicons name="close" size={14} color={themeColors.textMuted} />
-        </TouchableOpacity>
-      )}
       <TouchableOpacity
         style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
         activeOpacity={0.7}
         onPress={handleSlotTap}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
       >
         {showEv ? (
           <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 2 }}>
-            <Text style={[styles.eventText, { color: accent }]} numberOfLines={billingLabel ? 1 : 2}>
-              {(ev.clients?.name ? `${ev.clients.name}${ev.clients.has_active_billing_or_history ? ` [${ev.clients.package_current_count || 0}${ev.clients.billing_type === 'package' ? '/' + (ev.clients.package_size || 10) : ''}]` : ''}` : '—')}
+            <Text style={[styles.eventText, (ev.clients?.name || '').length > 18 && { fontSize: 10 }, { color: accent }]} numberOfLines={billingLabel ? 1 : 2}>
+              {(ev.clients?.name ? `${ev.clients.name}${ev.tile_number != null ? ` [${ev.tile_number}${ev.clients.billing_type === 'package' ? '/' + (ev.clients.package_size || 10) : ''}]` : (ev.clients.has_active_billing_or_history ? ` [${ev.clients.package_current_count || 0}${ev.clients.billing_type === 'package' ? '/' + (ev.clients.package_size || 10) : ''}]` : '')}` : '—')}
               {!billingLabel && (ev.training_plans?.name || ev.workout_types?.name) ? '\n' + (ev.training_plans?.name || ev.workout_types?.name) : ''}
             </Text>
+            {showEv && ev.partner_name && (
+              <Text style={{ fontSize: 9, color: themeColors.textSecondary, textAlign: 'center' }} numberOfLines={1}>
+                z: {ev.partner_name}
+              </Text>
+            )}
             {billingLabel && (
               <Text style={{ fontSize: 9, fontWeight: '700', color: (billingLabel.startsWith('Rozpoczęto') || billingLabel === 'Rozliczono') ? themeColors.success || '#28a745' : themeColors.textMuted, marginTop: 1, textAlign: 'center' }} numberOfLines={1}>
                 {billingLabel}
+              </Text>
+            )}
+            {showEv && ev.is_start_of_package && (
+              <Text style={{ fontSize: 8, fontWeight: '800', color: '#fff', backgroundColor: accent, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1, marginTop: 1, textAlign: 'center', overflow: 'hidden' }} numberOfLines={1}>
+                START PAKIETU
+              </Text>
+            )}
+            {showEv && ev.billing_flag && (
+              <Text style={{ fontSize: 8, fontWeight: '800', color: '#fff', backgroundColor: ev.billing_flag === 'OVERFLOW' ? (themeColors.danger || '#dc3545') : (themeColors.success || '#28a745'), borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1, marginTop: 1, textAlign: 'center', overflow: 'hidden' }} numberOfLines={1}>
+                {ev.billing_flag === 'OVERFLOW' ? 'POZA PAKIETEM' : 'OSTATNI'}
               </Text>
             )}
           </View>
@@ -353,7 +313,7 @@ function CalendarScreen({ navigation, route }) {
   const [monday, setMonday] = useState(getMonday(today));
   const [events, setEvents] = useState([]);
   const [absences, setAbsences] = useState([]);
-  const [editMode, setEditMode] = useState(false);
+  const [packageMode, setPackageMode] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [viewMode, setViewMode] = useState('week');
   const [historyMode, setHistoryMode] = useState(false);
@@ -366,10 +326,15 @@ function CalendarScreen({ navigation, route }) {
   useEffect(() => {
     if (route?.params?.activateHistory) {
       setHistoryMode(true);
-      setEditMode(false);
+      setPackageMode(false);
       navigation.setParams({ activateHistory: undefined });
     }
-  }, [route?.params?.activateHistory]);
+    if (route?.params?.activatePackage) {
+      setPackageMode(true);
+      setHistoryMode(false);
+      navigation.setParams({ activatePackage: undefined });
+    }
+  }, [route?.params?.activateHistory, route?.params?.activatePackage]);
 
   const handleShowHistory = useCallback(async (clientId, clientName) => {
     setHistoryClientId(clientId || '');
@@ -434,8 +399,8 @@ function CalendarScreen({ navigation, route }) {
   const [movingSlot, setMovingSlot] = useState(null);
   // Szuflada zarządzania slotem. { date, hour, ev }
   const [selSlot, setSelSlot] = useState(null);
-  // Decyzja nieobecności w szufladzie: pobierz / zwróć jednostkę.
-  const [absenceAction, setAbsenceAction] = useState('settle');
+  // Jawny wybór przy odwołaniu (jak X w trybie edycji): null | 'ask'
+  const [absenceAsk, setAbsenceAsk] = useState(false);
   const vScrollRef = useRef(null);
   const hGridRef = useRef(null);
 
@@ -557,6 +522,15 @@ function CalendarScreen({ navigation, route }) {
     }
   }, [handleDelete]);
 
+  // Odwołanie z jawnym wyborem rozliczenia (jak X): najpierw rozliczenie, potem nieobecność.
+  const reportAbsence = useCallback(async (dateStr, hour, ev, settle) => {
+    try {
+      if (settle) { try { await api.settleWorkout(dateStr, Number(hour)); } catch (e) {} }
+      await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour) });
+      setSelSlot(null); setAbsenceAsk(false); loadWeek();
+    } catch (e) { Alert.alert('Błąd', e.message); }
+  }, [loadWeek]);
+
   function getEvent(dayIdx, hour) {
     const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx);
     return events.find(e => e.event_date === formatDateString(date) && e.event_hour === hour);
@@ -641,7 +615,7 @@ function CalendarScreen({ navigation, route }) {
         if (viewMode === 'day' && idx !== todayDayIdx) return null;
         const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + idx); 
         const isToday = today.toDateString() === date.toDateString(); 
-        return (<TouchableOpacity key={day} style={[styles.dayCell, isToday && styles.todayCell, { width: dayW }]} onPress={() => !editMode && navigation.navigate('Training', { date: formatDateString(date) })}><Text style={[styles.dayText, isToday && styles.todayText]}>{day}</Text><Text style={[styles.dayNum, isToday && styles.todayText]}>{date.getDate()}</Text></TouchableOpacity>); 
+        return (<TouchableOpacity key={day} style={[styles.dayCell, isToday && styles.todayCell, { width: dayW }]} onPress={() => !packageMode && navigation.navigate('Training', { date: formatDateString(date) })}><Text style={[styles.dayText, isToday && styles.todayText]}>{day}</Text><Text style={[styles.dayNum, isToday && styles.todayText]}>{date.getDate()}</Text></TouchableOpacity>); 
       })}</ScrollView>
     </View>
 
@@ -649,7 +623,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: themeColors.border }}>
         <View style={{ width: HOUR_W }}>{HOURS.map(hour => (<View key={hour} style={styles.hourCell}><Text style={styles.hourText}>{hour}:00</Text></View>))}</View>
         <ScrollView ref={hGridRef} horizontal showsHorizontalScrollIndicator={false} onScroll={onHorizontalScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
-          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} editMode={editMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onDelete={handleDelete} onDeleteTap={requestDelete} onMoveStart={handleMoveStart} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} accent={C.accent} styles={styles} onSelectSlot={(d, h, e) => { setAbsenceAction('settle'); setSelSlot({ date: d, hour: h, ev: e }); }} />); })}</View>))}</View>
+          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} accent={C.accent} styles={styles} onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); }} />); })}</View>))}</View>
         </ScrollView>
       </View>
     </ScrollView>
@@ -701,30 +675,29 @@ function CalendarScreen({ navigation, route }) {
       <TouchableOpacity 
         style={[styles.bottomSideBtn, { left: SCREEN_WIDTH / 4 - 35 }]} 
         onPress={() => {
-          setHistoryMode(!historyMode);
-          setEditMode(false);
+          navigation.navigate('DayClose');
         }} 
         activeOpacity={0.6}
       >
         <MaterialCommunityIcons 
-          name="history" 
+          name="check-decagram-outline" 
           size={32} 
-          color={historyMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomIconColor} 
+          color={bottomIconColor} 
         />
         <Text 
           style={[
             styles.bottomText, 
-            { color: historyMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomTextColor }
+            { color: bottomTextColor }
           ]}
         >
-          HISTORIA
+          DZIEŃ
         </Text>
       </TouchableOpacity>
 
       <View style={[styles.homeButtonWrapper, { left: SCREEN_WIDTH / 2 - 40 }]}>
         <TouchableOpacity
           style={[styles.homeButton, { borderColor: C.accent, backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }]}
-          onPress={() => { setEditMode(false); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); }}
+          onPress={() => { setPackageMode(false); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); setAbsenceAsk(false); }}
           activeOpacity={0.7}
         >
           <View style={{ width: 66, height: 66, borderRadius: 33, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }}>
@@ -735,9 +708,9 @@ function CalendarScreen({ navigation, route }) {
         <Text style={[styles.bottomText, { color: bottomTextColor, marginTop: 9 }]}>GŁÓWNA</Text>
       </View>
 
-      <TouchableOpacity style={[styles.bottomSideBtn, { right: SCREEN_WIDTH / 4 - 35 }]} onPress={() => { setEditMode(!editMode); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); }} activeOpacity={0.6}>
-        <MaterialCommunityIcons name="square-edit-outline" size={32} color={editMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomIconColor} />
-        <Text style={[styles.bottomText, { color: editMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomTextColor }]}>EDYCJA</Text>
+      <TouchableOpacity style={[styles.bottomSideBtn, { right: SCREEN_WIDTH / 4 - 35 }]} onPress={() => { setPackageMode(!packageMode); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); setAbsenceAsk(false); }} activeOpacity={0.6}>
+        <MaterialCommunityIcons name="wallet-outline" size={32} color={packageMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomIconColor} />
+        <Text style={[styles.bottomText, { color: packageMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomTextColor }]}>PAKIET</Text>
       </TouchableOpacity>
 
       <View style={styles.versionBadge}><Text style={[styles.versionText, { color: bottomVersionColor }]}>v{APP_VERSION}</Text></View>
@@ -754,24 +727,34 @@ function CalendarScreen({ navigation, route }) {
           <Text style={styles.sheetTitle}>
             {selSlot.date} • {selSlot.hour}:00 — {selSlot.ev?.clients?.name || (selAbs ? `✕ nieobecność: ${selAbsName || ''}` : 'wolny slot')}
           </Text>
-          <TouchableOpacity onPress={() => setSelSlot(null)} style={{ padding: 4 }}>
+          <TouchableOpacity onPress={() => { setSelSlot(null); setAbsenceAsk(false); }} style={{ padding: 4 }}>
             <Ionicons name="close" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
-        {!!selSlot.ev && (
+        {!!selSlot.ev && (() => {
+          const sc = selSlot.ev.clients || {};
+          const pkgInfo = sc.billing_type === 'package'
+            ? `pakiet ${(sc.package_current_count ?? 0)}/${sc.package_size || 10}`
+            : (sc.has_active_billing_or_history ? `miesięczny: ${sc.package_current_count ?? 0}` : null);
+          return (
           <Text style={styles.sheetSub}>
             {selSlot.ev.training_plans?.name || selSlot.ev.workout_types?.name || 'trening'}
-            {selSlot.ev.is_settled ? ' • rozliczony' : ''}
+            {pkgInfo ? ` • ${pkgInfo}` : ''}
+            {selSlot.ev.is_settled ? ' • rozliczony' : ' • nierozliczony'}
+            {selSlot.ev.partner_name ? ` • z: ${selSlot.ev.partner_name}` : ''}
           </Text>
-        )}
+          );
+        })()}
         <View style={styles.sheetBtns}>
+          {!absenceAsk && (
           <TouchableOpacity
             style={[styles.sheetBtn, { backgroundColor: C.accent }]}
             onPress={() => { const s = selSlot; setSelSlot(null); navigation.navigate('Training', { date: s.date, hour: s.hour, ...(selAbs ? { replaceClientId: selAbs.client_id } : {}) }); }}
           >
             <Text style={[styles.sheetBtnText, { color: '#fff' }]}>{selSlot.ev ? 'Trening' : (selAbs ? 'Zastępstwo' : 'Dodaj')}</Text>
           </TouchableOpacity>
-          {!!selAbs && !selSlot.ev && (
+          )}
+          {!absenceAsk && !!selAbs && !selSlot.ev && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
               onPress={async () => {
@@ -782,27 +765,47 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Cofnij</Text>
             </TouchableOpacity>
           )}
+          {!absenceAsk && (
           <TouchableOpacity
             style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
             onPress={() => { if (selSlot.ev) { handleMoveStart(selSlot.date, selSlot.hour, selSlot.ev); } setSelSlot(null); }}
           >
             <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Przenieś</Text>
           </TouchableOpacity>
-          {!!selSlot.ev && !selSlot.ev.is_settled && (
+          )}
+          {!!selSlot.ev && !selSlot.ev.is_settled && !absenceAsk && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
-              onPress={async () => {
-                try {
-                  await api.createAbsence({ client_id: selSlot.ev.client_id, absence_date: selSlot.date, absence_hour: Number(selSlot.hour) });
-                  if (absenceAction === 'settle') { try { await api.settleWorkout(selSlot.date, Number(selSlot.hour)); } catch (e) {} }
-                  setSelSlot(null); loadWeek();
-                } catch (e) { Alert.alert('Błąd', e.message); }
-              }}
+              onPress={() => setAbsenceAsk(true)}
             >
               <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Nieobecność</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && !selSlot.ev.is_settled && (
+          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
+              onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, true); }}
+            >
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Z rozliczeniem</Text>
+            </TouchableOpacity>
+          )}
+          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
+              onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, false); }}
+            >
+              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Bez rozliczenia</Text>
+            </TouchableOpacity>
+          )}
+          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.border }]}
+              onPress={() => setAbsenceAsk(false)}
+            >
+              <Text style={[styles.sheetBtnText, { color: themeColors.textSecondary }]}>Powrót</Text>
+            </TouchableOpacity>
+          )}
+          {!absenceAsk && !!selSlot.ev && !selSlot.ev.is_settled && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: '#1dd1a1' }]}
               onPress={async () => {
@@ -813,7 +816,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: '#06281e' }]}>Rozlicz</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev?.client_id && (
+          {!absenceAsk && !!selSlot.ev?.client_id && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
               onPress={() => { const s = selSlot; setSelSlot(null); handleShowHistory(s.ev.client_id, s.ev.clients?.name); }}
@@ -821,7 +824,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Historia</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && (
+          {!absenceAsk && !!selSlot.ev && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={() => { const s = selSlot; setSelSlot(null); requestDelete(s.date, s.hour, s.ev); }}
@@ -830,20 +833,9 @@ function CalendarScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
         </View>
-        {!!selSlot.ev && !selSlot.ev.is_settled && (
+        {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Nieobecność:</Text>
-            {['settle', 'return'].map(a => (
-              <TouchableOpacity
-                key={a}
-                style={{ borderWidth: 1, borderColor: absenceAction === a ? C.accent : themeColors.border, backgroundColor: absenceAction === a ? C.accent + '25' : 'transparent', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
-                onPress={() => setAbsenceAction(a)}
-              >
-                <Text style={{ color: absenceAction === a ? C.accent : themeColors.textSecondary, fontSize: 12, fontWeight: '700' }}>
-                  {a === 'settle' ? 'Pobierz jednostkę' : 'Zwróć jednostkę'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Czy rozliczyć ten trening?</Text>
           </View>
         )}
       </View>
@@ -880,8 +872,8 @@ function makeStyles(accent, barBg, TC, insets) { return StyleSheet.create({
   deleteBtn: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: TC.surface, borderWidth: 1, borderColor: TC.border, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   absenceIndicator: { position: 'absolute', top: -1, right: -1, width: 0, height: 0, borderLeftWidth: 12, borderLeftColor: 'transparent', borderBottomWidth: 12, borderBottomColor: 'transparent', borderTopWidth: 12, borderTopColor: TC.danger, borderRightWidth: 12, borderRightColor: TC.danger, borderTopRightRadius: 6, zIndex: 9 },
   absenceIndicatorText: { position: 'absolute', top: 1, right: 1, color: '#fff', fontSize: 7, fontWeight: '900', zIndex: 11 },
-  eventText: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  iosBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 90, backgroundColor: 'transparent', zIndex: 100, overflow: 'visible' },
+  eventText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  iosBottom: { position: Platform.OS === 'web' ? 'fixed' : 'absolute', bottom: 0, left: 0, right: 0, height: 90, backgroundColor: 'transparent', zIndex: 100, overflow: 'visible' },
   bottomSideBtn: { position: 'absolute', top: 12, width: 70, alignItems: 'center' },
   homeButtonWrapper: { position: 'absolute', top: -25, width: 80, alignItems: 'center', zIndex: 102 },
   homeButton: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#000000', borderWidth: 2, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 10 },
