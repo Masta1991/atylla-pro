@@ -226,7 +226,7 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
             )}
             {showEv && ev.is_start_of_package && (
               <Text style={{ fontSize: 8, fontWeight: '800', color: '#fff', backgroundColor: accent, borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1, marginTop: 1, textAlign: 'center', overflow: 'hidden' }} numberOfLines={1}>
-                START PAKIETU
+                {ev.clients?.billing_type === 'package' ? 'START PAKIETU' : 'START CYKLU'}
               </Text>
             )}
             {showEv && ev.billing_flag && (
@@ -354,7 +354,7 @@ function CalendarScreen({ navigation, route }) {
   const deviceType = useDeviceType();
   // Telefon: 3 dni ze scrollem (bez zmian). Tablet: cały tydzień Pon–Sob (6 dni) naraz.
   const visibleDays = viewMode === 'week' ? (deviceType === 'tablet' ? 6 : 3) : 1;
-  const dayW = viewMode === 'week' ? (SCREEN_WIDTH - HOUR_W) / visibleDays : (SCREEN_WIDTH - HOUR_W);
+  const dayW = viewMode === 'week' ? (SCREEN_WIDTH - HOUR_W - 8) / visibleDays : (SCREEN_WIDTH - HOUR_W - 8);
   const headerScrollRef = useRef(null);
   const isCurrentWeek = isSameWeek(monday, today);
   const getDisplayDateLabel = () => {

@@ -184,6 +184,9 @@ def assign_chronological_numbers(events, supabase):
     # Pozycja treningu w pakiecie (1-based, liczona po kolei w cyklu,
     # także dla nierozliczonych — do flag OSTATNI / POZA PAKIETEM na kafelku).
     event_positions = {}
+    # Starty i końce cykli miesięcznych (do odznak START CYKLU / OSTATNI).
+    single_start_ids = set()
+    single_last_ids = set()
 
     # Właściciele aktywnych pakietów + członkowie cudzych pul (own-wins:
     # członek z własnym aktywnym pakietem rozlicza się sam).
@@ -353,6 +356,23 @@ def assign_chronological_numbers(events, supabase):
                     if ev and ev.get("is_settled"):
                         current_count += 1
                         event_counts[e_id] = current_count
+                if e_ids:
+                    # Pierwszy trening cyklu = START.
+                    single_start_ids.add(e_ids[0])
+                    # Zamknięty cykl: ostatni rozliczony trening (do end_date) = OSTATNI.
+                    ed = None
+                    if ck != "single":
+                        for h in history:
+                            if h.get("action") == "end" and f"pkg_{h.get('purchase_date')}" == ck:
+                                ed = h.get("end_date") or "9999-12-31"
+                                break
+                    if ed:
+                        by_id = {e["id"]: e for e in evs}
+                        cands = [x for x in e_ids
+                                 if (by_id.get(x) or {}).get("is_settled")
+                                 and (by_id.get(x) or {}).get("event_date", "") <= ed]
+                        if cands:
+                            single_last_ids.add(cands[-1])
 
     _all_start_ids = {p["start_training_id"] for p in packages if p.get("start_training_id")}
     _all_end_ids = {p.get("end_training_id") for p in packages if p.get("end_training_id")}
@@ -399,6 +419,10 @@ def assign_chronological_numbers(events, supabase):
                 else:
                     ev["clients"]["package_current_count"] = 0
                     has_active_or_history = False
+                # Odznaki cyklu miesięcznego: START na pierwszym, OSTATNI po domknięciu.
+                ev["is_start_of_package"] = e_id in single_start_ids
+                if e_id in single_last_ids:
+                    ev["billing_flag"] = "LAST"
                 # Numer na kafelek od razu (pozycja w cyklu).
                 if e_id in event_positions:
                     ev["tile_number"] = event_positions[e_id]
