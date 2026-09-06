@@ -28,3 +28,10 @@
 - Migracja 001_shared_packages.sql MUSIALA byc wykonana recznie w dashboardzie (brak DDL lokalnie) — wykonana 06.09 przed deployem, zweryfikowana (3 kolumny).
 - Dane testowe: Agnieszka (144 logi, 36 sesji) na koncie testowym; reszta testow posprzatana.
 - Deploy: ./deploy.ps1 -Version 1.6.0 (commit d448ac9, tagi v1.6.0/backup-v1.6.0, push master, bundle backup/atylla-pro-backup-v1.6.0.bundle zweryfikowany ~99 MB).
+
+## 2026-09-06 — v1.6.1: deploy (Railway przebudowuje)
+- Kalendarz: odznaki cykli miesiecznych (START CYKLU na pierwszym treningu cyklu, OSTATNI po domknieciu; pakiety bez zmian START PAKIETU), fix szerokosci kolumn week (-8px, brak overflow).
+- Klienci: chip "brak pakietu" bez daty, "pakiet: X/Y" / "miesieczny: N", przycisk Pomiary jako editBtn.
+- Rozliczenia: karta biezacego (otwartego) cyklu na gorze historii + "Cykl otwarty", ukrycie kosza dla karty otwartej.
+- Raporty: frekwencja liczy DNI treningowe (unikalne daty), nie logi; eksport PNG czeka na img.decode + 800ms (fix ucietych gifow na telefonie).
+- Deploy: ./deploy.ps1 -Version 1.6.1 (commit 66873b6, bundle index-be2445ce2c7d49388ec7965e25364468.js 1.6MB, tagi v1.6.1/backup-v1.6.1, push master, bundle backup/atylla-pro-backup-v1.6.1.bundle zweryfikowany).

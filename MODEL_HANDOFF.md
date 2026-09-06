@@ -1,5 +1,11 @@
 # Model Handoff — Atylla Pro
 
+## SESJA 2026-09-06 — v1.6.1 WDROŻONE (GitHub + Railway)
+- Commit 66873b6 + tagi v1.6.1/backup-v1.6.1 wypushowane na master 06.09. Railway przebudowuje automatycznie.
+- Produkcja: **v1.6.1**. Bundle web index-be2445ce2c7d49388ec7965e25364468.js (1.6MB). Bundle backup/atylla-pro-backup-v1.6.1.bundle zweryfikowany.
+- Zakres: odznaki START CYKLU/OSTATNI (miesieczne), fix szerokosci kalendarza, chipy brak pakietu/pakiet:, otwarty cykl w Rozliczeniach, frekwencja dniowa + fix eksportu PNG w Raportach.
+- Katalog roboczy zsynchronizowany (LOG + bundle). api.js = Railway URL.
+
 ## SESJA 2026-09-06 — v1.6.0 WDROŻONE (GitHub + Railway)
 - Commit d448ac9 + tagi v1.6.0/backup-v1.6.0 wypushowane na master 06.09. Railway przebudowuje automatycznie.
 - Produkcja: **v1.6.0**. Katalog roboczy zsynchronizowany (LOG + bundle backup/atylla-pro-backup-v1.6.0.bundle).
