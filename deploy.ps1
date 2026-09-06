@@ -67,6 +67,12 @@ if (-not (Test-Path "backend/static/_expo")) {
 }
 Copy-Item -Path "frontend/dist/_expo\*" -Destination "backend/static/_expo" -Recurse -Force
 
+Write-Host "Copying Expo assets (gifs, images) to backend..." -ForegroundColor Cyan
+if (-not (Test-Path "backend/static/assets")) {
+    New-Item -ItemType Directory -Path "backend/static/assets" -Force
+}
+Copy-Item -Path "frontend/dist/assets\*" -Destination "backend/static/assets" -Recurse -Force
+
 Write-Host "Copying PWA assets to backend..." -ForegroundColor Cyan
 Copy-Item -Path "frontend/assets/apple-touch-icon.png" -Destination "backend/static/" -ErrorAction SilentlyContinue
 Copy-Item -Path "frontend/assets/icon-192.png" -Destination "backend/static/" -ErrorAction SilentlyContinue
