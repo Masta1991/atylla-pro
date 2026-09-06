@@ -35,3 +35,8 @@
 - Rozliczenia: karta biezacego (otwartego) cyklu na gorze historii + "Cykl otwarty", ukrycie kosza dla karty otwartej.
 - Raporty: frekwencja liczy DNI treningowe (unikalne daty), nie logi; eksport PNG czeka na img.decode + 800ms (fix ucietych gifow na telefonie).
 - Deploy: ./deploy.ps1 -Version 1.6.1 (commit 66873b6, bundle index-be2445ce2c7d49388ec7965e25364468.js 1.6MB, tagi v1.6.1/backup-v1.6.1, push master, bundle backup/atylla-pro-backup-v1.6.1.bundle zweryfikowany).
+
+## 2026-09-06 — v1.6.2: fix gifow (Railway przebudowuje)
+- Przyczyna: bundle web odwoluje sie do /assets/assets/exercise-gifs/*.gif, a deploy.ps1 kopiowal tylko frontend/dist/_expo -> backend/static/_expo. Gify z frontend/dist/assets nigdy nie trafialy na produkcje (404). Lokalnie przez Metro dzialaly.
+- Fix: deploy.ps1 kopiuje teraz frontend/dist/assets -> backend/static/assets (merge). Zweryfikowano: backend/static/assets/assets/exercise-gifs/5x gif istnieje, bundle index-b718c0b0171c2728813b50717698892d.js odwoluje sie do tych sciezek, backend montuje /assets.
+- Deploy: ./deploy.ps1 -Version 1.6.2 (commit 8dc061b, bundle index-b718c0b0171c2728813b50717698892d.js, tagi v1.6.2/backup-v1.6.2, push master, bundle backup/atylla-pro-backup-v1.6.2.bundle zweryfikowany).

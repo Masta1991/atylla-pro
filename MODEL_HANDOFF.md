@@ -1,5 +1,10 @@
 # Model Handoff — Atylla Pro
 
+## SESJA 2026-09-06 — v1.6.2 WDROŻONE (GitHub + Railway) — FIX GIFÓW
+- Commit 8dc061b + tagi v1.6.2/backup-v1.6.2 wypushowane na master 06.09. Railway przebudowuje automatycznie.
+- Produkcja: **v1.6.2**. Przyczyna braku gifów: deploy nie kopiował frontend/dist/assets. Fix w deploy.ps1 + gify w backend/static/assets/assets/exercise-gifs (5 plików).
+- Bundle backup/atylla-pro-backup-v1.6.2.bundle zweryfikowany. api.js = Railway URL.
+
 ## SESJA 2026-09-06 — v1.6.1 WDROŻONE (GitHub + Railway)
 - Commit 66873b6 + tagi v1.6.1/backup-v1.6.1 wypushowane na master 06.09. Railway przebudowuje automatycznie.
 - Produkcja: **v1.6.1**. Bundle web index-be2445ce2c7d49388ec7965e25364468.js (1.6MB). Bundle backup/atylla-pro-backup-v1.6.1.bundle zweryfikowany.
