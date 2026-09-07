@@ -57,3 +57,11 @@
 - Weryfikacja: py_compile OK, node --check api.js OK, status czysty (calendar.py, CalendarScreen.js, api.js).
 - Deploy: ./deploy.ps1 -Version 1.6.4 (bundle index-08fced6777103a7174992f4f109cf418.js 1.6MB, tagi v1.6.4/backup-v1.6.4, push master, bundle backup/atylla-pro-backup-v1.6.4.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.4.bundle).
 - 1.7.x (portal klienta + hardening) dalej lokalnie w stashu, nie wdrozony.
+
+## 2026-09-07 — v1.6.5: dolar za rozliczone zastepstwo po odwołaniu (Railway przebudowuje)
+- Problem: trening odwolany (nieobecnosc w slocie), w jego miejsce inny trening, po rozliczeniu brak $ na kafelku.
+- Przyczyna: CalendarSlot liczyl isAbsent po samym slocie (data+godzina, bez klienta) — stara nieobecnosc gasila podswietlenie i $ (warunek showEv && is_settled && !isAbsent). Backend liczy absencje per klient eventu, frontend byl niespojny.
+- Fix (tylko frontend/CalendarScreen.js): nieobecnosc dotyczy slotu gdy ten sam klient (lub pusty slot) i nie starsza niz sam zapis (porownanie created_at — swiezy zapis po odwołaniu ignoruje stara nieobecnosc).
+- Weryfikacja: symulacja logiki 5/5 (zastepstwo obcy klient false, ten sam klient nowy zapis false, oryginalny odwolany true, pusty slot true, brak nieobecnosci false).
+- Deploy: ./deploy.ps1 -Version 1.6.5 (bundle index-2ab5b27369fd3fc7feca04fe41897cae.js 1.6MB, tagi v1.6.5/backup-v1.6.5, push master, bundle backup/atylla-pro-backup-v1.6.5.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.5.bundle).
+- 1.7.x dalej lokalnie w stashu, nie wdrozony.
