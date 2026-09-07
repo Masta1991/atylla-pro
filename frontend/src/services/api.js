@@ -247,6 +247,11 @@ export function settleWorkout(date, hour) {
   return request(`/calendar/${date}/${hour}/settle`, { method: 'POST' });
 }
 
+export function unsettleWorkout(date, hour) {
+  invalidateCache('clients');
+  return request(`/calendar/${date}/${hour}/unsettle`, { method: 'POST' });
+}
+
 export function getDaySummary(day) {
   return request(`/day/summary/${day}`);
 }
