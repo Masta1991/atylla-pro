@@ -621,7 +621,7 @@ export default function PaymentsScreen({ navigation, route }) {
                     <Text style={styles.clientName}>{client.name}</Text>
                     <View style={[styles.badge, isPackage ? styles.badgePackage : styles.badgeSingle]}>
                       <Text style={[styles.badgeText, isSingle && { color: '#8b949e' }]}>
-                        {isPackage ? 'PAKIET' : 'BEZ PAKIETU'}
+                        {isPackage ? 'PAKIET' : (client.package_purchase_date ? 'MIESIĘCZNY' : 'BEZ PAKIETU')}
                       </Text>
                     </View>
                   </View>

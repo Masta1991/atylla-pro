@@ -258,7 +258,11 @@ def assign_chronological_numbers(events, supabase):
                         continue
                     # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
                     # W unii: absencja liczona per właściciel eventu.
-                    if not e.get("is_settled") and has_timely_absence(e["client_id"], e["event_date"], e["event_hour"]):
+                    # FIX 2026-09-07 (Ania: usuniety + wpisany ponownie trening):
+                    # AKTYWNY trening w slocie uniewaznia absencje (kazdy przeplyw
+                    # tworzacy absencje przestawia event na deleted/cancelled, wiec
+                    # active + absencja to zawsze zastepstwo/ponowny wpis).
+                    if e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], e["event_date"], e["event_hour"]):
                         continue
 
                     e_id = e["id"]
@@ -318,7 +322,8 @@ def assign_chronological_numbers(events, supabase):
             for e in evs:
                 ev_date = e["event_date"]
                 # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
-                if e.get("status") != "deleted" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
+                # FIX 2026-09-07 jak wyzej: AKTYWNY trening ignoruje absencje.
+                if e.get("status") != "deleted" and e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
                     continue
                 cycle_key = "single"
                 belongs_to_history = False
@@ -505,6 +510,24 @@ def get_event(event_date: str, event_hour: int, request: Request):
     return events[0]
 
 
+def _clear_slot_absence(supabase, client_id, event_date: str, event_hour: int):
+    """Wpisanie treningu w slot kasuje absencje TEGO klienta w tym slocie.
+
+    FIX 2026-09-07 (Ania): delete_event tworzy absencje przy kazdym usunieciu,
+    wiec usuniety + wpisany ponownie trening zostawial wisząca absencje, ktora
+    wykluczala trening z numeracji. Wpis = klient wraca = absencja nieaktualna.
+    Tylko ten sam klient (cudze odwolania, np. zastepowane, zostaja).
+    """
+    if not client_id:
+        return
+    try:
+        supabase.table("absences").delete() \
+            .eq("client_id", client_id) \
+            .eq("absence_date", event_date).eq("absence_hour", event_hour).execute()
+    except Exception:
+        pass
+
+
 @router.post("/", response_model=CalendarEventResponse, status_code=201)
 def create_or_update_event(data: CalendarEventCreate, request: Request):
     """Upsert: create or replace calendar event."""
@@ -516,6 +539,8 @@ def create_or_update_event(data: CalendarEventCreate, request: Request):
         res = supabase.table("calendar_events").upsert(
             payload, on_conflict="event_date,event_hour,trainer_id"
         ).execute()
+        _clear_slot_absence(supabase, payload.get("client_id"),
+                            payload.get("event_date"), payload.get("event_hour"))
         return res.data[0]
     except Exception as e:
         import traceback
@@ -558,6 +583,10 @@ def replace_week(data: ReplaceWeekRequest, request: Request):
             # Raise exception if Supabase returns an error
             if hasattr(res, 'error') and res.error:
                 raise Exception(f"Supabase upsert error: {res.error}")
+
+            for p in payloads:
+                _clear_slot_absence(supabase, p.get("client_id"),
+                                    p.get("event_date"), p.get("event_hour"))
             
         return {"status": "replaced"}
     except Exception as e:
@@ -671,6 +700,10 @@ def swap_events(data: CalendarSwapRequest, request: Request):
             else:
                 _move_logs(c1, d1, d2)
                 _move_logs(c2, d2, d1)
+        _clear_slot_absence(supabase, ev1_data.get("client_id"),
+                            data.date2.isoformat(), data.hour2)
+        _clear_slot_absence(supabase, ev2_data.get("client_id"),
+                            data.date1.isoformat(), data.hour1)
         return {"status": "swapped"}
 
     # Przypadek 2: ruch w jedna strone = UPDATE daty/godziny (id zostaje,
@@ -683,6 +716,7 @@ def swap_events(data: CalendarSwapRequest, request: Request):
         {"event_date": dst_date, "event_hour": dst_hour, "updated_at": "now()"}
     ).eq("id", moving["id"]).execute()
     _move_logs(moving.get("client_id"), src_date, dst_date)
+    _clear_slot_absence(supabase, moving.get("client_id"), dst_date, dst_hour)
 
     return {"status": "swapped"}
 

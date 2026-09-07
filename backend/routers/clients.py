@@ -178,15 +178,22 @@ def assign_client_packages_status(clients, supabase):
     def count_free_absences(cid, start_date, evs):
         settled_keys = {(e["event_date"], e["event_hour"]) for e in evs if e.get("is_settled")}
         settled_days = {e["event_date"] for e in evs if e.get("is_settled")}
+        # FIX 2026-09-07 (Ania): slot ponownie zajety AKTYWNYM treningiem tego
+        # klienta (usuniety + wpisany ponownie) to nie odwolanie — absencja
+        # jest nieaktualna i nie liczy sie do "odwolanych bez rozliczenia".
+        active_keys = {(e["event_date"], e["event_hour"]) for e in evs
+                       if str(e.get("client_id")) == str(cid) and e.get("status") == "active"}
+        active_days = {e["event_date"] for e in evs
+                       if str(e.get("client_id")) == str(cid) and e.get("status") == "active"}
         free = 0
         for a in abs_by_client.get(cid, []):
             if a["absence_date"] < start_date:
                 continue
             h = a.get("absence_hour")
             if h is None:
-                if a["absence_date"] not in settled_days:
+                if a["absence_date"] not in settled_days and a["absence_date"] not in active_days:
                     free += 1
-            elif (a["absence_date"], h) not in settled_keys:
+            elif (a["absence_date"], h) not in settled_keys and (a["absence_date"], h) not in active_keys:
                 free += 1
         return free
         
