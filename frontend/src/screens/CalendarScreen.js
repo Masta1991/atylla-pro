@@ -140,20 +140,20 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
   const { themeColors } = useTheme();
   const slotRef = useRef(null);
 
-  // Nieobecnosc dotyczy slotu tylko gdy pasuje do aktualnego treningu:
-  // ten sam klient (nie cudza nieobecnosc) i nie starsza niz sam zapis.
-  // Bez tego odwolany trening gasil $ za rozliczone zastepstwo innego
-  // klienta w tym slocie (backend liczy absencje per klient eventu).
+  // Nieobecnosc dotyczy slotu tylko gdy nie ma w nim AKTYWNEGO treningu.
+  // Kazdy przeplyw tworzacy absencje (odwolanie, usuniecie) przestawia event
+  // na deleted/cancelled, wiec active + absencja to zawsze nieaktualna
+  // absencja (usuniety + wpisany ponownie trening, zastepstwo) — tak samo
+  // liczy backend w numeracji pakietow. Spojne: zajety slot = brak absencji.
   const slotAbsences = absences?.filter(a =>
     a.absence_date === dateStr &&
     (a.absence_hour == null || a.absence_hour === hour)
   );
-  const applyingAbsence = (!ev || !ev.client_id)
+  const applyingAbsence = (!ev || ev.status !== 'active')
     ? slotAbsences?.[0]
-    : slotAbsences?.find(a => a.client_id === ev.client_id
-        && (!a.created_at || !ev.created_at || a.created_at >= ev.created_at));
+    : null;
   const isAbsent = !!applyingAbsence;
-  const absentClientName = applyingAbsence?.clients?.name;
+  const absentClientName = (applyingAbsence?.clients?.name) || ev?.clients?.name;
   const absentTooltip = isAbsent ? `Trening odwołany: ${absentClientName || '—'}` : null;
 
   const handleSlotTap = () => {
