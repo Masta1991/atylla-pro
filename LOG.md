@@ -40,3 +40,13 @@
 - Przyczyna: bundle web odwoluje sie do /assets/assets/exercise-gifs/*.gif, a deploy.ps1 kopiowal tylko frontend/dist/_expo -> backend/static/_expo. Gify z frontend/dist/assets nigdy nie trafialy na produkcje (404). Lokalnie przez Metro dzialaly.
 - Fix: deploy.ps1 kopiuje teraz frontend/dist/assets -> backend/static/assets (merge). Zweryfikowano: backend/static/assets/assets/exercise-gifs/5x gif istnieje, bundle index-b718c0b0171c2728813b50717698892d.js odwoluje sie do tych sciezek, backend montuje /assets.
 - Deploy: ./deploy.ps1 -Version 1.6.2 (commit 8dc061b, bundle index-b718c0b0171c2728813b50717698892d.js, tagi v1.6.2/backup-v1.6.2, push master, bundle backup/atylla-pro-backup-v1.6.2.bundle zweryfikowany).
+
+## 2026-09-07 — v1.6.3: fix przenoszenia startu pakietu + kafelek pakietu laczonego (Railway przebudowuje)
+- Tylko ten fix (bez lokalnego 1.7.x portal-klienta; 1.7.x zostaje w stashu "1.7.0-portal-klienta-lokalnie-zostawione-na-pozniej").
+- Przyczyna 1 (Agata 04/09/2026 12:00 -> 11:00, pakiet 1/10): POST /calendar/swap robil UPSERT (nowy UUID) + DELETE, kopiujac tylko client_id/workout_type_id/status/is_settled. Gubil plan_id (nowy trening "bez planu") i sierocil client_packages.start_training_id (rozliczenia nie przesuwaly daty startu). Miesieczne (Ewa Dabrowska) liczone po dacie, wiec ich to nie dotyczylo.
+- Fix 1 (backend/routers/calendar.py swap_events): przenoszenie przez UPDATE po id — id wiersza zostaje, pakiet i rozliczenia podazaja automatycznie; logi workout_logs ida za treningiem; zamiana dwoch zajetych slotow przez bufor 1970-01-01 (unique); selecty scoped po trainer_id.
+- Przyczyna 2 (Sylwia+Marcin pakiet laczony 14, kafelek 1/10): backend ustawial clients.package_size tylko dla rozliczonych (event_counts), nierozliczone braly stara kolumne clients.package_size albo default 10.
+- Fix 2 (assign_chronological_numbers): package_size zawsze z SSOT pakietu (event_positions), fallback do kolumny; flaga LAST/OVERFLOW na tym samym rozmiarze.
+- Weryfikacja: py_compile OK, symulacja kafelka 1/14 OK, status czysty (tylko backend/routers/calendar.py).
+- Deploy: ./deploy.ps1 -Version 1.6.3 (bundle index-709dd7edc96077a16a75c16220483473.js 1.6MB, tagi v1.6.3/backup-v1.6.3, push master, bundle backup/atylla-pro-backup-v1.6.3.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.3.bundle).
+- Po deploynie do sprawdzenia w apce: przenies start pakietu Agaty 12->11 (ma zniknac 12:00, plan zachowany, rozliczenia z nowa data startu) oraz kafelek Sylwii/Marcina x/14.
