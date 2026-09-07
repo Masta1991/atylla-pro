@@ -73,7 +73,8 @@ export default function PaymentsScreen({ navigation, route }) {
 
   const loadData = useCallback(async () => {
     try {
-      const data = await api.getClients();
+      // Zawsze swiezo: karta z pieniedzmi nie moze pokazywac wczorajszych danych.
+      const data = await api.getClients(true);
       const fetched = data || [];
       setClients(fetched);
       global.cachedClients = fetched;

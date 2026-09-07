@@ -48,7 +48,8 @@ export default function ClientsScreen({ navigation }) {
   const loadClients = useCallback(async () => {
     try {
       const [data, wt] = await Promise.all([
-        api.getClients(),
+        // Zawsze swiezo: chipy z licznikami pakietow jak w Rozliczeniach.
+        api.getClients(true),
         api.getWorkoutTypes(),
       ]);
       const fetchedClients = data || [];

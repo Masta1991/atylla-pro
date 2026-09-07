@@ -146,9 +146,13 @@ export function login(email, password) {
 
 // ── Clients ─────────────────────────────────────────────────────────────────
 
-export async function getClients() {
-  
-  if (clientsCache) return clientsCache;
+// FIX 2026-09-07 (Ania: baza ma date 02.09 od 09:15, apka o 11:56 "brak daty"):
+// cache klientow nie mial TTL ani odswiezania w tle — zapis z innej sesji
+// (drugie urzadzenie/web) byl niewidoczny az do restartu/reloginu, a nawet
+// reczne przeciagniecie (RefreshControl) trafialo w ten sam cache.
+// Ekrany z danymi rozliczeniowymi wymuszaja swieze pobranie (force=true).
+export async function getClients(force = false) {
+  if (clientsCache && !force) return clientsCache;
   const res = await request('/clients/');
   clientsCache = res;
   return res;
