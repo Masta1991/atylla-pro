@@ -73,3 +73,11 @@
 - Weryfikacja na danych Ani: 02.09 START+1, 04.09 tile 2, karta 0/Od 02.09/free 0 (bylo: 02.09 puste, 04.09 START+1, free 1). py_compile OK.
 - Deploy: ./deploy.ps1 -Version 1.6.6 (bundle index-d667adc76279b96d4af7a45ab3f36fc0.js 1.6MB, tagi v1.6.6/backup-v1.6.6, push master, bundle backup/atylla-pro-backup-v1.6.6.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.6.bundle).
 - 1.7.x dalej lokalnie w stashu, nie wdrozony.
+
+## 2026-09-07 — v1.6.7: Rozliczenia widza swieze dane (force-refresh) (Railway przebudowuje)
+- Problem (prod, read-only + zrzut 11:56): Ania ma w bazie pakiet miesieczny od 02.09 (updated_at 09:15), a karta pokazuje "BEZ PAKIETU / brak daty / Nowe rozliczanie".
+- Przyczyna: getClients() cache bez TTL; zapis z innej sesji/urządzenia niewidoczny az do restartu/reloginu; focus i pull-to-refresh trafialy w ten sam cache (falszywe odswiezanie).
+- Fix (tylko frontend): getClients(force=false); PaymentsScreen i ClientsScreen pobieraja zawsze swiezo (force=true). Reszta ekranow bez zmian (cache dla list pomocniczych).
+- Weryfikacja: node --check api.js OK, diff czysty (api.js, PaymentsScreen.js, ClientsScreen.js).
+- Deploy: ./deploy.ps1 -Version 1.6.7 (bundle index-d3d8b47a2978f1fa6cfe2cba164b87c9.js 1.6MB, tagi v1.6.7/backup-v1.6.7, push master, bundle backup/atylla-pro-backup-v1.6.7.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.7.bundle).
+- 1.7.x dalej lokalnie w stashu, nie wdrozony.
