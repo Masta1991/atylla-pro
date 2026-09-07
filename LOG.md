@@ -50,3 +50,10 @@
 - Weryfikacja: py_compile OK, symulacja kafelka 1/14 OK, status czysty (tylko backend/routers/calendar.py).
 - Deploy: ./deploy.ps1 -Version 1.6.3 (bundle index-709dd7edc96077a16a75c16220483473.js 1.6MB, tagi v1.6.3/backup-v1.6.3, push master, bundle backup/atylla-pro-backup-v1.6.3.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.3.bundle).
 - Po deploynie do sprawdzenia w apce: przenies start pakietu Agaty 12->11 (ma zniknac 12:00, plan zachowany, rozliczenia z nowa data startu) oraz kafelek Sylwii/Marcina x/14.
+
+## 2026-09-07 — v1.6.4: kafelek Cofnij rozliczenie w szufladzie (Railway przebudowuje)
+- Potrzeba: rozliczony trening bez pakietu (zapomniane zalozenie pakietu) — brakowalo drogi powrotnej.
+- Fix: backend POST /calendar/{date}/{hour}/unsettle (is_settled -> False; id wiersza zostaje, pakiet przelicza sie sam) + api.unsettleWorkout + kafelek "Cofnij rozliczenie" w szufladzie TYLKO dla rozliczonych (potwierdzenie przed cofnieciem; dla nierozliczonych kafelek niewidoczny).
+- Weryfikacja: py_compile OK, node --check api.js OK, status czysty (calendar.py, CalendarScreen.js, api.js).
+- Deploy: ./deploy.ps1 -Version 1.6.4 (bundle index-08fced6777103a7174992f4f109cf418.js 1.6MB, tagi v1.6.4/backup-v1.6.4, push master, bundle backup/atylla-pro-backup-v1.6.4.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.4.bundle).
+- 1.7.x (portal klienta + hardening) dalej lokalnie w stashu, nie wdrozony.
