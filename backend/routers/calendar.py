@@ -391,7 +391,6 @@ def assign_chronological_numbers(events, supabase):
 
                 if e_id in event_counts:
                     ev["clients"]["package_current_count"] = event_counts[e_id]
-                    ev["clients"]["package_size"] = event_counts.get(f"{e_id}_size", 10)
                     has_active_or_history = True
                 else:
                     ev["clients"]["package_current_count"] = 0
@@ -400,12 +399,19 @@ def assign_chronological_numbers(events, supabase):
                 # Numer na kafelek od razu (pozycja w pakiecie).
                 if e_id in event_positions:
                     ev["tile_number"] = event_positions[e_id]
+                    # FIX 2026-09-07 (pakiet laczony 14 vs 1/10): rozmiar bierzemy
+                    # z SSOT pakietu (event_positions), nie ze starej kolumny
+                    # clients.package_size ani z domyslnego 10. Bez tego kafelek
+                    # nierozliczonego treningu pokazywal ".../10" mimo size=14.
+                    ev["clients"]["package_size"] = event_positions.get(f"{e_id}_size", ev["clients"].get("package_size", 10))
 
                 # Flagi kafelka na podstawie PAKIETU (znaczniki start/end),
                 # numeracja tylko jako fallback dla otwartych pakietów i nadwyżek.
                 if e_id in event_positions:
                     pos = event_positions[e_id]
-                    size = event_positions.get(f"{e_id}_size", 10)
+                    size = event_positions.get(f"{e_id}_size")
+                    if size is None:
+                        size = ev["clients"].get("package_size", 10)
                     is_end = e_id in _all_end_ids
                     if size > 0:
                         if is_end or pos == size:
@@ -606,12 +612,21 @@ def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate, re
 
 @router.post("/swap")
 def swap_events(data: CalendarSwapRequest, request: Request):
-    """Swap two calendar events (drag-and-drop)."""
+    """Swap two calendar events (drag-and-drop) or move one event.
+
+    FIX 2026-09-07 (przeniesienie startu pakietu 1/10):
+    wczesniej robil UPSERT (nowy UUID) + DELETE starego wiersza, kopiujac
+    tylko client_id/workout_type_id/status/is_settled. To gubilo plan_id
+    (nowy trening "bez planu") i sierocilo client_packages.start_training_id
+    (stary id znikal, rozliczenia nie przesuwaly daty startu).
+    Teraz przenosimy przez UPDATE po id: id wiersza zostaje, wiec pakiet
+    i rozliczenia podazaja automatycznie (SSOT = chronologia eventow).
+    """
     supabase, user_id = get_user_supabase(request)
 
-    # Fetch both events
-    res1 = supabase.table("calendar_events").select("*").eq("event_date", data.date1.isoformat()).eq("event_hour", data.hour1).execute()
-    res2 = supabase.table("calendar_events").select("*").eq("event_date", data.date2.isoformat()).eq("event_hour", data.hour2).execute()
+    # Fetch both events (scoped do trenera, zeby nie mieszac kont)
+    res1 = supabase.table("calendar_events").select("*").eq("event_date", data.date1.isoformat()).eq("event_hour", data.hour1).eq("trainer_id", user_id).execute()
+    res2 = supabase.table("calendar_events").select("*").eq("event_date", data.date2.isoformat()).eq("event_hour", data.hour2).eq("trainer_id", user_id).execute()
 
     ev1_data = res1.data[0] if res1.data else None
     ev2_data = res2.data[0] if res2.data else None
@@ -619,34 +634,55 @@ def swap_events(data: CalendarSwapRequest, request: Request):
     if not ev1_data and not ev2_data:
         raise HTTPException(404, "No events to swap")
 
-    # Swap: move ev1 to slot2, ev2 to slot1
-    if ev1_data:
-        supabase.table("calendar_events").upsert({
-            "event_date": data.date2.isoformat(),
-            "event_hour": data.hour2,
-            "client_id": ev1_data.get("client_id"),
-            "workout_type_id": ev1_data.get("workout_type_id"),
-            "status": ev1_data.get("status", "active"),
-            "is_settled": ev1_data.get("is_settled", False),
-            "trainer_id": user_id,
-        }, on_conflict="event_date,event_hour,trainer_id").execute()
+    def _move_logs(client_id, old_date: str, new_date: str):
+        if not client_id or old_date == new_date:
+            return
+        try:
+            supabase.table("workout_logs").update({"session_date": new_date}).eq("client_id", client_id).eq("session_date", old_date).execute()
+        except Exception:
+            pass
 
-    if ev2_data:
-        supabase.table("calendar_events").upsert({
-            "event_date": data.date1.isoformat(),
-            "event_hour": data.hour1,
-            "client_id": ev2_data.get("client_id"),
-            "workout_type_id": ev2_data.get("workout_type_id"),
-            "status": ev2_data.get("status", "active"),
-            "is_settled": ev2_data.get("is_settled", False),
-            "trainer_id": user_id,
-        }, on_conflict="event_date,event_hour,trainer_id").execute()
+    # Przypadek 1: oba sloty zajete = zamiana dat/godzin (id zostaja)
+    if ev1_data and ev2_data:
+        _TMP_DATE = "1970-01-01"
+        _TMP_HOUR = 6
+        # Krok przez slot tymczasowy, zeby nie zlamac unique(event_date,event_hour,trainer_id)
+        supabase.table("calendar_events").update(
+            {"event_date": _TMP_DATE, "event_hour": _TMP_HOUR, "updated_at": "now()"}
+        ).eq("id", ev1_data["id"]).execute()
+        supabase.table("calendar_events").update(
+            {"event_date": data.date1.isoformat(), "event_hour": data.hour1, "updated_at": "now()"}
+        ).eq("id", ev2_data["id"]).execute()
+        supabase.table("calendar_events").update(
+            {"event_date": data.date2.isoformat(), "event_hour": data.hour2, "updated_at": "now()"}
+        ).eq("id", ev1_data["id"]).execute()
+        # Logi ida za treningiem (bez godzin, tylko data)
+        d1, d2 = data.date1.isoformat(), data.date2.isoformat()
+        if d1 != d2:
+            c1, c2 = ev1_data.get("client_id"), ev2_data.get("client_id")
+            if c1 and c1 == c2:
+                # Ten sam klient po obu stronach: zamiana dat przez bufor
+                try:
+                    supabase.table("workout_logs").update({"session_date": _TMP_DATE}).eq("client_id", c1).eq("session_date", d1).execute()
+                    supabase.table("workout_logs").update({"session_date": d1}).eq("client_id", c1).eq("session_date", d2).execute()
+                    supabase.table("workout_logs").update({"session_date": d2}).eq("client_id", c1).eq("session_date", _TMP_DATE).execute()
+                except Exception:
+                    pass
+            else:
+                _move_logs(c1, d1, d2)
+                _move_logs(c2, d2, d1)
+        return {"status": "swapped"}
 
-    # If one slot was empty, delete the original
-    if not ev1_data:
-        supabase.table("calendar_events").delete().eq("event_date", data.date2.isoformat()).eq("event_hour", data.hour2).execute()
-    if not ev2_data:
-        supabase.table("calendar_events").delete().eq("event_date", data.date1.isoformat()).eq("event_hour", data.hour1).execute()
+    # Przypadek 2: ruch w jedna strone = UPDATE daty/godziny (id zostaje,
+    # plan/partner/notatka/is_settled nienaruszone)
+    moving = ev1_data or ev2_data
+    src_date = data.date1.isoformat() if ev1_data else data.date2.isoformat()
+    dst_date = data.date2.isoformat() if ev1_data else data.date1.isoformat()
+    dst_hour = data.hour2 if ev1_data else data.hour1
+    supabase.table("calendar_events").update(
+        {"event_date": dst_date, "event_hour": dst_hour, "updated_at": "now()"}
+    ).eq("id", moving["id"]).execute()
+    _move_logs(moving.get("client_id"), src_date, dst_date)
 
     return {"status": "swapped"}
 
