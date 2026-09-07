@@ -65,3 +65,11 @@
 - Weryfikacja: symulacja logiki 5/5 (zastepstwo obcy klient false, ten sam klient nowy zapis false, oryginalny odwolany true, pusty slot true, brak nieobecnosci false).
 - Deploy: ./deploy.ps1 -Version 1.6.5 (bundle index-2ab5b27369fd3fc7feca04fe41897cae.js 1.6MB, tagi v1.6.5/backup-v1.6.5, push master, bundle backup/atylla-pro-backup-v1.6.5.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.5.bundle).
 - 1.7.x dalej lokalnie w stashu, nie wdrozony.
+
+## 2026-09-07 — v1.6.6: start cyklu po usunieciu + ponownym wpisie (Ania) (Railway przebudowuje)
+- Problem (prod, read-only): Ania miesieczny od 02.09; trener usunal trening 02.09 i wpisal ponownie; START CYKLU wyladowal na 04.09, licznik wolnych 1, karta "BEZ PAKIETU".
+- Przyczyna: delete_event tworzy absencje przy KAZDYM usunieciu; ponowny wpis (upsert) wisi na starej absencji; numeracja wykluczala aktywny trening z absencja (frontend i backend), free-count ja liczyl.
+- Fix: (1) numeracja ignoruje absencje dla AKTYWNYCH eventow (pakiet + single; kazdy przeplyw absencji przestawia event na deleted/cancelled, wiec active+absencja to zawsze zastepstwo/ponowny wpis); (2) wpis/replace/swap kasuje absencje TEGO klienta w slocie (cudze zostaja); (3) free-count pomija sloty z aktywnym treningiem klienta; (4) kafelek: zajety slot = brak absencji (statusowa regula zamiast timestampow z 1.6.5); (5) badge MIESIECZNY dla single z data startu (zamiast mylacego BEZ PAKIETU).
+- Weryfikacja na danych Ani: 02.09 START+1, 04.09 tile 2, karta 0/Od 02.09/free 0 (bylo: 02.09 puste, 04.09 START+1, free 1). py_compile OK.
+- Deploy: ./deploy.ps1 -Version 1.6.6 (bundle index-d667adc76279b96d4af7a45ab3f36fc0.js 1.6MB, tagi v1.6.6/backup-v1.6.6, push master, bundle backup/atylla-pro-backup-v1.6.6.bundle zweryfikowany; backup pre: backup/atylla-pro-backup-pre-1.6.6.bundle).
+- 1.7.x dalej lokalnie w stashu, nie wdrozony.
