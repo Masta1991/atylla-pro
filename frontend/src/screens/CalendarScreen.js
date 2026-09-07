@@ -816,6 +816,28 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: '#06281e' }]}>Rozlicz</Text>
             </TouchableOpacity>
           )}
+          {!absenceAsk && !!selSlot.ev?.is_settled && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
+              onPress={() => {
+                const s = selSlot;
+                const doUnsettle = async () => {
+                  try { await api.unsettleWorkout(s.date, Number(s.hour)); setSelSlot(null); loadWeek(); }
+                  catch (e) { Alert.alert('Błąd', e.message); }
+                };
+                if (Platform.OS === 'web') {
+                  if (window.confirm(`Cofnąć rozliczenie treningu?\n\nKlient: ${s.ev?.clients?.name || ''}\nTrening wypadnie z licznika pakietu.`)) doUnsettle();
+                } else {
+                  Alert.alert('Cofnij rozliczenie', `Klient: ${s.ev?.clients?.name || ''}\n\nTrening wypadnie z licznika pakietu.`, [
+                    { text: 'Anuluj', style: 'cancel' },
+                    { text: 'Cofnij', onPress: doUnsettle },
+                  ]);
+                }
+              }}
+            >
+              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Cofnij rozliczenie</Text>
+            </TouchableOpacity>
+          )}
           {!absenceAsk && !!selSlot.ev?.client_id && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}

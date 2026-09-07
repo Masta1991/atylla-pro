@@ -787,6 +787,26 @@ def settle_event(event_date: str, event_hour: int, request: Request):
     return {"status": "settled"}
 
 
+@router.post("/{event_date}/{event_hour}/unsettle")
+def unsettle_event(event_date: str, event_hour: int, request: Request):
+    """Cofniecie rozliczenia (np. rozliczony trening bez pakietu).
+
+    Tylko flaga is_settled -> False. Id wiersza zostaje, wiec kotwice
+    pakietow (start/end_training_id) i numeracja przeliczaja sie same.
+    """
+    supabase, _ = get_user_supabase(request)
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
+    if not ev.data:
+        raise HTTPException(404, "Workout not found in calendar")
+
+    if not ev.data.get("is_settled"):
+        return {"status": "already unsettled"}
+
+    supabase.table("calendar_events").update({"is_settled": False}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
+
+    return {"status": "unsettled"}
+
+
 @router.delete("/{event_date}/{event_hour}")
 def delete_event(event_date: str, event_hour: int, request: Request):
     """Soft-delete: set status='deleted', log to deleted_workouts, and create absence."""
