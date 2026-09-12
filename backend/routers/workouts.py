@@ -78,7 +78,7 @@ def save_workout_batch(data: WorkoutLogBatch, request: Request):
     supabase, user_id = get_user_supabase(request)
 
     if not data.logs:
-        raise HTTPException(400, "Empty workout batch — nothing to save. Use delete to clear a day.")
+        raise HTTPException(400, "Pusty trening — zaznacz ćwiczenia przed zapisem. Dzień czyści się przyciskiem Usuń.")
 
     records = []
     for log in data.logs:
