@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, useWindowDimensions, Platform, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, useWindowDimensions, Platform, Image, ActivityIndicator, TextInput } from 'react-native';
 import { Svg, Path, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../assets/theme';
@@ -530,17 +530,29 @@ function CalendarScreen({ navigation, route }) {
       });
   }, [selSlot, drawerClient, loadWeek]);
 
-  // Start cyklu z szuflady: typ miesięczny ustawia się sam (nie ma go w karcie klienta).
-  const startCycleFromDrawer = useCallback(() => {
+  // Panel startu w szufladzie: jeden przycisk, typ i rozmiar na miejscu.
+  // Pakiet startuje od treningu szuflady, cykl od jego daty. Typ dopisuje się sam.
+  const [startPanel, setStartPanel] = useState(null);
+  const confirmStartPanel = useCallback(async () => {
     const s = selSlot; const c = drawerClient;
-    if (!s?.ev || !c) return;
-    confirm2('Rozpocznij cykl',
-      `Klient: ${c.name || ''}\nStart: ${s.ev.event_date}`,
-      'Rozpocznij', async () => {
-        try { await api.updateClient(c.id, { package_purchase_date: s.ev.event_date, billing_type: 'single' }); setSelSlot(null); loadWeek(); }
-        catch (e) { Alert.alert('Błąd', e.message); }
-      });
-  }, [selSlot, drawerClient, loadWeek]);
+    if (!s?.ev || !c || !startPanel) return;
+    try {
+      if (startPanel.mode === 'package') {
+        const size = parseInt(startPanel.size, 10) || 10;
+        if (size < 1 || size > 100) {
+          Alert.alert('Błąd', 'Rozmiar pakietu 1–100.');
+          return;
+        }
+        await api.createClientPackage(c.id, {
+          size, start_training_id: s.ev.id, offset: 0, shared_client_ids: [],
+        });
+        await api.updateClient(c.id, { billing_type: 'package' });
+      } else {
+        await api.updateClient(c.id, { billing_type: 'single', package_purchase_date: s.ev.event_date });
+      }
+      setStartPanel(null); setSelSlot(null); loadWeek();
+    } catch (e) { Alert.alert('Błąd', e.message); }
+  }, [selSlot, drawerClient, startPanel, loadWeek]);
 
   // T9: liczy backend (close-cycle), nie kopiujemy bieżącego licznika.
   const endCycleFromDrawer = useCallback(() => {
@@ -803,7 +815,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: themeColors.border }}>
         <View style={{ width: HOUR_W }}>{HOURS.map(hour => (<View key={hour} style={styles.hourCell}><Text style={styles.hourText}>{hour}:00</Text></View>))}</View>
         <ScrollView ref={hGridRef} horizontal showsHorizontalScrollIndicator={false} onScroll={onHorizontalScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
-          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} onRepointPick={handleRepointPick} isRepointing={isRepointActive} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
+          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} onRepointPick={handleRepointPick} isRepointing={isRepointActive} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setStartPanel(null); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
         </ScrollView>
       </View>
     </ScrollView>
@@ -865,7 +877,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={[styles.homeButtonWrapper, { left: SCREEN_WIDTH / 2 - 40 }]}>
         <TouchableOpacity
           style={[styles.homeButton, { borderColor: C.accent, backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }]}
-              onPress={() => { setPackageMode(false); setHistoryMode(false); setMovingSlot(null); setRepoint(null); setSelSlot(null); setAbsenceAsk(false); }}
+              onPress={() => { setPackageMode(false); setHistoryMode(false); setMovingSlot(null); setRepoint(null); setStartPanel(null); setSelSlot(null); setAbsenceAsk(false); }}
           activeOpacity={0.7}
         >
           <View style={{ width: 66, height: 66, borderRadius: 33, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }}>
@@ -876,7 +888,7 @@ function CalendarScreen({ navigation, route }) {
         <Text style={[styles.bottomText, { color: bottomTextColor, marginTop: 9 }]}>GŁÓWNA</Text>
       </View>
 
-      <TouchableOpacity style={[styles.bottomSideBtn, { right: SCREEN_WIDTH / 4 - 35 }]} onPress={() => { setPackageMode(!packageMode); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); setAbsenceAsk(false); }} activeOpacity={0.6}>
+      <TouchableOpacity style={[styles.bottomSideBtn, { right: SCREEN_WIDTH / 4 - 35 }]} onPress={() => { setPackageMode(!packageMode); setHistoryMode(false); setMovingSlot(null); setStartPanel(null); setSelSlot(null); setAbsenceAsk(false); }} activeOpacity={0.6}>
         <MaterialCommunityIcons name="wallet-outline" size={32} color={packageMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomIconColor} />
         <Text style={[styles.bottomText, { color: packageMode ? (barStyle === 'pianoWhite' ? '#000000' : themeColors.text) : bottomTextColor }]}>PAKIET</Text>
       </TouchableOpacity>
@@ -953,15 +965,54 @@ function CalendarScreen({ navigation, route }) {
           {/* Start rozliczenia z szuflady: oba warianty (typ wybierany przy starcie,
               nie w karcie klienta). Pakiet startuje w Rozliczeniach (modal: rozmiar),
               cykl od daty slotu. Widoczne tylko bez aktywnego rozliczenia. */}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && (
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: C.accent }]}
-              onPress={() => { const c = drawerClient; setSelSlot(null); navigation.navigate('Payments', { clientId: c.id, openStart: true }); }}
+              onPress={() => setStartPanel(startPanel ? null : { mode: 'package', size: '10' })}
             >
               <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij pakiet</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.active_package_id && (
+          {startPanel && !!selSlot.ev?.client_id && drawerClient && (
+            <View style={{ width: '100%', marginTop: 8, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: themeColors.border, backgroundColor: themeColors.surfaceLight }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {['package', 'single'].map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: startPanel.mode === m ? C.accent : 'transparent', borderWidth: 1, borderColor: startPanel.mode === m ? C.accent : themeColors.border }}
+                    onPress={() => setStartPanel({ ...startPanel, mode: m })}
+                  >
+                    <Text style={{ color: startPanel.mode === m ? '#fff' : themeColors.text, fontWeight: '700' }}>{m === 'package' ? 'Pakiet' : 'Miesięczny'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {startPanel.mode === 'package' && (
+                <TextInput
+                  style={[styles.sheetInput, { marginTop: 8 }]}
+                  value={startPanel.size}
+                  onChangeText={v => setStartPanel({ ...startPanel, size: v })}
+                  keyboardType="numeric"
+                  placeholder="Rozmiar (z palca)"
+                  placeholderTextColor={themeColors.textMuted}
+                />
+              )}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.sheetBtn, { flex: 1, backgroundColor: C.accent }]}
+                  onPress={confirmStartPanel}
+                >
+                  <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sheetBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.border }]}
+                  onPress={() => setStartPanel(null)}
+                >
+                  <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Anuluj</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.active_package_id && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endPackageFromDrawer}
@@ -969,15 +1020,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ pakiet</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && (
-            <TouchableOpacity
-              style={[styles.sheetBtn, { backgroundColor: C.accent }]}
-              onPress={startCycleFromDrawer}
-            >
-              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij cykl</Text>
-            </TouchableOpacity>
-          )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && drawerClient?.package_purchase_date && (
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && drawerClient?.package_purchase_date && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endCycleFromDrawer}
@@ -1102,6 +1145,7 @@ function makeStyles(accent, barBg, TC, insets) { return StyleSheet.create({
   sheetBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   sheetBtn: { flex: 1, minWidth: '30%', borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
   sheetBtnText: { fontSize: 12, fontWeight: '800' },
+  sheetInput: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, fontSize: 14, color: TC.text, backgroundColor: TC.surface, borderWidth: 1, borderColor: TC.border },
 }); }
 
 function CalendarScreenWrapper(props) {
