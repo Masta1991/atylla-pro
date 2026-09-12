@@ -247,8 +247,9 @@ def assign_chronological_numbers(events, supabase):
             for i, pkg in enumerate(pkgs):
                 start_id = pkg["start_training_id"]
                 end_id = pkg.get("end_training_id")
-                offset = pkg.get("offset", 0)
-                pkg_size = pkg.get("size", 10)
+                # Prod: offset/size bywają NULL (patrz fix clients.py).
+                offset = pkg.get("offset") or 0
+                pkg_size = pkg.get("size") or 10
                 
                 start_idx = ev_id_to_idx.get(start_id)
                 if start_idx is None:

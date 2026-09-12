@@ -286,7 +286,8 @@ def assign_client_packages_status(clients, supabase):
                                           for p in packages))]
                 union = union_events(members)
                 start_id = pkg["start_training_id"]
-                offset = pkg.get("offset", 0)
+                # Prod: offset/size bywają NULL — None nie może wejść do licznika.
+                offset = pkg.get("offset") or 0
 
                 start_idx = next((i for i, e in enumerate(union) if str(e["id"]) == str(start_id)), None)
 
@@ -311,7 +312,7 @@ def assign_client_packages_status(clients, supabase):
                     for m in members:
                         mc = clients_by_id[m]
                         mc["package_current_count"] = current_count
-                        mc["package_size"] = pkg.get("size", 10)
+                        mc["package_size"] = pkg.get("size") or 10
                         mc["package_purchase_date"] = start_date
                         mc["active_package_id"] = pkg["id"]
                         mc["cancelled_settled_count"] = cancelled_settled
