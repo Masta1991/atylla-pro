@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.7: HTTP/1.1 do Supabase (fix zrywanych połączeń)
+- Log Railway: postgrest-py stawia HTTP/2, brzeg Supabase zrywa strumienie (`RemoteProtocolError ConnectionTerminated`) → 500 tygodnia. Fix: wstrzyknięty `httpx.Client(http2=False)` przez `SyncClientOptions` (zweryfikowane lokalnie: transport bez h2). Deploy ./deploy.ps1 -Version 2.0.7 (bundle index-2013883a, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.6: treningi wróciły; sprzątnięcie diagnostyki
 - Zapisy pojawiły się w apce (zadziałał retry + lżejsze zapytanie z 2.0.4/2.0.5). Usunięte tymczasowe znaczniki [weekdiag]. Deploy ./deploy.ps1 -Version 2.0.6 (bundle index-e86078e4, Railway przebudowuje).
 
