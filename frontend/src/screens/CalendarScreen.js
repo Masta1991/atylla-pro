@@ -519,18 +519,6 @@ function CalendarScreen({ navigation, route }) {
     else Alert.alert(title, msg, [{ text: 'Anuluj', style: 'cancel' }, { text: okLabel, onPress: fn }]);
   };
 
-  const startPackageFromDrawer = useCallback(() => {
-    const s = selSlot; const c = drawerClient;
-    if (!s?.ev || !c) return;
-    const size = c.package_size || 10;
-    confirm2('Rozpocznij pakiet',
-      `Klient: ${c.name || ''}\nStart: ${s.date} ${s.hour}:00\nRozmiar: ${size} (zmiana w Rozliczeniach)`,
-      'Rozpocznij', async () => {
-        try { await api.startPackageAt(c.id, { event_id: s.ev.id, size }); setSelSlot(null); loadWeek(); }
-        catch (e) { Alert.alert('Błąd', e.message); }
-      });
-  }, [selSlot, drawerClient, loadWeek]);
-
   const endPackageFromDrawer = useCallback(() => {
     const s = selSlot; const c = drawerClient;
     if (!s?.ev || !c) return;
@@ -542,13 +530,14 @@ function CalendarScreen({ navigation, route }) {
       });
   }, [selSlot, drawerClient, loadWeek]);
 
+  // Start cyklu z szuflady: typ miesięczny ustawia się sam (nie ma go w karcie klienta).
   const startCycleFromDrawer = useCallback(() => {
     const s = selSlot; const c = drawerClient;
     if (!s?.ev || !c) return;
     confirm2('Rozpocznij cykl',
       `Klient: ${c.name || ''}\nStart: ${s.ev.event_date}`,
       'Rozpocznij', async () => {
-        try { await api.updateClient(c.id, { package_purchase_date: s.ev.event_date }); setSelSlot(null); loadWeek(); }
+        try { await api.updateClient(c.id, { package_purchase_date: s.ev.event_date, billing_type: 'single' }); setSelSlot(null); loadWeek(); }
         catch (e) { Alert.alert('Błąd', e.message); }
       });
   }, [selSlot, drawerClient, loadWeek]);
@@ -911,10 +900,15 @@ function CalendarScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
         {!!selSlot.ev && (() => {
-          const sc = selSlot.ev.clients || {};
-          const pkgInfo = sc.billing_type === 'package'
-            ? `pakiet ${(sc.package_current_count ?? 0)}/${sc.package_size || 10}`
-            : (sc.has_active_billing_or_history ? `miesięczny: ${sc.package_current_count ?? 0}` : null);
+          // Stan rozliczeń ze świeżego odczytu (drawerClient), nie ze starych
+          // kolumn wiersza treningu. Bez aktywnego rozliczenia: brak pakietu.
+          const dc = drawerClient;
+          let pkgInfo = null;
+          if (dc) {
+            if (dc.active_package_id) pkgInfo = `pakiet ${(dc.package_current_count ?? 0)}/${dc.package_size || 10}`;
+            else if (dc.billing_type !== 'package' && dc.package_purchase_date) pkgInfo = `miesięczny: ${dc.package_current_count ?? 0}`;
+            else pkgInfo = 'brak pakietu';
+          }
           // 2.0: stan ze statusu i czasu (nie ze znaku $).
           const evState = selSlot.ev.status === 'cancelled'
             ? (selSlot.ev.is_settled ? 'odwołany • opłacony' : 'odwołany')
@@ -956,16 +950,18 @@ function CalendarScreen({ navigation, route }) {
             <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Przenieś</Text>
             </TouchableOpacity>
           )}
-          {/* 2.0: start/koniec pakietu i cyklu z szuflady (solo). */}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type === 'package' && !drawerClient.active_package_id && (
+          {/* Start rozliczenia z szuflady: oba warianty (typ wybierany przy starcie,
+              nie w karcie klienta). Pakiet startuje w Rozliczeniach (modal: rozmiar),
+              cykl od daty slotu. Widoczne tylko bez aktywnego rozliczenia. */}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: C.accent }]}
-              onPress={startPackageFromDrawer}
+              onPress={() => { const c = drawerClient; setSelSlot(null); navigation.navigate('Payments', { clientId: c.id, openStart: true }); }}
             >
               <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij pakiet</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type === 'package' && drawerClient.active_package_id && (
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.active_package_id && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endPackageFromDrawer}
@@ -973,7 +969,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ pakiet</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && drawerClient.billing_type !== 'package' && !drawerClient.package_purchase_date && (
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: C.accent }]}
               onPress={startCycleFromDrawer}
@@ -981,7 +977,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij cykl</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type !== 'package' && drawerClient?.package_purchase_date && (
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && drawerClient?.package_purchase_date && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endCycleFromDrawer}

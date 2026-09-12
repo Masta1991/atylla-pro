@@ -29,9 +29,8 @@ export default function ClientFormScreen({ navigation, route }) {
   const [exercisesByGroup, setExercisesByGroup] = useState(global.cachedExercisesByGroup || {});
   const [strengthExercises, setStrengthExercises] = useState(client?.strength_progression || []);
   const [showStrength, setShowStrength] = useState(false);
-  const [billingType, setBillingType] = useState(client?.billing_type || 'package');
-  const [packageSize, setPackageSize] = useState(client?.package_size !== undefined ? String(client.package_size) : '10');
-  const [packagePurchaseDate, setPackagePurchaseDate] = useState(client?.package_purchase_date || new Date().toISOString().split('T')[0]);
+  // Typ rozliczenia i rozmiar ustawia się przy starcie pakietu/cyklu
+  // (Rozliczenia / szuflada) — nie w karcie klienta.
 
   const [schedule, setSchedule] = useState(client?.training_schedule || []);
   const [newSchDay, setNewSchDay] = useState(0);
@@ -101,9 +100,6 @@ export default function ClientFormScreen({ navigation, route }) {
         default_plan_id: selectedType || null,
         strength_progression: strengthExercises,
         training_schedule: schedule,
-        billing_type: billingType,
-        package_size: billingType === 'package' ? (parseInt(packageSize, 10) || 10) : 0,
-        package_purchase_date: packagePurchaseDate || null,
       };
       if (isEdit) {
         await api.updateClient(client.id, payload);
@@ -146,41 +142,6 @@ export default function ClientFormScreen({ navigation, route }) {
             { label: "Wybierz", value: "", color: themeColors.textMuted },
             ...(Array.isArray(plans) ? plans : []).map(pl => ({ label: pl.name, value: pl.id, color: themeColors.text }))
           ]}
-        />
-
-        <Text style={styles.label}>Forma płatności</Text>
-        <DropdownPicker
-          selectedValue={billingType}
-          onValueChange={setBillingType}
-          style={styles.pickerWrap}
-          dropdownIconColor={themeColors.textSecondary}
-          items={[
-            { label: "Pakiet (np. 10 treningów)", value: "package", color: themeColors.text },
-            { label: "Bez pakietu (pojedyncze treningi)", value: "single", color: themeColors.text }
-          ]}
-        />
-
-        {billingType === 'package' && (
-          <>
-            <Text style={styles.label}>Wielkość pakietu (liczba treningów)</Text>
-            <TextInput
-              style={styles.input}
-              value={packageSize}
-              onChangeText={setPackageSize}
-              placeholder="np. 10"
-              placeholderTextColor={themeColors.textMuted}
-              keyboardType="numeric"
-            />
-          </>
-        )}
-
-        <Text style={styles.label}>Data wykupienia / startu rozliczenia</Text>
-        <TextInput
-          style={styles.input}
-          value={packagePurchaseDate}
-          onChangeText={setPackagePurchaseDate}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={themeColors.textMuted}
         />
 
         <Text style={styles.label}>Harmonogram stałych treningów</Text>
