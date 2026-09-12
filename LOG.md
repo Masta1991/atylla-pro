@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.4: odporny odczyt (retry + lżejszy tydzień)
+- Log Railway pokazał: Supabase zrywa połączenie w trakcie zapytania tygodnia (`RemoteProtocolError`). Fix: `supabase_retry` (3 próby, tylko błędy transportu) na `/calendar/week` i `/clients/` + jawna lista kolumn zamiast `*` w tygodniu + czytelny 502 zamiast generycznego 500. Deploy ./deploy.ps1 -Version 2.0.4 (bundle index-cd7bb5fd, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.3: widoczne błędy odczytu (diagnoza pustej apki)
 - Kalendarz i Klienci pokazują raz komunikat z nazwą padającego endpointu zamiast cichego pustego ekranu. Deploy ./deploy.ps1 -Version 2.0.3 (bundle index-69adf331, Railway przebudowuje). Po odczycie komunikatu — fix przyczyny.
 
