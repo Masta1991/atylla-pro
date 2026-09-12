@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.8: pusty trening po polsku
+- Zapis bez wybranych ćwiczeń (pusta Główna partia) blokowany już w apce z komunikatem „Pusty trening — wybierz Główną partię…”, backend 400 też po polsku. Deploy ./deploy.ps1 -Version 2.0.8 (bundle index-61a17b74, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.7: HTTP/1.1 do Supabase (fix zrywanych połączeń)
 - Log Railway: postgrest-py stawia HTTP/2, brzeg Supabase zrywa strumienie (`RemoteProtocolError ConnectionTerminated`) → 500 tygodnia. Fix: wstrzyknięty `httpx.Client(http2=False)` przez `SyncClientOptions` (zweryfikowane lokalnie: transport bez h2). Deploy ./deploy.ps1 -Version 2.0.7 (bundle index-2013883a, Railway przebudowuje).
 
