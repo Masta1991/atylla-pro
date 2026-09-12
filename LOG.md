@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.2: fix NULL offset/size pakietu (pusta apka na prodzie)
+- Przyczyna pustej apki: pakiet z `offset/size = NULL` wywalał `TypeError` w liczeniu → 500 na `/clients/` (i numeracji kalendarza) → PWA pokazywała pusto i cicho. Weryfikacja: stres-test offline na danych z NULL-ami/UUID (wcześniej 500, po fixie 200 na clients/single/week/stats/week-summary). Deploy ./deploy.ps1 -Version 2.0.2 (bundle index-ae014d22, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.1: fix handlera błędów (encoding utf-8 dla error.log)
 - Przyczyna: traceback z polskimi znakami (np. nazwiska klientów) wywalał sam handler pustą odpowiedzią → ciche puste UI na PWA. Deploy ./deploy.ps1 -Version 2.0.1 (bundle index-7bd42350, Railway przebudowuje).
 
