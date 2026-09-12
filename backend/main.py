@@ -8,7 +8,7 @@ from routers import clients, calendar, workouts, measurements, config_router, au
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.0.0",
+    version="2.0.1",
 )
 
 from fastapi import Request
@@ -26,7 +26,9 @@ async def global_exception_handler(request: Request, exc: Exception):
             content={"detail": "Session expired (JWT expired or invalid)"},
         )
         
-    with open("error.log", "a") as f:
+    # encoding=utf-8: traceback z polskimi znakami (np. w danych klienta)
+    # nie może wywalić handlera pustą odpowiedzią (ciche puste UI na PWA).
+    with open("error.log", "a", encoding="utf-8") as f:
         f.write("=== ERROR ===\n")
         f.write(traceback.format_exc())
         f.write("\n")
@@ -133,6 +135,7 @@ if os.path.isdir(STATIC_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 
 
