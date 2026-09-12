@@ -657,7 +657,9 @@ def replace_week(data: ReplaceWeekRequest, request: Request):
                 .eq("is_settled", False) \
                 .execute()
             from database import get_supabase as _svc2
-            _detach_anchors(supabase, _svc2(), user_id, [r["id"] for r in (doomed.data or []) if r.get("id")])
+            _doomed_ids = [r["id"] for r in (doomed.data or []) if r.get("id")]
+            _cancel_active_packages_at(supabase, _doomed_ids)
+            _detach_anchors(supabase, _svc2(), user_id, _doomed_ids)
         except Exception:
             pass
         # 1. Hard delete all calendar_events between monday and saturday for this trainer
@@ -716,7 +718,9 @@ def clear_week(monday_date: str, request: Request):
                 .eq("is_settled", False) \
                 .execute()
             from database import get_supabase as _svc3
-            _detach_anchors(supabase, _svc3(), user_id, [r["id"] for r in (doomed.data or []) if r.get("id")])
+            _doomed_ids = [r["id"] for r in (doomed.data or []) if r.get("id")]
+            _cancel_active_packages_at(supabase, _doomed_ids)
+            _detach_anchors(supabase, _svc3(), user_id, _doomed_ids)
         except Exception:
             pass
         supabase.table("calendar_events") \
@@ -949,10 +953,23 @@ def delete_event(event_date: str, event_hour: int, request: Request):
     if not (ev.data and len(ev.data) > 0):
         raise HTTPException(404, "Workout not found in calendar")
     event = ev.data[0]
-    if _active_pool_package_at(supabase, event) is not None:
+    if _active_pool_package_at(supabase, event) is not None or _any_active_anchor(supabase, event):
         raise HTTPException(400, "Trening jest początkiem aktywnego pakietu — odśwież szufladę i użyj opcji początku pakietu.")
     _hard_delete(supabase, user_id, event, event_date, event_hour)
     return {"status": "deleted"}
+
+
+def _any_active_anchor(supabase, event):
+    """Czy KTOKOLWIEK aktywny pakiet startuje w tym evencie (bez patrzenia
+    na członków puli)? Siatka bezpieczeństwa przed cichym FK-500."""
+    try:
+        res = supabase.table("client_packages").select("id").execute()
+        for p in (res.data or []):
+            if p.get("end_training_id") is None and str(p.get("start_training_id")) == str(event.get("id")):
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def _hard_delete(supabase, user_id, event, event_date, event_hour):
@@ -988,9 +1005,32 @@ def _hard_delete(supabase, user_id, event, event_date, event_hour):
     return "deleted"
 
 
+def _cancel_active_packages_at(supabase, event_ids):
+    """Anuluj AKTYWNE pakiety zakotwiczone w kasowanych treningach (bulk wipe).
+    Ciche odpięcie zostawiałoby zombie 0/10 „Brak danych” — jawne anulowanie
+    (wiersz znika) jest uczciwsze. Zwraca liczbę anulowanych."""
+    ids = {str(i) for i in (event_ids or []) if i}
+    if not ids:
+        return 0
+    n = 0
+    try:
+        rows = supabase.table("client_packages").select("id,start_training_id,end_training_id").execute()
+        for p in (rows.data or []):
+            if p.get("end_training_id") is not None:
+                continue
+            if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
+                supabase.table("client_packages").delete().eq("id", p["id"]).execute()
+                n += 1
+    except Exception:
+        pass
+    return n
+
+
 def _detach_anchors(supabase, svc, user_id, event_ids):
-    """Odepnij kotwice pakietów (start/end) wskazujące na kasowane treningi.
+    """Odepnij kotwice ZAMKNIĘTYCH/starych pakietów wskazujące na kasowane treningi.
     Bez tego DELETE łamie FK client_packages_start_training_id_fkey (RESTRICT).
+    Aktywnych NIE ruszamy (anuluje je _cancel_active_packages_at albo przepływ
+    delete-start) — inaczej powstałby zombie-pakiet 0/10 bez startu.
     Skan przez service-role (widzi też wiersze schowane przez RLS), zapis tylko
     własnych/NULLOWYCH trenerów — cudzych nie ruszamy."""
     ids = [str(i) for i in (event_ids or []) if i]
@@ -999,6 +1039,8 @@ def _detach_anchors(supabase, svc, user_id, event_ids):
     try:
         rows = svc.table("client_packages").select("id,trainer_id,start_training_id,end_training_id").execute()
         for p in (rows.data or []):
+            if p.get("end_training_id") is None:
+                continue  # aktywne obsługuje cancel/repoint, nie ciche odpięcie
             patch = {}
             if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
                 patch["start_training_id"] = None
