@@ -35,6 +35,13 @@ def _decode_jwt_user_id(token: str) -> str:
         raise HTTPException(401, "Invalid token format")
 
 
+def utcnow_iso():
+    """Znacznik czasu do kolumn updated_at. NIE używać stringu "now()"
+    (Postgres odrzuca go jako timestamptz → ciche 500 w update)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
 def supabase_retry(fn, attempts=3, base_delay=0.4):
     """Ponów odczyt, gdy Supabase zerwie połączenie w trakcie
     (httpcore RemoteProtocolError / timeouty). Błędy logiki i walidacji

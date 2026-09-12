@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from database import get_supabase, get_user_supabase
+from database import get_supabase, get_user_supabase, utcnow_iso
 from models import WorkoutLogBatch, WorkoutLogResponse
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -144,7 +144,7 @@ def save_workout_batch(data: WorkoutLogBatch, request: Request):
 @router.put("/{log_id}", response_model=WorkoutLogResponse)
 def update_workout_log(log_id: str, weight_kg: Optional[float] = None, reps: Optional[int] = None, request: Request = None):
     supabase, _ = get_user_supabase(request)
-    payload = {"updated_at": "now()"}
+    payload = {"updated_at": utcnow_iso()}
     if weight_kg is not None:
         payload["weight_kg"] = weight_kg
     if reps is not None:
