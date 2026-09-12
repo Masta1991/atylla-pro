@@ -137,7 +137,7 @@ function HistoryPopup({ visible, onClose, clientId, clientName, logs, loading, a
   );
 }
 
-function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyMode, onShowHistory, navigation, onMoveTo, isMoving, isMoveTarget, accent, styles, onSelectSlot }) {
+function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyMode, onShowHistory, navigation, onMoveTo, isMoving, isMoveTarget, onRepointPick, isRepointing, accent, styles, onSelectSlot }) {
   const { themeColors } = useTheme();
   const slotRef = useRef(null);
 
@@ -160,6 +160,10 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
   const handleSlotTap = () => {
     if (isMoveTarget) {
       onMoveTo(dateStr, hour);
+      return;
+    }
+    if (isRepointing) {
+      onRepointPick(dateStr, hour, ev);
       return;
     }
     if (historyMode) {
@@ -565,26 +569,17 @@ function CalendarScreen({ navigation, route }) {
 
   // Wspólna ścieżka usuwania zapisu (X w trybie edycji + przycisk w szufladzie).
   // 2.0: pyta o OPLACENIE (notatka dla trenera), nie o rozliczenie.
+  // Tryb wskazywania nowego początku pakietu (jak Przenieś: tapnij trening).
+  const [repoint, setRepoint] = useState(null);
+
   const requestDelete = useCallback((dateStr, hour, ev) => {
     const clientName = ev?.clients?.name || '';
 
-    if (ev?.is_start_of_package) {
-      if (Platform.OS === 'web') {
-        window.alert('Punkt Startowy 🐶\n\nTen trening rozpoczyna pakiet. Wskaż nowy start lub usuń pakiet w zakładce Rozliczenia zanim go usuniesz.');
-      } else {
-        Alert.alert(
-          'Punkt Startowy 🐶',
-          'Ten trening rozpoczyna pakiet. Wskaż nowy start lub usuń pakiet w zakładce Rozliczenia zanim go usuniesz.'
-        );
-      }
-      return;
-    }
-
-    // T4: jedno atomowe żądanie z flagą paid — brak wyścigu settle/delete,
-    // błąd przerywa całość zamiast cichego .catch(()=>{}).
-    const doAtomicDelete = async (paid) => {
+    // Usuń = TWARDE usunięcie z bazy (przypadek/test). Licznik pakietu
+    // przelicza się sam. Bez pytania o płatność, bez śladu w kalendarzu.
+    const doHardDelete = async () => {
       try {
-        await api.deleteCalendarEvent(dateStr, hour, paid);
+        await api.deleteCalendarEvent(dateStr, hour);
         loadWeek();
       } catch (e) {
         loadWeek();
@@ -593,18 +588,91 @@ function CalendarScreen({ navigation, route }) {
       }
     };
 
+    // Początek pakietu: sonda do backendu, potem przepływ wg stanu pakietu.
+    // - brak kotwicy (stary znacznik / cykl miesięczny) → zwykłe usunięcie.
+    // - brak kolejnych treningów → anuluj pakiet i usuń.
+    // - są kolejne → automatycznie pierwszy kolejny albo wskazanie ręczne.
+    const doStartFlow = async () => {
+      setSelSlot(null);
+      let info;
+      try {
+        info = await api.deletePackageStart(dateStr, hour, { mode: 'probe' });
+      } catch (e) {
+        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+        else Alert.alert('Błąd', e.message);
+        loadWeek();
+        return;
+      }
+      if (!info.is_package_start) {
+        doHardDelete();
+        return;
+      }
+      const shared = (info.shared_with || []).length > 0 ? ` (wspólny z ${info.shared_with.length} os.)` : '';
+      const doCancel = async () => {
+        try {
+          await api.deletePackageStart(dateStr, hour, { mode: 'cancel' });
+          loadWeek();
+        } catch (e) {
+          loadWeek();
+          if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+          else Alert.alert('Błąd', e.message);
+        }
+      };
+      const doAuto = async () => {
+        try {
+          await api.deletePackageStart(dateStr, hour, { mode: 'repoint', new_event_id: info.next_event.id });
+          loadWeek();
+        } catch (e) {
+          loadWeek();
+          if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+          else Alert.alert('Błąd', e.message);
+        }
+      };
+      const doManual = () => {
+        setRepoint({ delDate: dateStr, delHour: hour, clientId: ev.client_id, clientName });
+      };
+      if (!info.future_count) {
+        const msg = `To początek pakietu${shared}, bez kolejnych treningów.\n\nKlient: ${clientName}\nAnulować pakiet i usunąć trening?`;
+        if (Platform.OS === 'web') {
+          if (window.confirm(msg)) doCancel();
+          else loadWeek();
+        } else {
+          Alert.alert('Początek pakietu', msg, [
+            { text: 'Cofnij', style: 'cancel', onPress: () => loadWeek() },
+            { text: 'Anuluj pakiet i usuń', style: 'destructive', onPress: doCancel },
+          ]);
+        }
+        return;
+      }
+      const nxt = `${info.next_event.event_date} ${info.next_event.event_hour}:00`;
+      const msg = `To początek pakietu${shared} (${info.future_count} kolejne).\n\nKlient: ${clientName}\nAutomatycznie ustawiłby się: ${nxt}.`;
+      if (Platform.OS === 'web') {
+        if (window.confirm(msg + '\n\nOK = ustaw automatycznie\nAnuluj = wskaż sam / cofnij')) doAuto();
+        else if (window.confirm('Wskazać nowy początek samemu (tapnij trening)?\n\nOK = tryb wskazywania\nAnuluj = cofnij')) doManual();
+        else loadWeek();
+      } else {
+        Alert.alert('Początek pakietu', msg, [
+          { text: 'Cofnij', style: 'cancel', onPress: () => loadWeek() },
+          { text: 'Wskaż sam', onPress: doManual },
+          { text: `Automatycznie (${nxt})`, onPress: doAuto },
+        ]);
+      }
+    };
+
+    // Twarde usunięcie z jednym potwierdzeniem (bez pytania o płatność).
+    const confirmMsg = `Czy na pewno chcesz trwale usunąć trening z bazy?\n\nKlient: ${clientName}\nJeżeli trening się odbył, pakiet zostanie pomniejszony o ten trening.`;
+    const needProbe = ev?.is_start_of_package && drawerClient?.billing_type === 'package' && drawerClient?.active_package_id;
     if (Platform.OS === 'web') {
-      if (!window.confirm(`Czy na pewno chcesz usunąć zapis treningu?\n\nKlient: ${clientName}`)) return;
-      const paid = window.confirm(`Czy trening OPŁACONO?\n\nKlient: ${clientName}\n\nKliknij OK gdy klient płaci mimo odwołania (czerwony, liczy się do pakietu),\nlub Anuluj gdy bez płatności (zniknie jak dotychczas).`);
-      doAtomicDelete(paid);
+      if (!window.confirm(confirmMsg)) return;
+      if (needProbe) doStartFlow();
+      else doHardDelete();
     } else {
-      Alert.alert('Usuń zapis', `Klient: ${clientName}\n\nCzy trening opłacono?`, [
-        { text: 'Anuluj', style: 'cancel' },
-        { text: 'Opłacony', style: 'destructive', onPress: () => doAtomicDelete(true) },
-        { text: 'Bez płatności', onPress: () => doAtomicDelete(false) },
+      Alert.alert('Usuń trening', confirmMsg, [
+        { text: 'Cofnij', style: 'cancel' },
+        { text: 'Usuń trwale', style: 'destructive', onPress: () => { if (needProbe) doStartFlow(); else doHardDelete(); } },
       ]);
     }
-  }, [loadWeek]);
+  }, [loadWeek, drawerClient]);
 
   // Odwołanie z jawnym wyborem płatności (jak X): najpierw oznaczenie, potem nieobecność.
   // T4: błąd settle przerywa całość — brak cichego połykania (płatne musi być pewne).
@@ -625,12 +693,50 @@ function CalendarScreen({ navigation, route }) {
   function onHorizontalScroll(e) { const x = e.nativeEvent.contentOffset.x; headerScrollRef.current?.scrollTo?.({ x, animated: false }); }
 
   const isMovingActive = movingSlot !== null;
+  const isRepointActive = repoint !== null;
+
+  // Ręczne wskazanie nowego początku pakietu: tapnij AKTYWNY trening tego klienta.
+  const handleRepointPick = useCallback(async (dateStr, hour, ev) => {
+    if (!repoint) return;
+    if (!ev || String(ev.client_id) !== String(repoint.clientId)) {
+      showMessage('Wskaż trening', `Tapnij trening klienta ${repoint.clientName || ''}.`);
+      return;
+    }
+    if (ev.status !== 'active') {
+      showMessage('Wskaż trening', 'Nowym początkiem może być tylko aktywny (nieodwołany) trening.');
+      return;
+    }
+    const finish = async () => {
+      try {
+        await api.deletePackageStart(repoint.delDate, repoint.delHour, {
+          mode: 'repoint', new_event_id: ev.id,
+        });
+        setRepoint(null);
+        loadWeek();
+      } catch (e) {
+        loadWeek();
+        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+        else Alert.alert('Błąd', e.message);
+      }
+    };
+    confirm2(`Nowy początek pakietu`,
+      `Klient: ${repoint.clientName || ''}\nNowy start: ${dateStr} ${hour}:00\nStary trening zostanie usunięty.`,
+      'Ustaw', finish);
+  }, [repoint, loadWeek]);
 
   return (<View style={styles.container}>
     {isMovingActive && (
       <View style={styles.moveBanner}>
         <Text style={styles.moveBannerText}>Przenoszenie: {movingSlot.ev?.clients?.name || ''} — kliknij docelowy slot lub anuluj</Text>
         <TouchableOpacity style={styles.moveCancelBtn} onPress={() => setMovingSlot(null)}>
+          <Text style={styles.moveCancelText}>Anuluj</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+    {isRepointActive && (
+      <View style={styles.moveBanner}>
+        <Text style={styles.moveBannerText}>Nowy początek pakietu ({repoint.clientName || ''}) — tapnij trening lub anuluj</Text>
+        <TouchableOpacity style={styles.moveCancelBtn} onPress={() => { setRepoint(null); loadWeek(); }}>
           <Text style={styles.moveCancelText}>Anuluj</Text>
         </TouchableOpacity>
       </View>
@@ -708,7 +814,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: themeColors.border }}>
         <View style={{ width: HOUR_W }}>{HOURS.map(hour => (<View key={hour} style={styles.hourCell}><Text style={styles.hourText}>{hour}:00</Text></View>))}</View>
         <ScrollView ref={hGridRef} horizontal showsHorizontalScrollIndicator={false} onScroll={onHorizontalScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
-          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
+          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} onRepointPick={handleRepointPick} isRepointing={isRepointActive} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
         </ScrollView>
       </View>
     </ScrollView>
@@ -770,7 +876,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={[styles.homeButtonWrapper, { left: SCREEN_WIDTH / 2 - 40 }]}>
         <TouchableOpacity
           style={[styles.homeButton, { borderColor: C.accent, backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }]}
-          onPress={() => { setPackageMode(false); setHistoryMode(false); setMovingSlot(null); setSelSlot(null); setAbsenceAsk(false); }}
+              onPress={() => { setPackageMode(false); setHistoryMode(false); setMovingSlot(null); setRepoint(null); setSelSlot(null); setAbsenceAsk(false); }}
           activeOpacity={0.7}
         >
           <View style={{ width: 66, height: 66, borderRadius: 33, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: mode === 'light' ? '#FFFDF8' : '#1A1510' }}>

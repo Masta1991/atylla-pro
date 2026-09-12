@@ -1,5 +1,20 @@
 # Model Handoff — Atylla Pro
 
+## TWARDE USUWANIE — 2026-09-12 (NIEWDROŻONE, testy offline OK, BEZ deploya)
+- Usuń = DELETE wiersza (przypadek/test): bez pytania o płatność, jedno potwierdzenie „trwale usunąć… pakiet pomniejszy…”, licznik przelicza się sam, zero śladu w kalendarzu (logi+absencja slotu czyszczone, kotwica końca odpinana, audyt w deleted_workouts). Kotwica aktywnego pakietu → 400 (przepływ delete-start, też twardo). Nieobecność bez zmian.
+- Podsumowanie tygodnia pokazuje wpisy „Usunięty” (deleted_workouts, szare, poza licznikiem treningów).
+- Testy: HARD-DELETE/400-guard/START-CANCEL/WEEK-REMOVED offline PASS. Mirror w atylla-pro-2.0.
+
+## USUŃ vs NIEOBECNOŚĆ — 2026-09-12 (NIEWDROŻONE, testy offline OK, BEZ deploya)
+- Rozdzielone: Usuń bez płatności znika BEZ śladu (event deleted, logi skasowane, stara absencja slotu też + wpis w deleted_workouts); opłacony zostawia ślad (cancelled + absencja). Nieobecność (bez zmian) zawsze zostawia ślad: trójkąt + moduł Absencji, logi nietknięte.
+- Testy: UNPAID-CLEAN + PAID-TRACE offline PASS. Mirror w atylla-pro-2.0.
+
+## START PAKIETU — 2026-09-12 (NIEWDROŻONE, testy offline OK, BEZ deploya na życzenie)
+- Problem: usunięcie treningu startowego było zablokowane ślepym komunikatem; start potrafił pojawić się bez zakładania pakietu (kotwica historyczna/reużyty slot).
+- Backend `POST /calendar/{date}/{hour}/delete-start` (probe/cancel/repoint): sonda zwraca kotwicę + przyszłe treningi; cancel anuluje pakiet i usuwa atomowo; repoint przestawia start (walidacja: kolejny trening pakietu, chronologia vs koniec). Bez kotwicy (stary znacznik, cykl miesięczny) — zwykłe usunięcie. Refactor `_apply_delete` (przy okazji fix 404 zamiast 500 przy braku eventu).
+- Frontend: sonda → brak kolejnych = „anuluj pakiet i usuń”; są kolejne = automatycznie pierwszy kolejny albo ręczne wskazanie tapnięciem (tryb jak Przenieś + baner). Początek miesięczny i stara kotwica już nie blokują.
+- Testy: probe/repoint/cancel/stale/400 offline PASS. Mirror w atylla-pro-2.0. Deploy wstrzymany — testy funkcjonalne trwają.
+
 ## DEPLOY v2.0.0 — 2026-09-12 (prod Railway, do testów online)
 - Commit c07681d, tagi v2.0.0/backup-v2.0.0, push master. Bundle index-ed9bbaf4 → prod URL.
 - Produkcja: **v2.0.0**. Do wklejenia na PROD Supabase: migracje 004 + 006.

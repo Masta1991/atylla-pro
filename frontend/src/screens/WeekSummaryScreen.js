@@ -23,6 +23,7 @@ function slotPassed(dateStr, hour) {
 const DOW = ['PON', 'WT', 'ŚR', 'CZW', 'PT', 'SOB', 'ND'];
 
 function evState(ev) {
+  if (ev.status === 'removed') return 'removed';
   if (ev.status === 'cancelled') return ev.is_settled ? 'paid' : 'cancel';
   if (ev.status === 'deleted') return 'free';
   return slotPassed(ev.event_date, ev.event_hour) ? 'done' : 'planned';
@@ -33,6 +34,7 @@ const STATE_META = {
   paid: { label: 'odwołany • opłacony', color: '#e67e22' },
   cancel: { label: 'odwołany', color: '#ff6b6b' },
   free: { label: 'odwołany • bez płatności', color: '#ff6b6b' },
+  removed: { label: 'Usunięty', color: '#8b949e' },
 };
 
 export default function WeekSummaryScreen({ navigation }) {

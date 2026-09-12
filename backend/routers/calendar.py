@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
+from pydantic import BaseModel
 from database import get_user_supabase, supabase_retry
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
@@ -556,9 +557,26 @@ def get_week_summary(monday_date: str, request: Request):
         .eq("trainer_id", user_id) \
         .gte("absence_date", monday.isoformat()).lte("absence_date", sunday.isoformat()) \
         .order("absence_date").execute()
+    # Twarde usunięcia (Usuń): ślad w podsumowaniu jako wpis „Usunięty".
+    try:
+        dels = supabase.table("deleted_workouts") \
+            .select("id,event_date,event_hour,client_name,workout_type") \
+            .eq("trainer_id", user_id) \
+            .gte("event_date", monday.isoformat()).lte("event_date", sunday.isoformat()) \
+            .order("event_date").order("event_hour").execute()
+        removed = [{
+            "id": f"del-{d.get('id')}", "client_id": None,
+            "event_date": d.get("event_date"), "event_hour": d.get("event_hour"),
+            "status": "removed", "is_settled": False, "partner_client_id": None,
+            "clients": {"name": d.get("client_name") or "—"},
+            "workout_types": {"name": d.get("workout_type")} if d.get("workout_type") else None,
+            "training_plans": None,
+        } for d in (dels.data or [])]
+    except Exception:
+        removed = []
     return {
         "monday": monday.isoformat(), "sunday": sunday.isoformat(),
-        "events": evs.data or [], "absences": abss.data or [],
+        "events": (evs.data or []) + removed, "absences": abss.data or [],
     }
 
 
@@ -895,46 +913,164 @@ def settle_event(event_date: str, event_hour: int, request: Request):
 
 
 @router.delete("/{event_date}/{event_hour}")
-def delete_event(event_date: str, event_hour: int, request: Request, paid: bool = False):
-    """T4: atomowe odwołanie. Jeden request ustawia opłacenie i status razem —
-    brak wyścigu settle vs delete. paid=True → cancelled+is_settled (liczy się
-    do pakietu); paid=False → dotychczasowa ścieżka (cancelled tylko gdy już
-    opłacony, inaczej deleted)."""
+def delete_event(event_date: str, event_hour: int, request: Request):
+    """Usuń = TWARDE usunięcie wiersza z bazy (przypadek/test). Licznik pakietu
+    przelicza się sam (SSOT dynamiczny). Bez pytania o płatność, bez śladu
+    w kalendarzu (ślad tylko w deleted_workouts + wpisie Usunięty w tygodniu).
+    Kotwica aktywnego pakietu → 400 (przepływ delete-start)."""
     supabase, user_id = get_user_supabase(request)
 
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
 
-    if ev.data and len(ev.data) > 0:
-        event = ev.data[0]
-        settled = bool(event.get("is_settled")) or paid
-        supabase.table("deleted_workouts").insert({
-            "event_date": event_date,
-            "event_hour": event_hour,
-            "client_name": event.get("clients", {}).get("name") if isinstance(event.get("clients"), dict) else None,
-            "workout_type": event.get("workout_types", {}).get("name") if isinstance(event.get("workout_types"), dict) else None,
-            "trainer_id": user_id,
-        }).execute()
-        
-        # Decide status: if it was settled (or paid in this call), it must remain
-        # on the calendar as 'cancelled' to hold the billing number
-        new_status = "cancelled" if settled else "deleted"
-        
-        # Also delete workout logs for this client on this date to prevent stale data
-        client_id = event.get("client_id")
-        if client_id:
-            supabase.table("workout_logs").delete().eq("client_id", client_id).eq("session_date", event_date).execute()
-            # Create absence record so it shows in Absences module and on calendar
-            supabase.table("absences").upsert({
-                "client_id": client_id,
-                "absence_date": event_date,
-                "absence_hour": event_hour,
-                "trainer_id": user_id,
-            }, on_conflict="client_id,absence_date,absence_hour").execute()
+    if not (ev.data and len(ev.data) > 0):
+        raise HTTPException(404, "Workout not found in calendar")
+    event = ev.data[0]
+    if _active_pool_package_at(supabase, event) is not None:
+        raise HTTPException(400, "Trening jest początkiem aktywnego pakietu — odśwież szufladę i użyj opcji początku pakietu.")
+    _hard_delete(supabase, user_id, event, event_date, event_hour)
+    return {"status": "deleted"}
 
-        # Soft delete or cancel — one write sets status AND paid flag together
-        supabase.table("calendar_events").update({"status": new_status, "is_settled": settled, "updated_at": "now()"}).eq("id", event["id"]).execute()
 
-    return {"status": new_status, "is_settled": settled}
+def _hard_delete(supabase, user_id, event, event_date, event_hour):
+    """Twarde usunięcie treningu: wpis audytowy, czyszczenie logów i absencji
+    slotu, odpięcie kotwicy końca pakietu, DELETE wiersza. Bez śladu w kalendarzu."""
+    supabase.table("deleted_workouts").insert({
+        "event_date": event_date,
+        "event_hour": event_hour,
+        "client_name": event.get("clients", {}).get("name") if isinstance(event.get("clients"), dict) else None,
+        "workout_type": event.get("workout_types", {}).get("name") if isinstance(event.get("workout_types"), dict) else None,
+        "trainer_id": user_id,
+    }).execute()
+
+    client_id = event.get("client_id")
+    if client_id:
+        supabase.table("workout_logs").delete().eq("client_id", client_id).eq("session_date", event_date).execute()
+        try:
+            supabase.table("absences").delete() \
+                .eq("client_id", client_id) \
+                .eq("absence_date", event_date).eq("absence_hour", event_hour).execute()
+        except Exception:
+            pass
+    # Koniec pakietu wskazujący na kasowany trening: odepnij (pakiet się otwiera).
+    try:
+        supabase.table("client_packages").update(
+            {"end_training_id": None, "updated_at": "now()"}).eq("end_training_id", event["id"]).execute()
+    except Exception:
+        pass
+    supabase.table("calendar_events").delete().eq("id", event["id"]).execute()
+    return "deleted"
+
+
+class DeleteStartRequest(BaseModel):
+    paid: bool = False
+    mode: str = "probe"  # probe | cancel | repoint
+    new_event_id: Optional[str] = None
+
+
+def _active_pool_package_at(supabase, event):
+    """Aktywny pakiet zakotwiczony w danym evencie (owner lub członek puli)."""
+    if not event or not event.get("id"):
+        return None
+    try:
+        res = supabase.table("client_packages").select("*").is_("end_training_id", None).execute()
+    except Exception:
+        return None
+    for p in (res.data or []):
+        if str(p.get("start_training_id")) != str(event.get("id")):
+            continue
+        members = [str(p.get("client_id"))] + [
+            str(x) for x in (p.get("shared_client_ids") or [])]
+        if str(event.get("client_id")) in members:
+            return p
+    return None
+
+
+def _package_future_trainings(supabase, pkg, event):
+    """Policzalne treningi pakietu po usuwanym evencie (do repoint/cancel)."""
+    members = [str(pkg.get("client_id"))] + [
+        str(x) for x in (pkg.get("shared_client_ids") or [])]
+    try:
+        res = supabase.table("calendar_events") \
+            .select("id,client_id,event_date,event_hour,status,is_settled") \
+            .in_("client_id", members).execute()
+    except Exception:
+        return []
+    old_key = (str(event.get("event_date")), int(event.get("event_hour") or 0))
+    out = []
+    for e in (res.data or []):
+        if str(e.get("id")) == str(event.get("id")):
+            continue
+        if e.get("status") == "deleted":
+            continue
+        key = (str(e.get("event_date")), int(e.get("event_hour") or 0))
+        if key <= old_key:
+            continue
+        if e.get("status") == "cancelled" and not e.get("is_settled"):
+            continue
+        out.append(e)
+    out.sort(key=lambda e: (str(e.get("event_date")), int(e.get("event_hour") or 0)))
+    return out
+
+
+@router.post("/{event_date}/{event_hour}/delete-start")
+def delete_package_start(event_date: str, event_hour: int, data: DeleteStartRequest, request: Request):
+    """Usunięcie treningu rozpoczynającego pakiet.
+    - probe: czy to kotwica aktywnego pakietu + ile kolejnych treningów (bez usuwania).
+    - cancel: anuluj pakiet (usuń wiersz) i usuń trening atomowo.
+    - repoint: wskaż nowy początek (z przyszłych treningów pakietu) i usuń stary.
+    Bez kotwicy (stary znacznik, cykl miesięczny): zwykłe atomowe usunięcie."""
+    supabase, user_id = get_user_supabase(request)
+    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
+    if not (ev.data and len(ev.data) > 0):
+        raise HTTPException(404, "Workout not found in calendar")
+    event = ev.data[0]
+    pkg = _active_pool_package_at(supabase, event)
+
+    if pkg is None:
+        if data.mode == "probe":
+            return {"is_package_start": False}
+        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
+        return {"status": new_status, "package": "none"}
+
+    future = _package_future_trainings(supabase, pkg, event)
+    nxt = future[0] if future else None
+    if data.mode == "probe":
+        return {
+            "is_package_start": True,
+            "package_id": pkg["id"],
+            "package_size": pkg.get("size") or 10,
+            "shared_with": [x for x in (pkg.get("shared_client_ids") or [])],
+            "future_count": len(future),
+            "next_event": {"id": nxt["id"], "event_date": nxt["event_date"],
+                           "event_hour": nxt["event_hour"]} if nxt else None,
+        }
+    if data.mode == "cancel":
+        supabase.table("client_packages").delete().eq("id", pkg["id"]).execute()
+        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
+        return {"status": new_status, "package": "cancelled"}
+    if data.mode == "repoint":
+        if not data.new_event_id:
+            raise HTTPException(400, "Wskaż nowy początek pakietu")
+        cand = next((e for e in future if str(e.get("id")) == str(data.new_event_id)), None)
+        if cand is None:
+            raise HTTPException(400, "Nowy początek musi być kolejnym treningiem tego pakietu")
+        if pkg.get("end_training_id"):
+            try:
+                endres = supabase.table("calendar_events").select("event_date,event_hour").eq("id", pkg["end_training_id"]).execute()
+                if endres.data:
+                    ed, eh = endres.data[0]["event_date"], int(endres.data[0]["event_hour"] or 0)
+                    if (str(cand["event_date"]), int(cand["event_hour"] or 0)) > (str(ed), eh):
+                        raise HTTPException(400, "Nowy początek wypada za końcem pakietu")
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+        supabase.table("client_packages").update(
+            {"start_training_id": cand["id"], "updated_at": "now()"}).eq("id", pkg["id"]).execute()
+        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
+        return {"status": new_status, "package": "repointed",
+                "new_start_event_id": cand["id"]}
+    raise HTTPException(400, "Nieznany tryb") 
 
 
 @router.delete("/events/{event_date}/{event_hour}/hard")
