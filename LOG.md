@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.9: zapis bez ćwiczeń (sam wpis w kalendarzu)
+- Trening da się zapisać bez wybierania ćwiczeń (wpis w kalendarzu, logi nietknięte; czyszczenie dnia robi Usuń). Deploy ./deploy.ps1 -Version 2.0.9 (bundle index-0bff9ca5, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.8: pusty trening po polsku
 - Zapis bez wybranych ćwiczeń (pusta Główna partia) blokowany już w apce z komunikatem „Pusty trening — wybierz Główną partię…”, backend 400 też po polsku. Deploy ./deploy.ps1 -Version 2.0.8 (bundle index-61a17b74, Railway przebudowuje).
 
