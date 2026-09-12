@@ -1,5 +1,10 @@
 # Model Handoff — Atylla Pro
 
+## DEPLOY v2.0.0 — 2026-09-12 (prod Railway, do testów online)
+- Commit c07681d, tagi v2.0.0/backup-v2.0.0, push master. Bundle index-ed9bbaf4 → prod URL.
+- Produkcja: **v2.0.0**. Do wklejenia na PROD Supabase: migracje 004 + 006.
+- Dokładnie jeden następny krok: werdykt użytkownika z testów online (poprawki wracać najpierw do atylla-pro-2.0 czy wprost tu — do decyzji po zgłoszeniu).
+
 ## MIGRACJA 1.6.7 → 2.0.0-dev — 2026-09-12 (BEZ panelu klienta, BEZ deploya)
 - Backup: `C:\Projects\Backups\atylla-pro\pre-2.0-migration-20260912\` — 2 bundle (oba `verify` OK, drugi zawiera też stash) + manifest. Stash `stash@{0}` = cała praca 1.7 (portal). Workdir startował czysty z 93b0be6.
 - Backend: main.py (T1 traversal, generyczny 500, jawny CORS, bez dayclose/portalu, 2.0.0-dev) + kopiowane routery calendar/clients/workouts/email (T2/T4/T5/T6/T7/T9/T10, start/end-at, close-cycle, week-summary). Usunięte: dayclose.py, debug.py (martwy). Migracje 004 + 006 do wklejenia RAZ (najpierw testowy Supabase) — NIE wklejone.
