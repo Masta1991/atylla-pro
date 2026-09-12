@@ -1,5 +1,10 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.10: początek pakietu + twarde usuwanie (pakiet funkcjonalny)
+- Usunięcie startu pakietu: sonda → anuluj pakiet / automatycznie pierwszy kolejny / wskaż sam (tapnięcie). Stara kotwica i początek miesięczny nie blokują.
+- Usuń = twarde kasowanie z jednym potwierdzeniem (licznik sam maleje, zero śladu w kalendarzu, „Usunięty” w tygodniu). Nieobecność bez zmian.
+- Deploy ./deploy.ps1 -Version 2.0.10 (bundle index-1888dfed, backend 78 tras, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.9: zapis bez ćwiczeń (sam wpis w kalendarzu)
 - Trening da się zapisać bez wybierania ćwiczeń (wpis w kalendarzu, logi nietknięte; czyszczenie dnia robi Usuń). Deploy ./deploy.ps1 -Version 2.0.9 (bundle index-0bff9ca5, Railway przebudowuje).
 
