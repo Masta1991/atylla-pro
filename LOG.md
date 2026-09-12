@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.11: fix FK przy usuwaniu (kotwice pakietów)
+- Log Railway: DELETE łamał `client_packages_start_training_id_fkey` (RESTRICT) — Adam ma ZAMKNIĘTY pakiet z kotwicą na tym treningu (stąd flaga START bez aktywnego pakietu). Fix: `_detach_anchors` odpina start/koniec przed DELETE (też w kopiowaniu/czyszczeniu tygodnia). Deploy ./deploy.ps1 -Version 2.0.11 (bundle index-2e4dcd6d, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.10: początek pakietu + twarde usuwanie (pakiet funkcjonalny)
 - Usunięcie startu pakietu: sonda → anuluj pakiet / automatycznie pierwszy kolejny / wskaż sam (tapnięcie). Stara kotwica i początek miesięczny nie blokują.
 - Usuń = twarde kasowanie z jednym potwierdzeniem (licznik sam maleje, zero śladu w kalendarzu, „Usunięty” w tygodniu). Nieobecność bez zmian.
