@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.1: fix handlera błędów (encoding utf-8 dla error.log)
+- Przyczyna: traceback z polskimi znakami (np. nazwiska klientów) wywalał sam handler pustą odpowiedzią → ciche puste UI na PWA. Deploy ./deploy.ps1 -Version 2.0.1 (bundle index-7bd42350, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.0 WDROŻONE (GitHub + Railway) — audyt T1–T11 + migracja 2.0 bez portalu
 - Commit c07681d + tagi v2.0.0/backup-v2.0.0 wypchnięte na master 12.09. Railway przebudowuje automatycznie.
 - Zakres: fixy audytu (T1 traversal, T2 auth maili, T3 env API, T4 atomowe odwołanie, T5/T6 pula+own-wins, T7 guarded batch, T8 klucze po ID, T9 close-cycle, T10 paginacja, T11 confirm.js), WeekSummary zamiast DayClose (DayClose usunięty), liczenie pozycyjne. Bez panelu klienta.
