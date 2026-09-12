@@ -1,7 +1,8 @@
 from supabase import create_client, Client
 from fastapi import Request, HTTPException
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_ANON_KEY
-import json, base64
+import json, base64, time
+import httpx
 
 _supabase: Client = None
 
@@ -24,6 +25,21 @@ def _decode_jwt_user_id(token: str) -> str:
         return claims.get("sub")
     except Exception:
         raise HTTPException(401, "Invalid token format")
+
+
+def supabase_retry(fn, attempts=3, base_delay=0.4):
+    """Ponów odczyt, gdy Supabase zerwie połączenie w trakcie
+    (httpcore RemoteProtocolError / timeouty). Błędy logiki i walidacji
+    przechodzą od razu — ponawiamy tylko transport."""
+    last = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except httpx.TransportError as e:
+            last = e
+            if i < attempts - 1:
+                time.sleep(base_delay * (2 ** i))
+    raise last
 
 
 def get_user_supabase(request: Request) -> tuple[Client, str]:

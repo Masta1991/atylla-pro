@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from datetime import date, datetime, timedelta
 from models import ClientCreate, ClientUpdate, ClientResponse, ClientPackageCreate, ClientPackageUpdate, ClientPackageResponse, StartBillingRequest, EndBillingRequest
-from database import get_supabase, get_user_supabase
+from database import get_supabase, get_user_supabase, supabase_retry
 from pydantic import BaseModel
 
 class AdjustPackageRequest(BaseModel):
@@ -375,10 +375,18 @@ def assign_client_packages_status(clients, supabase):
 
 @router.get("/", response_model=List[ClientResponse])
 def list_clients(request: Request):
+    import httpx as _httpx
     supabase, _ = get_user_supabase(request)
-    res = supabase.table("clients").select("*").order("name").execute()
-    clients = res.data or []
-    return assign_client_packages_status(clients, supabase)
+
+    def _load():
+        res = supabase.table("clients").select("*").order("name").execute()
+        clients = res.data or []
+        return assign_client_packages_status(clients, supabase)
+
+    try:
+        return supabase_retry(_load)
+    except _httpx.TransportError:
+        raise HTTPException(502, "Baza chwilowo nie odpowiada (Supabase). Spróbuj ponownie.")
 
 @router.put("/packages/{package_id}", response_model=ClientPackageResponse)
 def end_client_package(package_id: str, data: ClientPackageUpdate, request: Request):
