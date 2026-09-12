@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.14: koniec duchów ../10 na kafelkach
+- Kafelek brał rozmiar ze starej kolumny clients.package_size (stąd 1/10 przy pakiecie 7). Backend zeruje ją bez danych SSOT, frontend rysuje /rozmiar tylko gdy znany. Deploy ./deploy.ps1 -Version 2.0.14 (bundle index-6e3f7cb5, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.13: koniec zombie-pakietów 0/10
 - Przyczyna stanu Agaty: wipe tygodnia (Menadżer) po cichu odcinał starty ŻYWYCH pakietów → pakiet bez startu, licznik 0, „Brak danych”. Fix: bulk wipe ANULUJE pakiety zakotwiczone w kasowanym zakresie (z ostrzeżeniem w modalu), odpinanie dotyczy tylko zamkniętych, strażnik początku jest ślepy na członków puli. Deploy ./deploy.ps1 -Version 2.0.13 (bundle index-343e952b, Railway przebudowuje). Naprawa Agaty: Twardy Reset na jej karcie.
 
