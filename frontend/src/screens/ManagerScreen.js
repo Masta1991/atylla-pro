@@ -734,6 +734,7 @@ export default function ManagerScreen({ navigation }) {
             
             <Text style={{ fontSize: 15, color: themeColors.textSecondary, marginBottom: 24, lineHeight: 22 }}>
               Czy na pewno chcesz bezpowrotnie usunąć WSZYSTKIE treningi z tygodnia od <Text style={{ fontWeight: '700', color: themeColors.text }}>{formatDateString(currentMonday)}</Text>?
+              {'\n\n'}Pakiety rozpoczęte w tym tygodniu zostaną ANULOWANE.
             </Text>
             
             <View style={{ flexDirection: 'row', gap: 12 }}>
