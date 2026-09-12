@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.6: treningi wróciły; sprzątnięcie diagnostyki
+- Zapisy pojawiły się w apce (zadziałał retry + lżejsze zapytanie z 2.0.4/2.0.5). Usunięte tymczasowe znaczniki [weekdiag]. Deploy ./deploy.ps1 -Version 2.0.6 (bundle index-e86078e4, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.5: diagnostyka tygodnia (znaczniki [weekdiag] w logach)
 - Znaczniki etapów zapytań tygodnia na stderr (tymczasowe, do usunięcia po fixie). Deploy ./deploy.ps1 -Version 2.0.5 (bundle index-28bfa019, Railway przebudowuje).
 
