@@ -430,6 +430,9 @@ def assign_chronological_numbers(events, supabase):
                 else:
                     ev["clients"]["package_current_count"] = 0
                     has_active_or_history = False
+                    # Bez danych SSOT nie pokazujemy starej kolumny
+                    # clients.package_size (duch ../10 na kafelku).
+                    ev["clients"]["package_size"] = None
 
                 # Numer na kafelek od razu (pozycja w pakiecie).
                 if e_id in event_positions:
@@ -446,9 +449,9 @@ def assign_chronological_numbers(events, supabase):
                     pos = event_positions[e_id]
                     size = event_positions.get(f"{e_id}_size")
                     if size is None:
-                        size = ev["clients"].get("package_size", 10)
+                        size = ev["clients"].get("package_size") or None
                     is_end = e_id in _all_end_ids
-                    if size > 0:
+                    if size and size > 0:
                         if is_end or pos == size:
                             ev["billing_flag"] = "LAST"
                         elif pos > size:
