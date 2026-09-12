@@ -393,6 +393,10 @@ export async function saveCalendarWorkout(data) {
   };
   await createCalendarEvent(calendarPayload);
 
+  // Zapis bez ćwiczeń: sam wpis w kalendarzu, logów nie ruszamy
+  // (ani nie dopisujemy, ani nie czyścimy — czyszczenie robi Usuń).
+  if (!data.exercises || data.exercises.length === 0) return [];
+
   const batchPayload = {
     client_id: data.client_id,
     session_date: data.event_date,
