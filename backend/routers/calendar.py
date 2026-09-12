@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
 from pydantic import BaseModel
-from database import get_user_supabase, supabase_retry
+from database import get_user_supabase, supabase_retry, utcnow_iso
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
     CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest
@@ -81,7 +81,7 @@ def create_absence(data: AbsenceCreate, request: Request):
     existing_evs = query_evs.execute().data
     for ev in existing_evs:
         new_status = "cancelled" if ev.get("is_settled") else "deleted"
-        supabase.table("calendar_events").update({"status": new_status, "updated_at": "now()"}).eq("id", ev["id"]).execute()
+        supabase.table("calendar_events").update({"status": new_status, "updated_at": utcnow_iso()}).eq("id", ev["id"]).execute()
 
     return res.data[0]
 
@@ -656,7 +656,8 @@ def replace_week(data: ReplaceWeekRequest, request: Request):
                 .eq("trainer_id", user_id) \
                 .eq("is_settled", False) \
                 .execute()
-            _detach_anchors(supabase, [r["id"] for r in (doomed.data or []) if r.get("id")])
+            from database import get_supabase as _svc2
+            _detach_anchors(supabase, _svc2(), user_id, [r["id"] for r in (doomed.data or []) if r.get("id")])
         except Exception:
             pass
         # 1. Hard delete all calendar_events between monday and saturday for this trainer
@@ -714,7 +715,8 @@ def clear_week(monday_date: str, request: Request):
                 .eq("trainer_id", user_id) \
                 .eq("is_settled", False) \
                 .execute()
-            _detach_anchors(supabase, [r["id"] for r in (doomed.data or []) if r.get("id")])
+            from database import get_supabase as _svc3
+            _detach_anchors(supabase, _svc3(), user_id, [r["id"] for r in (doomed.data or []) if r.get("id")])
         except Exception:
             pass
         supabase.table("calendar_events") \
@@ -735,7 +737,7 @@ def clear_week(monday_date: str, request: Request):
 def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate, request: Request):
     supabase, _ = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
-    payload["updated_at"] = "now()"
+    payload["updated_at"] = utcnow_iso()
 
     res = (
         supabase.table("calendar_events")
@@ -787,13 +789,13 @@ def swap_events(data: CalendarSwapRequest, request: Request):
         _TMP_HOUR = 6
         # Krok przez slot tymczasowy, zeby nie zlamac unique(event_date,event_hour,trainer_id)
         supabase.table("calendar_events").update(
-            {"event_date": _TMP_DATE, "event_hour": _TMP_HOUR, "updated_at": "now()"}
+            {"event_date": _TMP_DATE, "event_hour": _TMP_HOUR, "updated_at": utcnow_iso()}
         ).eq("id", ev1_data["id"]).execute()
         supabase.table("calendar_events").update(
-            {"event_date": data.date1.isoformat(), "event_hour": data.hour1, "updated_at": "now()"}
+            {"event_date": data.date1.isoformat(), "event_hour": data.hour1, "updated_at": utcnow_iso()}
         ).eq("id", ev2_data["id"]).execute()
         supabase.table("calendar_events").update(
-            {"event_date": data.date2.isoformat(), "event_hour": data.hour2, "updated_at": "now()"}
+            {"event_date": data.date2.isoformat(), "event_hour": data.hour2, "updated_at": utcnow_iso()}
         ).eq("id", ev1_data["id"]).execute()
         # Logi ida za treningiem (bez godzin, tylko data)
         d1, d2 = data.date1.isoformat(), data.date2.isoformat()
@@ -823,7 +825,7 @@ def swap_events(data: CalendarSwapRequest, request: Request):
     dst_date = data.date2.isoformat() if ev1_data else data.date1.isoformat()
     dst_hour = data.hour2 if ev1_data else data.hour1
     supabase.table("calendar_events").update(
-        {"event_date": dst_date, "event_hour": dst_hour, "updated_at": "now()"}
+        {"event_date": dst_date, "event_hour": dst_hour, "updated_at": utcnow_iso()}
     ).eq("id", moving["id"]).execute()
     _move_logs(moving.get("client_id"), src_date, dst_date)
     _clear_slot_absence(supabase, moving.get("client_id"), dst_date, dst_hour)
@@ -975,28 +977,40 @@ def _hard_delete(supabase, user_id, event, event_date, event_hour):
             pass
     # Kotwice pakietów (start KONIECZNIE — FK RESTRICT, koniec dla porządku):
     # odepnij, żeby twarde kasowanie nie łamało klucza obcego.
-    _detach_anchors(supabase, [event["id"]])
-    supabase.table("calendar_events").delete().eq("id", event["id"]).execute()
+    from database import get_supabase as _svc
+    _detach_anchors(supabase, _svc(), user_id, [event["id"]])
+    try:
+        supabase.table("calendar_events").delete().eq("id", event["id"]).execute()
+    except Exception as e:
+        if "foreign key" in str(e).lower():
+            raise HTTPException(400, "Trening jest powiązany z pakietem spoza Twojego konta — napisz, odepnę ręcznie.")
+        raise
     return "deleted"
 
 
-def _detach_anchors(supabase, event_ids):
+def _detach_anchors(supabase, svc, user_id, event_ids):
     """Odepnij kotwice pakietów (start/end) wskazujące na kasowane treningi.
-    Bez tego DELETE łamie FK client_packages_start_training_id_fkey (RESTRICT)."""
+    Bez tego DELETE łamie FK client_packages_start_training_id_fkey (RESTRICT).
+    Skan przez service-role (widzi też wiersze schowane przez RLS), zapis tylko
+    własnych/NULLOWYCH trenerów — cudzych nie ruszamy."""
     ids = [str(i) for i in (event_ids or []) if i]
     if not ids:
         return
     try:
-        rows = supabase.table("client_packages").select("id,start_training_id,end_training_id").execute()
+        rows = svc.table("client_packages").select("id,trainer_id,start_training_id,end_training_id").execute()
         for p in (rows.data or []):
             patch = {}
             if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
                 patch["start_training_id"] = None
             if p.get("end_training_id") and str(p.get("end_training_id")) in ids:
                 patch["end_training_id"] = None
-            if patch:
-                patch["updated_at"] = "now()"
-                supabase.table("client_packages").update(patch).eq("id", p["id"]).execute()
+            if not patch:
+                continue
+            owner = p.get("trainer_id")
+            if owner is not None and str(owner) != str(user_id):
+                continue
+            patch["updated_at"] = utcnow_iso()
+            svc.table("client_packages").update(patch).eq("id", p["id"]).execute()
     except Exception:
         pass
 
@@ -1106,7 +1120,7 @@ def delete_package_start(event_date: str, event_hour: int, data: DeleteStartRequ
             except Exception:
                 pass
         supabase.table("client_packages").update(
-            {"start_training_id": cand["id"], "updated_at": "now()"}).eq("id", pkg["id"]).execute()
+            {"start_training_id": cand["id"], "updated_at": utcnow_iso()}).eq("id", pkg["id"]).execute()
         new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
         return {"status": new_status, "package": "repointed",
                 "new_start_event_id": cand["id"]}

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from database import get_supabase, get_user_supabase
+from database import get_supabase, get_user_supabase, utcnow_iso
 from models import MeasurementCreate, MeasurementUpdate, MeasurementResponse
 
 router = APIRouter(prefix="/measurements", tags=["measurements"])
@@ -49,7 +49,7 @@ def create_measurement(data: MeasurementCreate, request: Request):
 def update_measurement(measurement_id: str, data: MeasurementUpdate, request: Request):
     supabase, _ = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
-    payload["updated_at"] = "now()"
+    payload["updated_at"] = utcnow_iso()
 
     res = supabase.table("measurements").update(payload).eq("id", measurement_id).execute()
     if not res.data:

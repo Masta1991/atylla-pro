@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from datetime import date, datetime, timedelta
 from models import ClientCreate, ClientUpdate, ClientResponse, ClientPackageCreate, ClientPackageUpdate, ClientPackageResponse, StartBillingRequest, EndBillingRequest
-from database import get_supabase, get_user_supabase, supabase_retry
+from database import get_supabase, get_user_supabase, supabase_retry, utcnow_iso
 from pydantic import BaseModel
 
 class AdjustPackageRequest(BaseModel):
@@ -392,7 +392,7 @@ def list_clients(request: Request):
 def end_client_package(package_id: str, data: ClientPackageUpdate, request: Request):
     supabase, _ = get_user_supabase(request)
     payload = data.model_dump(exclude_none=True, mode='json')
-    payload["updated_at"] = "now()"
+    payload["updated_at"] = utcnow_iso()
     
     # We can handle the un-setting of end_training_id if they send null
     if "end_training_id" in data.model_fields_set and data.end_training_id is None:
@@ -516,7 +516,7 @@ def create_client(data: ClientCreate, request: Request):
 def update_client(client_id: str, data: ClientUpdate, request: Request):
     supabase, user_id = get_user_supabase(request)
     payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
-    payload["updated_at"] = "now()"
+    payload["updated_at"] = utcnow_iso()
 
     if "package_purchase_date" in data.model_fields_set and data.package_purchase_date is None:
         payload["package_purchase_date"] = None
@@ -713,7 +713,7 @@ def close_client_cycle(client_id: str, data: CloseCycleRequest, request: Request
     })
     upd = supabase.table("clients").update(
         {"payment_history": history, "package_purchase_date": None,
-         "updated_at": "now()"}).eq("id", client_id).execute()
+         "updated_at": utcnow_iso()}).eq("id", client_id).execute()
     if not upd.data:
         raise HTTPException(404, "Client not found")
     return assign_client_packages_status([upd.data[0]], supabase)[0]
@@ -733,6 +733,6 @@ def end_package_at(client_id: str, data: PackageEndAtRequest, request: Request):
         if (ev["event_date"], ev["event_hour"]) < (s["event_date"], s["event_hour"]):
             raise HTTPException(400, "Koniec nie moze byc przed startem pakietu")
     supabase.table("client_packages").update(
-        {"end_training_id": data.event_id, "updated_at": "now()"}).eq("id", pkg["id"]).execute()
+        {"end_training_id": data.event_id, "updated_at": utcnow_iso()}).eq("id", pkg["id"]).execute()
     return {"status": "closed", "package_id": pkg["id"]}
 
