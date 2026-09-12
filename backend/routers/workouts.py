@@ -67,33 +67,78 @@ def get_client_history(client_id: str, request: Request):
 @router.post("/batch", status_code=201)
 def save_workout_batch(data: WorkoutLogBatch, request: Request):
     """
-    Save a batch of workout logs for a session.
-    Replaces existing logs for this client+date combination.
+    T7: guarded replace of one session's logs.
+    - Validate BEFORE any delete (bad payload never wipes data).
+    - Empty batch is refused (T8): clearing a day goes through delete,
+      never through an accidental empty save.
+    - Prefer atomic RPC `save_workout_batch_atomic` (migration 006) when
+      deployed; otherwise delete+insert with compensating restore of the
+      snapshot on insert failure.
     """
     supabase, user_id = get_user_supabase(request)
 
-    # Delete existing logs for this client+date
+    if not data.logs:
+        raise HTTPException(400, "Empty workout batch — nothing to save. Use delete to clear a day.")
+
+    records = []
+    for log in data.logs:
+        if str(log.client_id) != str(data.client_id):
+            raise HTTPException(400, "Log client_id must match batch client_id")
+        if log.session_date != data.session_date:
+            raise HTTPException(400, "Log session_date must match batch session_date")
+        records.append({
+            "client_id": str(data.client_id),
+            "exercise_id": str(log.exercise_id),
+            "weight_kg": log.weight_kg,
+            "reps": log.reps,
+            "week_number": data.week_number,
+            "session_date": data.session_date.isoformat(),
+            "trainer_id": user_id,
+        })
+
+    date_iso = data.session_date.isoformat()
+
+    # Atomic path when the RPC is deployed (one transaction in Postgres).
+    rpc = getattr(supabase, "rpc", None)
+    if callable(rpc):
+        try:
+            res = supabase.rpc("save_workout_batch_atomic", {
+                "p_client_id": str(data.client_id),
+                "p_session_date": date_iso,
+                "p_week_number": data.week_number,
+                "p_trainer_id": user_id,
+                "p_logs": [
+                    {"exercise_id": r["exercise_id"], "weight_kg": r["weight_kg"],
+                     "reps": r["reps"], "week_number": r["week_number"]}
+                    for r in records
+                ],
+            }).execute()
+            if res.data:
+                return res.data
+        except Exception:
+            pass  # fall through to guarded replace below
+
+    # Snapshot for compensating restore.
+    old_res = supabase.table("workout_logs").select(
+        "client_id,exercise_id,weight_kg,reps,week_number,session_date,trainer_id"
+    ).eq("client_id", str(data.client_id)).eq("session_date", date_iso).execute()
+    old_rows = [dict(r) for r in (old_res.data or [])]
+
     supabase.table("workout_logs").delete() \
         .eq("client_id", str(data.client_id)) \
-        .eq("session_date", data.session_date.isoformat()) \
+        .eq("session_date", date_iso) \
         .execute()
 
-    if data.logs:
-        records = []
-        for log in data.logs:
-            records.append({
-                "client_id": str(data.client_id),
-                "exercise_id": str(log.exercise_id),
-                "weight_kg": log.weight_kg,
-                "reps": log.reps,
-                "week_number": data.week_number,
-                "session_date": data.session_date.isoformat(),
-                "trainer_id": user_id,
-            })
+    try:
         res = supabase.table("workout_logs").insert(records).execute()
         return res.data
-
-    return []
+    except Exception:
+        try:
+            if old_rows:
+                supabase.table("workout_logs").insert(old_rows).execute()
+        except Exception:
+            pass
+        raise HTTPException(500, "Save failed — previous workout restored")
 
 
 @router.put("/{log_id}", response_model=WorkoutLogResponse)

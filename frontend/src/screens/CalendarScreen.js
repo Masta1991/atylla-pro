@@ -244,13 +244,17 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
           </View>
         ) : null}
       </TouchableOpacity>
-      {showEv && ev.is_settled && !isAbsent && (
-        <View style={{ position: 'absolute', bottom: 3, right: 4 }}>
-          <Ionicons name="logo-usd" size={10} color={accent} />
-        </View>
-      )}
+      {/* 2.0: brak znaku $ (treningi licza sie pozycyjnie). Oplacone odwolania
+          widac jako czerwone w Podsumowaniu tygodnia i historii rozliczen. */}
     </View>
   );
+}
+
+// 2.0: czy slot juz minal (trening 8-9 o 9:01 widnieje jako odbyty).
+function isSlotPassed(dateStr, hour) {
+  const end = new Date(dateStr + 'T00:00:00');
+  end.setHours(Number(hour) + 1, 0, 0, 0);
+  return Date.now() > end.getTime();
 }
 
 function CalendarScreen({ navigation, route }) {
@@ -392,11 +396,7 @@ function CalendarScreen({ navigation, route }) {
   );
 
   useEffect(() => {
-    // Prefetch dictionaries in background for faster navigation
-    api.getClients().catch(() => {});
-    api.getWorkoutTypes().catch(() => {});
-    api.getMuscleGroups().catch(() => {});
-    api.getExercisesGrouped().catch(() => {});
+    api.prefetchTrainingDicts();
   }, []);
 
   const nextWeek = () => setMonday(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7));
@@ -408,6 +408,15 @@ function CalendarScreen({ navigation, route }) {
   const [selSlot, setSelSlot] = useState(null);
   // Jawny wybór przy odwołaniu (jak X w trybie edycji): null | 'ask'
   const [absenceAsk, setAbsenceAsk] = useState(false);
+  // 2.0: pelna karta klienta do przyciskow pakietu w szufladzie (pobierana przy otwarciu).
+  const [drawerClient, setDrawerClient] = useState(null);
+  useEffect(() => {
+    const cid = selSlot?.ev?.client_id;
+    if (!cid) { setDrawerClient(null); return; }
+    let cancelled = false;
+    api.getClient(cid).then(c => { if (!cancelled) setDrawerClient(c || null); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [selSlot]);
   const vScrollRef = useRef(null);
   const hGridRef = useRef(null);
 
@@ -492,8 +501,62 @@ function CalendarScreen({ navigation, route }) {
     }
   }, [loadWeek]);
 
+  // 2.0: start/koniec pakietu i cyklu z szuflady (solo; wspoldzielone w Rozliczeniach).
+  const confirm2 = (title, msg, okLabel, fn) => {
+    if (Platform.OS === 'web') { if (window.confirm(`${title}\n\n${msg}`)) fn(); }
+    else Alert.alert(title, msg, [{ text: 'Anuluj', style: 'cancel' }, { text: okLabel, onPress: fn }]);
+  };
+
+  const startPackageFromDrawer = useCallback(() => {
+    const s = selSlot; const c = drawerClient;
+    if (!s?.ev || !c) return;
+    const size = c.package_size || 10;
+    confirm2('Rozpocznij pakiet',
+      `Klient: ${c.name || ''}\nStart: ${s.date} ${s.hour}:00\nRozmiar: ${size} (zmiana w Rozliczeniach)`,
+      'Rozpocznij', async () => {
+        try { await api.startPackageAt(c.id, { event_id: s.ev.id, size }); setSelSlot(null); loadWeek(); }
+        catch (e) { Alert.alert('Błąd', e.message); }
+      });
+  }, [selSlot, drawerClient, loadWeek]);
+
+  const endPackageFromDrawer = useCallback(() => {
+    const s = selSlot; const c = drawerClient;
+    if (!s?.ev || !c) return;
+    confirm2('Zakończ pakiet',
+      `Klient: ${c.name || ''}\nKoniec: ${s.date} ${s.hour}:00`,
+      'Zakończ', async () => {
+        try { await api.endPackageAt(c.id, { event_id: s.ev.id }); setSelSlot(null); loadWeek(); }
+        catch (e) { Alert.alert('Błąd', e.message); }
+      });
+  }, [selSlot, drawerClient, loadWeek]);
+
+  const startCycleFromDrawer = useCallback(() => {
+    const s = selSlot; const c = drawerClient;
+    if (!s?.ev || !c) return;
+    confirm2('Rozpocznij cykl',
+      `Klient: ${c.name || ''}\nStart: ${s.ev.event_date}`,
+      'Rozpocznij', async () => {
+        try { await api.updateClient(c.id, { package_purchase_date: s.ev.event_date }); setSelSlot(null); loadWeek(); }
+        catch (e) { Alert.alert('Błąd', e.message); }
+      });
+  }, [selSlot, drawerClient, loadWeek]);
+
+  // T9: liczy backend (close-cycle), nie kopiujemy bieżącego licznika.
+  const endCycleFromDrawer = useCallback(() => {
+    const s = selSlot; const c = drawerClient;
+    if (!s?.ev || !c) return;
+    confirm2('Zakończ cykl',
+      `Klient: ${c.name || ''}\nKoniec: ${s.ev.event_date}`,
+      'Zakończ', async () => {
+        try {
+          await api.closeClientCycle(c.id, { end_date: s.ev.event_date });
+          setSelSlot(null); loadWeek();
+        } catch (e) { Alert.alert('Błąd', e.message); }
+      });
+  }, [selSlot, drawerClient, loadWeek]);
+
   // Wspólna ścieżka usuwania zapisu (X w trybie edycji + przycisk w szufladzie).
-  // Pilnuje startu pakietu i pyta o rozliczenie.
+  // 2.0: pyta o OPLACENIE (notatka dla trenera), nie o rozliczenie.
   const requestDelete = useCallback((dateStr, hour, ev) => {
     const clientName = ev?.clients?.name || '';
 
@@ -509,30 +572,37 @@ function CalendarScreen({ navigation, route }) {
       return;
     }
 
+    // T4: jedno atomowe żądanie z flagą paid — brak wyścigu settle/delete,
+    // błąd przerywa całość zamiast cichego .catch(()=>{}).
+    const doAtomicDelete = async (paid) => {
+      try {
+        await api.deleteCalendarEvent(dateStr, hour, paid);
+        loadWeek();
+      } catch (e) {
+        loadWeek();
+        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
+        else Alert.alert('Błąd', 'Nie udało się usunąć: ' + e.message);
+      }
+    };
+
     if (Platform.OS === 'web') {
       if (!window.confirm(`Czy na pewno chcesz usunąć zapis treningu?\n\nKlient: ${clientName}`)) return;
-      const settle = window.confirm(`Czy chcesz ROZLICZYĆ ten trening?\n\nKlient: ${clientName}\n\nKliknij OK aby rozliczyć (doliczy się do pakietu),\nlub Anuluj aby tylko usunąć bez rozliczania.`);
-      if (settle) {
-        api.settleWorkout(dateStr, hour).catch(() => {});
-        Alert.alert('Rozliczono', `Trening ${clientName} został rozliczony i usunięty.`);
-      }
-      handleDelete(dateStr, hour, ev);
+      const paid = window.confirm(`Czy trening OPŁACONO?\n\nKlient: ${clientName}\n\nKliknij OK gdy klient płaci mimo odwołania (czerwony, liczy się do pakietu),\nlub Anuluj gdy bez płatności (zniknie jak dotychczas).`);
+      doAtomicDelete(paid);
     } else {
-      Alert.alert('Usuń zapis', `Klient: ${clientName}\n\nCzy chcesz usunąć ten zapis?`, [
+      Alert.alert('Usuń zapis', `Klient: ${clientName}\n\nCzy trening opłacono?`, [
         { text: 'Anuluj', style: 'cancel' },
-        { text: 'Usuń i rozlicz', style: 'destructive', onPress: () => {
-          api.settleWorkout(dateStr, hour).catch(() => {});
-          handleDelete(dateStr, hour, ev);
-        }},
-        { text: 'Tylko usuń', onPress: () => handleDelete(dateStr, hour, ev) },
+        { text: 'Opłacony', style: 'destructive', onPress: () => doAtomicDelete(true) },
+        { text: 'Bez płatności', onPress: () => doAtomicDelete(false) },
       ]);
     }
-  }, [handleDelete]);
+  }, [loadWeek]);
 
-  // Odwołanie z jawnym wyborem rozliczenia (jak X): najpierw rozliczenie, potem nieobecność.
-  const reportAbsence = useCallback(async (dateStr, hour, ev, settle) => {
+  // Odwołanie z jawnym wyborem płatności (jak X): najpierw oznaczenie, potem nieobecność.
+  // T4: błąd settle przerywa całość — brak cichego połykania (płatne musi być pewne).
+  const reportAbsence = useCallback(async (dateStr, hour, ev, paid) => {
     try {
-      if (settle) { try { await api.settleWorkout(dateStr, Number(hour)); } catch (e) {} }
+      if (paid) await api.settleWorkout(dateStr, Number(hour));
       await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour) });
       setSelSlot(null); setAbsenceAsk(false); loadWeek();
     } catch (e) { Alert.alert('Błąd', e.message); }
@@ -630,7 +700,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: themeColors.border }}>
         <View style={{ width: HOUR_W }}>{HOURS.map(hour => (<View key={hour} style={styles.hourCell}><Text style={styles.hourText}>{hour}:00</Text></View>))}</View>
         <ScrollView ref={hGridRef} horizontal showsHorizontalScrollIndicator={false} onScroll={onHorizontalScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
-          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} accent={C.accent} styles={styles} onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); }} />); })}</View>))}</View>
+          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
         </ScrollView>
       </View>
     </ScrollView>
@@ -679,26 +749,14 @@ function CalendarScreen({ navigation, route }) {
         );
       })()}
 
-      <TouchableOpacity 
-        style={[styles.bottomSideBtn, { left: SCREEN_WIDTH / 4 - 35 }]} 
-        onPress={() => {
-          navigation.navigate('DayClose');
-        }} 
+      {/* 2.0: lewy przycisk = TYDZIEN (WeekSummary). DayClose usuniety. */}
+      <TouchableOpacity
+        style={[styles.bottomSideBtn, { left: SCREEN_WIDTH / 4 - 35 }]}
+        onPress={() => navigation.navigate('WeekSummary')}
         activeOpacity={0.6}
       >
-        <MaterialCommunityIcons 
-          name="check-decagram-outline" 
-          size={32} 
-          color={bottomIconColor} 
-        />
-        <Text 
-          style={[
-            styles.bottomText, 
-            { color: bottomTextColor }
-          ]}
-        >
-          DZIEŃ
-        </Text>
+        <MaterialCommunityIcons name="calendar-week-outline" size={32} color={bottomIconColor} />
+        <Text style={[styles.bottomText, { color: bottomTextColor }]}>TYDZIEŃ</Text>
       </TouchableOpacity>
 
       <View style={[styles.homeButtonWrapper, { left: SCREEN_WIDTH / 2 - 40 }]}>
@@ -743,11 +801,15 @@ function CalendarScreen({ navigation, route }) {
           const pkgInfo = sc.billing_type === 'package'
             ? `pakiet ${(sc.package_current_count ?? 0)}/${sc.package_size || 10}`
             : (sc.has_active_billing_or_history ? `miesięczny: ${sc.package_current_count ?? 0}` : null);
+          // 2.0: stan ze statusu i czasu (nie ze znaku $).
+          const evState = selSlot.ev.status === 'cancelled'
+            ? (selSlot.ev.is_settled ? 'odwołany • opłacony' : 'odwołany')
+            : (isSlotPassed(selSlot.date, selSlot.hour) ? 'odbyty' : 'planowany');
           return (
           <Text style={styles.sheetSub}>
             {selSlot.ev.training_plans?.name || selSlot.ev.workout_types?.name || 'trening'}
             {pkgInfo ? ` • ${pkgInfo}` : ''}
-            {selSlot.ev.is_settled ? ' • rozliczony' : ' • nierozliczony'}
+            {` • ${evState}`}
             {selSlot.ev.partner_name ? ` • z: ${selSlot.ev.partner_name}` : ''}
           </Text>
           );
@@ -756,7 +818,7 @@ function CalendarScreen({ navigation, route }) {
           {!absenceAsk && (
           <TouchableOpacity
             style={[styles.sheetBtn, { backgroundColor: C.accent }]}
-            onPress={() => { const s = selSlot; setSelSlot(null); navigation.navigate('Training', { date: s.date, hour: s.hour, ...(selAbs ? { replaceClientId: selAbs.client_id } : {}) }); }}
+            onPress={() => { const s = selSlot; setSelSlot(null); navigation.navigate('Training', { date: s.date, hour: s.hour, ev: s.ev, ...(selAbs ? { replaceClientId: selAbs.client_id } : {}) }); }}
           >
             <Text style={[styles.sheetBtnText, { color: '#fff' }]}>{selSlot.ev ? 'Trening' : (selAbs ? 'Zastępstwo' : 'Dodaj')}</Text>
           </TouchableOpacity>
@@ -778,9 +840,42 @@ function CalendarScreen({ navigation, route }) {
             onPress={() => { if (selSlot.ev) { handleMoveStart(selSlot.date, selSlot.hour, selSlot.ev); } setSelSlot(null); }}
           >
             <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Przenieś</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
           )}
-          {!!selSlot.ev && !selSlot.ev.is_settled && !absenceAsk && (
+          {/* 2.0: start/koniec pakietu i cyklu z szuflady (solo). */}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type === 'package' && !drawerClient.active_package_id && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: C.accent }]}
+              onPress={startPackageFromDrawer}
+            >
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij pakiet</Text>
+            </TouchableOpacity>
+          )}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type === 'package' && drawerClient.active_package_id && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
+              onPress={endPackageFromDrawer}
+            >
+              <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ pakiet</Text>
+            </TouchableOpacity>
+          )}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && drawerClient.billing_type !== 'package' && !drawerClient.package_purchase_date && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: C.accent }]}
+              onPress={startCycleFromDrawer}
+            >
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Rozpocznij cykl</Text>
+            </TouchableOpacity>
+          )}
+          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.billing_type !== 'package' && drawerClient?.package_purchase_date && (
+            <TouchableOpacity
+              style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
+              onPress={endCycleFromDrawer}
+            >
+              <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ cykl</Text>
+            </TouchableOpacity>
+          )}
+          {!!selSlot.ev && selSlot.ev.status === 'active' && !absenceAsk && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => setAbsenceAsk(true)}
@@ -788,23 +883,23 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Nieobecność</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, true); }}
             >
-              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Z rozliczeniem</Text>
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Opłacono</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
               onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, false); }}
             >
-              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Bez rozliczenia</Text>
+              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Bez płatności</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.border }]}
               onPress={() => setAbsenceAsk(false)}
@@ -812,39 +907,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.textSecondary }]}>Powrót</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev && !selSlot.ev.is_settled && (
-            <TouchableOpacity
-              style={[styles.sheetBtn, { backgroundColor: '#1dd1a1' }]}
-              onPress={async () => {
-                try { await api.settleWorkout(selSlot.date, Number(selSlot.hour)); setSelSlot(null); loadWeek(); }
-                catch (e) { Alert.alert('Błąd', e.message); }
-              }}
-            >
-              <Text style={[styles.sheetBtnText, { color: '#06281e' }]}>Rozlicz</Text>
-            </TouchableOpacity>
-          )}
-          {!absenceAsk && !!selSlot.ev?.is_settled && (
-            <TouchableOpacity
-              style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
-              onPress={() => {
-                const s = selSlot;
-                const doUnsettle = async () => {
-                  try { await api.unsettleWorkout(s.date, Number(s.hour)); setSelSlot(null); loadWeek(); }
-                  catch (e) { Alert.alert('Błąd', e.message); }
-                };
-                if (Platform.OS === 'web') {
-                  if (window.confirm(`Cofnąć rozliczenie treningu?\n\nKlient: ${s.ev?.clients?.name || ''}\nTrening wypadnie z licznika pakietu.`)) doUnsettle();
-                } else {
-                  Alert.alert('Cofnij rozliczenie', `Klient: ${s.ev?.clients?.name || ''}\n\nTrening wypadnie z licznika pakietu.`, [
-                    { text: 'Anuluj', style: 'cancel' },
-                    { text: 'Cofnij', onPress: doUnsettle },
-                  ]);
-                }
-              }}
-            >
-              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Cofnij rozliczenie</Text>
-            </TouchableOpacity>
-          )}
+          {/* 2.0: brak przycisku Rozlicz (treningi licza sie pozycyjnie). */}
           {!absenceAsk && !!selSlot.ev?.client_id && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
@@ -862,9 +925,9 @@ function CalendarScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
         </View>
-        {!!selSlot.ev && !selSlot.ev.is_settled && absenceAsk && (
+        {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Czy rozliczyć ten trening?</Text>
+            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Czy trening opłacono?</Text>
           </View>
         )}
       </View>

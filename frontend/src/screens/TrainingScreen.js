@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   TextInput, Alert, ActivityIndicator,
@@ -9,6 +9,7 @@ import { COLORS, SPACING } from '../assets/theme';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import * as api from '../services/api';
+import { showMessage, showError } from '../services/confirm';
 
 export default function TrainingScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
@@ -16,6 +17,13 @@ export default function TrainingScreen({ navigation, route }) {
   const { date: passedDate, hour, replaceClientId } = route.params || {};
   const originalDate = passedDate || '';
   const originalHour = hour != null ? String(hour) : '';
+
+  const passedHourMatches = (ev, h) => {
+    if (!ev) return false;
+    const evHour = ev.event_hour != null ? String(ev.event_hour) : '';
+    const hStr = h != null ? String(h) : '';
+    return ev.event_date === passedDate && evHour === hStr;
+  };
 
   const [clients, setClients] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -38,8 +46,28 @@ export default function TrainingScreen({ navigation, route }) {
   const [note, setNote] = useState('');
   const [dictating, setDictating] = useState(false);
   const [recognition, setRecognition] = useState(null);
-  const [isSettled, setIsSettled] = useState(false);
+  // 2.0: brak stanu rozliczenia — paid (is_settled) tylko z zaladowanego eventu.
   const [isReadyToSave, setIsReadyToSave] = useState(false);
+  // Event zaladowany na wejscie (do blokady zmiany daty startu pakietu).
+  const [loadedEvent, setLoadedEvent] = useState(null);
+  const skipNextAutosaveRef = useRef(false);
+  // T8: klucze stanu ćwiczeń po ID (nazwy z '_' łamały split) — separator
+  // nielegalny w nazwach/ID. Stare klucze part_name nie występują (stan świeży).
+  const exKey = (part, exId) => `${part}|||${exId}`;
+  const parseExKey = (key) => {
+    const i = String(key).lastIndexOf('|||');
+    if (i < 0) return null;
+    return { part: String(key).slice(0, i), exId: String(key).slice(i + 3) };
+  };
+  const findExerciseById = (groups, exId) => {
+    for (const [part, list] of Object.entries(groups || {})) {
+      const ex = (list || []).find(e => String(e.id) === String(exId));
+      if (ex) return { part, ex };
+    }
+    return null;
+  };
+  // T7: mutex zapisów — autosave nie wchodzi w trakcie ręcznego zapisu i odwrotnie.
+  const isSavingRef = useRef(false);
   const [supersetMode, setSupersetMode] = useState({});
   const [supersetSelection, setSupersetSelection] = useState({});
 
@@ -47,53 +75,58 @@ export default function TrainingScreen({ navigation, route }) {
     if (!clientId || !dateStr) return;
     try {
       const logs = await api.getClientWorkouts(clientId, dateStr);
-      if (logs && logs.length > 0) {
-        const newWeights = {};
-        const newAddedParts = [];
-        
-        logs.forEach(log => {
-          let foundPart = null;
-          let foundExName = null;
-          // Sort entries: plan-based parts ("Plan: ...") first, so plan exercises take priority over muscle group duplicates
-          const sortedEntries = Object.entries(groupedExercises || {}).sort(([a], [b]) => {
-            const aPlan = a.startsWith('Plan: ') ? 0 : 1;
-            const bPlan = b.startsWith('Plan: ') ? 0 : 1;
-            return aPlan - bPlan;
-          });
-          for (const [part, list] of sortedEntries) {
-            const ex = list.find(e => e.id === log.exercise_id);
-            if (ex) {
-              foundPart = part;
-              foundExName = ex.name;
-              break;
-            }
-          }
-          if (foundPart && foundExName) {
-            const key = `${foundPart}_${foundExName}`;
-            newWeights[key] = {
-              weight: log.weight_kg !== null ? log.weight_kg.toString() : '0',
-              reps: log.reps !== null ? log.reps.toString() : '',
-            };
-            if (!newAddedParts.includes(foundPart)) {
-              newAddedParts.push(foundPart);
-            }
-          }
-        });
-        
-        setExerciseWeights(newWeights);
-        if (newAddedParts.length > 0) {
-          setSelectedMainGroup(current => current || newAddedParts[0] || '');
-          setAddedParts(current => {
-            if (current && current.length > 0) return current;
-            const main = newAddedParts[0];
-            return newAddedParts.filter(p => p !== main);
-          });
-        }
-      } else {
-        setExerciseWeights({});
-      }
+      mapLogsToState(logs, groupedExercises);
     } catch (e) {
       console.error('Error loading workout logs:', e);
+    }
+  }
+
+  // Czyste mapowanie logow na stan (bez fetch) — do rownoleglego init().
+  function mapLogsToState(logs, groupedExercises) {
+    if (logs && logs.length > 0) {
+      const newWeights = {};
+      const newAddedParts = [];
+
+      logs.forEach(log => {
+        let foundPart = null;
+        let foundExName = null;
+        // Sort entries: plan-based parts ("Plan: ...") first, so plan exercises take priority over muscle group duplicates
+        const sortedEntries = Object.entries(groupedExercises || {}).sort(([a], [b]) => {
+          const aPlan = a.startsWith('Plan: ') ? 0 : 1;
+          const bPlan = b.startsWith('Plan: ') ? 0 : 1;
+          return aPlan - bPlan;
+        });
+        for (const [part, list] of sortedEntries) {
+          const ex = list.find(e => e.id === log.exercise_id);
+          if (ex) {
+            foundPart = part;
+            foundExName = ex.name;
+            break;
+          }
+        }
+        if (foundPart && foundExName) {
+          const key = exKey(foundPart, log.exercise_id);
+          newWeights[key] = {
+            weight: log.weight_kg !== null ? log.weight_kg.toString() : '0',
+            reps: log.reps !== null ? log.reps.toString() : '',
+          };
+          if (!newAddedParts.includes(foundPart)) {
+            newAddedParts.push(foundPart);
+          }
+        }
+      });
+
+      setExerciseWeights(newWeights);
+      if (newAddedParts.length > 0) {
+        setSelectedMainGroup(current => current || newAddedParts[0] || '');
+        setAddedParts(current => {
+          if (current && current.length > 0) return current;
+          const main = newAddedParts[0];
+          return newAddedParts.filter(p => p !== main);
+        });
+      }
+    } else {
+      setExerciseWeights({});
     }
   }
 
@@ -142,13 +175,16 @@ export default function TrainingScreen({ navigation, route }) {
   };
 
   useEffect(() => {
+    let cancelled = false;
     async function init() {
+      const { ev: passedEv } = route.params || {};
       const [cl, wt, mg, ex] = await Promise.all([
         api.getClients().catch(() => []),
         api.getPlans().catch(() => []),
         api.getMuscleGroups().catch(() => []),
         api.getExercisesGrouped().catch(() => ({})),
       ]);
+      if (cancelled) return;
 
       setClients(cl || []);
       setPlans(wt || []);
@@ -163,28 +199,25 @@ export default function TrainingScreen({ navigation, route }) {
       let activeType = '';
       let activePlan = '';
 
-      if (passedDate && hour) {
+      // Fast path: slot z kalendarza ma już cały event (prefetch przy szufladzie).
+      let existingEvent = passedEv && passedDate && passedHourMatches(passedEv, hour) ? passedEv : null;
+      if (passedDate && hour && !existingEvent) {
         try {
-          const existingEvent = await api.getCalendarEvent(passedDate, parseInt(hour));
-          if (existingEvent) {
-            activeClient = existingEvent.client_id || '';
-            activeType = existingEvent.workout_type_id || '';
-            activePlan = existingEvent.plan_id || '';
-            setIsSettled(!!existingEvent.is_settled);
-            setPartnerClient(existingEvent.partner_client_id || '');
-            if (existingEvent.note) {
-              setNote(existingEvent.note);
-            }
-            if (existingEvent.main_group) {
-              setSelectedMainGroup(existingEvent.main_group);
-            }
-            if (existingEvent.added_groups) {
-              setAddedParts(existingEvent.added_groups);
-            }
-          }
+          existingEvent = await api.getCalendarEvent(passedDate, parseInt(hour));
         } catch (err) {
           console.log('No existing calendar event:', err.message);
         }
+      }
+      if (existingEvent) {
+        activeClient = existingEvent.client_id || '';
+        activeType = existingEvent.workout_type_id || '';
+        activePlan = existingEvent.plan_id || '';
+        if (!cancelled) setLoadedEvent(existingEvent);
+        // 2.0: flaga paid zostaje na evencie (do zachowania przy zapisie).
+        setPartnerClient(existingEvent.partner_client_id || '');
+        if (existingEvent.note) setNote(existingEvent.note);
+        if (existingEvent.main_group) setSelectedMainGroup(existingEvent.main_group);
+        if (existingEvent.added_groups) setAddedParts(existingEvent.added_groups);
       }
 
       if (activeClient) {
@@ -193,52 +226,53 @@ export default function TrainingScreen({ navigation, route }) {
           setSelectedType(activeType);
         } else {
           const clObj = (finalCl || []).find(c => c.id === activeClient);
-          if (clObj?.default_workout_type_id) {
-            setSelectedType(clObj.default_workout_type_id);
-          }
+          if (clObj?.default_workout_type_id) setSelectedType(clObj.default_workout_type_id);
         }
         if (activePlan) {
           setSelectedPlan(activePlan);
         } else {
           const clObj = (finalCl || []).find(c => c.id === activeClient);
-          if (clObj?.default_plan_id) {
-            setSelectedPlan(clObj.default_plan_id);
-          }
+          if (clObj?.default_plan_id) setSelectedPlan(clObj.default_plan_id);
         }
       }
 
-      setLoading(false);
+      // Render natychmiast z tego co mamy (słowniki + event), resztę w tle.
+      if (!cancelled) setLoading(false);
+
+      // Plan i logi rownolegle (wczesniej wodospad: plan -> logi = 2x RTT po sobie).
+      const planObj = activePlan ? (wt || []).find(p => p.id === activePlan) : null;
+      const [planExList, logsRaw] = await Promise.all([
+        planObj ? api.getPlanExercises(activePlan).catch(() => []) : Promise.resolve(null),
+        activeClient ? api.getClientWorkouts(activeClient, passedDate || selectedDate).catch(() => []) : Promise.resolve(null),
+      ]);
+      if (cancelled) return;
 
       // If this training has a plan, load its exercises into exercisesByGroup
       let loadedExByGroup = finalEx;
-      if (activePlan) {
-        const plan = (wt || []).find(p => p.id === activePlan);
-        if (plan) {
-          try {
-            const planExList = await api.getPlanExercises(activePlan);
-            const planPartName = `Plan: ${plan.name}`;
-            const mapped = (planExList || []).map(pe => ({
-              id: pe.exercise_id,
-              name: pe.exercises?.name || 'Nieznane',
-              unit: pe.exercises?.unit || 'KG',
-              superset_id: pe.superset_id || null
-            }));
-            loadedExByGroup = { ...finalEx, [planPartName]: mapped };
-            setExercisesByGroup(loadedExByGroup);
-            setAddedParts(prev => prev.includes(planPartName) ? prev : [...prev, planPartName]);
-          } catch (e) {
-            console.log('Failed to load plan exercises for existing event:', e);
-          }
-        }
+      if (planObj && planExList) {
+        const planPartName = `Plan: ${planObj.name}`;
+        const mapped = (planExList || []).map(pe => ({
+          id: pe.exercise_id,
+          name: pe.exercises?.name || 'Nieznane',
+          unit: pe.exercises?.unit || 'KG',
+          superset_id: pe.superset_id || null
+        }));
+        loadedExByGroup = { ...finalEx, [planPartName]: mapped };
+        setExercisesByGroup(loadedExByGroup);
+        setAddedParts(prev => prev.includes(planPartName) ? prev : [...prev, planPartName]);
       }
 
       if (activeClient) {
-        loadClientWorkoutLogs(activeClient, passedDate || selectedDate, loadedExByGroup).finally(() => setIsReadyToSave(true));
+        skipNextAutosaveRef.current = true;
+        mapLogsToState(logsRaw, loadedExByGroup);
+        if (!cancelled) setIsReadyToSave(true);
       } else {
+        skipNextAutosaveRef.current = true;
         setIsReadyToSave(true);
       }
     }
     init();
+    return () => { cancelled = true; };
   }, []);
 
   const removePart = (partName) => {
@@ -354,8 +388,8 @@ export default function TrainingScreen({ navigation, route }) {
     });
   };
 
-  const toggleExercise = (part, exName) => {
-    const key = `${part}_${exName}`;
+  const toggleExercise = (part, exId) => {
+    const key = exKey(part, exId);
     setExerciseWeights(prev => {
       const copy = { ...prev };
       if (copy[key]) {
@@ -367,8 +401,8 @@ export default function TrainingScreen({ navigation, route }) {
     });
   };
 
-  const changeWeight = (part, exName, diff) => {
-    const key = `${part}_${exName}`;
+  const changeWeight = (part, exId, diff) => {
+    const key = exKey(part, exId);
     setExerciseWeights(prev => {
       const current = prev[key] || { weight: '0', reps: '0' };
       let w = parseFloat(current.weight) || 0;
@@ -380,8 +414,8 @@ export default function TrainingScreen({ navigation, route }) {
     });
   };
 
-  const updateWeight = (part, exName, field, val) => {
-    const key = `${part}_${exName}`;
+  const updateWeight = (part, exId, field, val) => {
+    const key = exKey(part, exId);
     setExerciseWeights(prev => {
       const current = prev[key] || { weight: '0', reps: '0' };
       return {
@@ -389,6 +423,27 @@ export default function TrainingScreen({ navigation, route }) {
         [key]: { ...current, [field]: val },
       };
     });
+  };
+
+  // T8: wspólne budowanie listy ćwiczeń z kluczy ID — bez dzielenia nazw.
+  // Nierozpoznany wpis BLOKUJE zapis (zwraca unknown>0), nigdy nie znika po cichu.
+  const buildExercisesFromState = () => {
+    const exercises = [];
+    let unknown = 0;
+    Object.entries(exerciseWeights).forEach(([key, val]) => {
+      const parsed = parseExKey(key);
+      const hit = parsed ? findExerciseById(exercisesByGroup, parsed.exId) : null;
+      if (hit) {
+        exercises.push({
+          exercise_id: hit.ex.id,
+          weight_kg: parseFloat(val.weight) || 0,
+          reps: parseInt(val.reps) || 0,
+        });
+      } else {
+        unknown += 1;
+      }
+    });
+    return { exercises, unknown };
   };
 
   const toggleDictation = () => {
@@ -437,74 +492,24 @@ export default function TrainingScreen({ navigation, route }) {
     }
   };
 
-  async function handleSettle() {
-    if (!selectedClient) {
-      Alert.alert('Błąd', 'Wybierz podopiecznego.');
-      return;
-    }
-    if (!selectedDate || !selectedHour) {
-      Alert.alert('Błąd', 'Brak daty lub godziny.');
-      return;
-    }
-
-    try {
-      const clientObj = clients.find(c => c.id === selectedClient);
-      let showSoftClose = false;
-
-      // Smart Rozliczenia i Poka-Yoke
-      if (clientObj && clientObj.billing_type === 'package') {
-        const pkgs = await api.getClientPackages(selectedClient);
-        const activePkg = pkgs.find(p => p.end_training_id === null);
-        
-        if (!activePkg) {
-           Alert.alert('Brak pakietu 🐶', 'Ten podopieczny nie ma aktywnego pakietu. Przejdź najpierw do zakładki Rozliczenia, by go utworzyć, zanim rozliczysz trening.');
-           return; 
-        }
-
-        const evs = await api.getCalendarEvents(null, null, selectedClient);
-        const sorted = (evs || []).sort((a,b) => {
-            if (a.event_date === b.event_date) return a.event_hour - b.event_hour;
-            return new Date(a.event_date) - new Date(b.event_date);
-        });
-        
-        const startIndex = sorted.findIndex(e => e.id === activePkg.start_training_id);
-        
-        if (startIndex !== -1) {
-            let settledCount = activePkg.offset;
-            for (let i = startIndex; i < sorted.length; i++) {
-                if (sorted[i].is_settled) settledCount++;
-            }
-            
-            const thisEv = sorted.find(e => e.event_date === selectedDate && e.event_hour === parseInt(selectedHour));
-            if (!thisEv || !thisEv.is_settled) {
-                settledCount++;
-            }
-            
-            if (settledCount === activePkg.size) {
-                showSoftClose = true;
-            }
-        }
-      }
-
-      await api.settleWorkout(selectedDate, parseInt(selectedHour));
-      setIsSettled(true);
-      
-      if (showSoftClose) {
-          Alert.alert('Ostatni trening 🐶', 'Trening został rozliczony. UWAGA: To był ostatni trening w pakiecie. Pamiętaj, by zamknąć go w Rozliczeniach.');
-      } else {
-          Alert.alert('Sukces', 'Trening został rozliczony.');
-      }
-    } catch (e) {
-      Alert.alert('Błąd', e.message);
-    }
-  }
+  // 2.0: brak recznego rozliczania (handleSettle usuniety) — treningi licza
+  // sie pozycyjnie; is_settled znaczy wylacznie "oplacone" przy odwolanym.
 
   async function handleSave() {
     if (!selectedClient) {
       Alert.alert('Błąd', 'Wybierz podopiecznego.');
       return;
     }
-
+    // Startu pakietu nie przenosimy z ekranu Treningu (DELETE+CREATE gubilby
+    // kotwice pakietu). Do przenoszenia sluzy przycisk Przenies w kalendarzu.
+    if (loadedEvent?.is_start_of_package && originalDate && originalHour
+        && (originalDate !== selectedDate || originalHour !== String(selectedHour))) {
+      Alert.alert(
+        'Punkt Startowy 🐶',
+        'Ten trening rozpoczyna pakiet. Daty startu nie zmienisz tutaj — użyj przycisku Przenieś w kalendarzu albo wskaż nowy start w Rozliczeniach.'
+      );
+      return;
+    }
 
     const payload = {
       client_id: selectedClient,
@@ -514,7 +519,8 @@ export default function TrainingScreen({ navigation, route }) {
       event_date: selectedDate,
       event_hour: parseInt(selectedHour) || 12,
       note: note,
-      is_settled: isSettled,
+      // 2.0: paid zachowane z treningu (odwolany-oplacony), nowe zawsze false.
+      is_settled: !!loadedEvent?.is_settled,
       main_group: selectedMainGroup,
       added_groups: addedParts,
       exercises: [],
@@ -522,29 +528,36 @@ export default function TrainingScreen({ navigation, route }) {
       replaced_client_id: replaceClientId || null,
     };
 
-    Object.entries(exerciseWeights).forEach(([key, val]) => {
-      const [part, exName] = key.split('_');
-      const groupList = exercisesByGroup[part] || [];
-      const exObj = groupList.find(e => e.name === exName);
-      if (exObj) {
-        payload.exercises.push({
-          exercise_id: exObj.id,
-          weight_kg: parseFloat(val.weight) || 0,
-          reps: parseInt(val.reps) || 0,
-        });
-      }
-    });
+    // T8: nierozpoznane ćwiczenie blokuje zapis (nie czyści logów pustym batchem).
+    const built = buildExercisesFromState();
+    if (built.unknown > 0) {
+      Alert.alert(
+        'Błąd',
+        'Nie rozpoznano części ćwiczeń — zapis zablokowany, aby nie usunąć danych. Odśwież słowniki i spróbuj ponownie.'
+      );
+      return;
+    }
+    payload.exercises = built.exercises;
 
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       // If date or hour changed, remove the old calendar entry
       if (originalDate && originalHour && (originalDate !== selectedDate || originalHour !== selectedHour)) {
-        api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10)).catch(() => {});
+        try {
+          await api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10));
+        } catch (e) {
+          Alert.alert('Błąd', 'Nie udało się przenieść treningu: ' + e.message);
+          return;
+        }
       }
       await api.saveCalendarWorkout(payload);
-      Alert.alert('Sukces', 'Trening został zapisany.');
+      showMessage('Sukces', 'Trening został zapisany.');
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Błąd', e.message);
+      showError(e.message);
+    } finally {
+      isSavingRef.current = false;
     }
   }
 
@@ -562,7 +575,8 @@ export default function TrainingScreen({ navigation, route }) {
         event_date: selectedDate,
         event_hour: parseInt(selectedHour) || 12,
         note: note,
-        is_settled: isSettled,
+        // 2.0: paid zachowane z treningu, nowe zawsze false.
+        is_settled: !!loadedEvent?.is_settled,
         main_group: selectedMainGroup,
         added_groups: addedParts,
         exercises: [],
@@ -570,34 +584,52 @@ export default function TrainingScreen({ navigation, route }) {
         replaced_client_id: replaceClientId || null,
       };
 
-      Object.entries(exerciseWeights).forEach(([key, val]) => {
-        const [part, exName] = key.split('_');
-        const groupList = exercisesByGroup[part] || [];
-        const exObj = groupList.find(e => e.name === exName);
-        if (exObj) {
-          payload.exercises.push({
-            exercise_id: exObj.id,
-            weight_kg: parseFloat(val.weight) || 0,
-            reps: parseInt(val.reps) || 0,
-          });
-        }
-      });
 
+      // T8: autosave nigdy nie wysyła pustego/niekompletnego batcha (nie czyści logów).
+      const built = buildExercisesFromState();
+      if (built.unknown > 0) {
+        if (__DEV__) console.error('Autosave skipped: unknown exercises.');
+        return;
+      }
+      if (Object.keys(exerciseWeights).length > 0 && built.exercises.length === 0) {
+        if (__DEV__) console.error('Autosave skipped: empty exercise payload.');
+        return;
+      }
+      payload.exercises = built.exercises;
+
+      // Start pakietu: autosave nie rusza daty (jak handleSave — tylko Przenies).
+      const startMoved = loadedEvent?.is_start_of_package && originalDate && originalHour
+        && (originalDate !== selectedDate || originalHour !== String(selectedHour));
+      if (isSavingRef.current) return;
+      isSavingRef.current = true;
       try {
         // If date or hour changed, remove the old calendar entry
-        if (originalDate && originalHour && (originalDate !== selectedDate || originalHour !== selectedHour)) {
-          api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10)).catch(() => {});
+        if (!startMoved && originalDate && originalHour && (originalDate !== selectedDate || originalHour !== selectedHour)) {
+          try {
+            await api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10));
+          } catch (e) {
+            if (__DEV__) console.error('Autosave move failed:', e.message);
+            return;
+          }
         }
-        await api.saveCalendarWorkout(payload);
-        console.log('Real-time workout autosave successful.');
+        if (!startMoved) {
+          await api.saveCalendarWorkout(payload);
+        }
+        if (__DEV__) console.log('Real-time workout autosave successful.');
       } catch (err) {
-        console.error('Real-time workout autosave error:', err.message);
+        if (__DEV__) console.error('Real-time workout autosave error:', err.message);
+      } finally {
+        isSavingRef.current = false;
       }
     };
 
     const timer = setTimeout(() => {
+      if (skipNextAutosaveRef.current) {
+        skipNextAutosaveRef.current = false;
+        return;
+      }
       performAutoSave();
-    }, 800);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [
@@ -610,7 +642,6 @@ export default function TrainingScreen({ navigation, route }) {
     addedParts,
     exerciseWeights,
     note,
-    isSettled,
     isReadyToSave,
     exercisesByGroup
   ]);
@@ -719,7 +750,7 @@ export default function TrainingScreen({ navigation, route }) {
               </View>
             </View>
             {(exercisesByGroup[part] || []).map((ex, exIdx) => {
-              const key = `${part}_${ex.name}`;
+              const key = exKey(part, ex.id);
               const selected = !!exerciseWeights[key];
               const isLinkedToNext = ex.superset_id && exercisesByGroup[part][exIdx + 1] && exercisesByGroup[part][exIdx + 1].superset_id === ex.superset_id;
               const isLinkedToPrev = ex.superset_id && exIdx > 0 && exercisesByGroup[part][exIdx - 1].superset_id === ex.superset_id;
@@ -754,7 +785,7 @@ export default function TrainingScreen({ navigation, route }) {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.leftCol}
-                          onPress={() => supersetMode[part] ? handleSelectForSuperset(part, exIdx) : toggleExercise(part, ex.name)}
+                          onPress={() => supersetMode[part] ? handleSelectForSuperset(part, exIdx) : toggleExercise(part, ex.id)}
                           activeOpacity={0.7}
                         >
                         {supersetMode[part] ? (
@@ -776,7 +807,7 @@ export default function TrainingScreen({ navigation, route }) {
                         <View style={styles.stepperContainer}>
                           <TouchableOpacity
                             style={styles.stepperBtn}
-                            onPress={() => changeWeight(part, ex.name, -2.5)}
+                            onPress={() => changeWeight(part, ex.id, -2.5)}
                             activeOpacity={0.7}
                           >
                             <Text style={styles.stepperBtnText}>-</Text>
@@ -786,7 +817,7 @@ export default function TrainingScreen({ navigation, route }) {
                             <TextInput
                               style={styles.stepperInput}
                               value={exerciseWeights[key]?.weight || '0'}
-                              onChangeText={v => updateWeight(part, ex.name, 'weight', v)}
+                              onChangeText={v => updateWeight(part, ex.id, 'weight', v)}
                               keyboardType="decimal-pad"
                             />
                             <Text style={[styles.stepperUnit, { pointerEvents: 'none' }]}>{ex.unit || 'KG'}</Text>
@@ -794,14 +825,14 @@ export default function TrainingScreen({ navigation, route }) {
 
                           <TouchableOpacity
                             style={styles.stepperBtn}
-                            onPress={() => changeWeight(part, ex.name, 2.5)}
+                            onPress={() => changeWeight(part, ex.id, 2.5)}
                             activeOpacity={0.7}
                           >
                             <Text style={styles.stepperBtnText}>+</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={{ marginLeft: 6, padding: 4 }}
-                            onPress={() => toggleExercise(part, ex.name)}
+                            onPress={() => toggleExercise(part, ex.id)}
                           >
                             <Ionicons name="close-circle" size={20} color={themeColors.textMuted} />
                           </TouchableOpacity>
@@ -833,7 +864,7 @@ export default function TrainingScreen({ navigation, route }) {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.leftCol}
-                          onPress={() => supersetMode[part] ? handleSelectForSuperset(part, exIdx) : toggleExercise(part, ex.name)}
+                          onPress={() => supersetMode[part] ? handleSelectForSuperset(part, exIdx) : toggleExercise(part, ex.id)}
                           activeOpacity={0.7}
                         >
                           {supersetMode[part] ? (
@@ -876,23 +907,7 @@ export default function TrainingScreen({ navigation, route }) {
         </View>
         <TextInput style={[styles.input, { minHeight: 60 }]} value={note} onChangeText={setNote} placeholder="Opcjonalna notatka..." placeholderTextColor={themeColors.textMuted} multiline />
 
-        {/* Settle Workout */}
-        {passedDate && hour && (
-          isSettled ? (
-            <View style={styles.settleInfoBox}>
-              <Ionicons name="checkmark-circle" size={20} color={C.accent} />
-              <Text style={styles.settleInfoText}>TRENING ROZLICZONY</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.settleBtn}
-              onPress={handleSettle}
-            >
-              <Ionicons name="cash-outline" size={20} color={themeColors.background} />
-              <Text style={styles.settleBtnText}>ROZLICZ TRENING</Text>
-            </TouchableOpacity>
-          )
-        )}
+        {/* 2.0: brak przycisku rozliczania. Oplacone odwolanie widac w historii. */}
 
         {/* Save */}
         <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.lg }}>
@@ -1023,10 +1038,6 @@ function makeStyles(accent, TC) {
       fontSize: 8,
       fontWeight: '600',
     },
-    settleBtn: { backgroundColor: accent, borderRadius: 12, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: SPACING.md },
-    settleInfoBox: { backgroundColor: accent + '10', borderWidth: 1, borderColor: accent + '30', borderRadius: 12, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: SPACING.md },
-    settleBtnText: { color: TC.background, fontWeight: '700', fontSize: 14 },
-    settleInfoText: { color: TC.text, fontWeight: '700', fontSize: 14 },
     cancelBtn: { flex: 1, backgroundColor: TC.surface, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: TC.border },
     cancelBtnText: { color: TC.textSecondary, fontWeight: '700', fontSize: 13 },
     saveBtn: { flex: 2, backgroundColor: accent, borderRadius: 12, padding: 16, alignItems: 'center' },

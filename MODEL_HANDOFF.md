@@ -1,5 +1,12 @@
 # Model Handoff — Atylla Pro
 
+## MIGRACJA 1.6.7 → 2.0.0-dev — 2026-09-12 (BEZ panelu klienta, BEZ deploya)
+- Backup: `C:\Projects\Backups\atylla-pro\pre-2.0-migration-20260912\` — 2 bundle (oba `verify` OK, drugi zawiera też stash) + manifest. Stash `stash@{0}` = cała praca 1.7 (portal). Workdir startował czysty z 93b0be6.
+- Backend: main.py (T1 traversal, generyczny 500, jawny CORS, bez dayclose/portalu, 2.0.0-dev) + kopiowane routery calendar/clients/workouts/email (T2/T4/T5/T6/T7/T9/T10, start/end-at, close-cycle, week-summary). Usunięte: dayclose.py, debug.py (martwy). Migracje 004 + 006 do wklejenia RAZ (najpierw testowy Supabase) — NIE wklejone.
+- Frontend: kopiowane Calendar/Training/Payments/Reports/Manager/WeekSummary(now)/confirm(now) + App.js (WeekSummary zamiast DayClose) + Hamburger (TYDZIEŃ) + AppLayout (przycisk TYDZIEŃ) + api.js (2.0 minus portal, dev→8000). Pomiary/Auth/Login/Clients bez zmian (1.6.7, bez portalu). Wersja 2.0.0-dev w 4 miejscach.
+- Odbiór: py_compile OK, node --check 10 plików OK, TestClient: 77 tras (98−22 portal+close-cycle), T1 brak wycieku, T2 401. Brak deploya, brak migracji DB, brak maili.
+- Następny krok: Twoje klikanie na 8000/3001 (konto testowe) → decyzja o deployu `./deploy.ps1 -Version "2.0.0"` (ustawi prod API + bundle + push + LOG). Przed deployem wkleić 004+006 na PROD Supabase.
+
 ## SESJA 2026-09-06 — v1.6.2 WDROŻONE (GitHub + Railway) — FIX GIFÓW
 - Commit 8dc061b + tagi v1.6.2/backup-v1.6.2 wypushowane na master 06.09. Railway przebudowuje automatycznie.
 - Produkcja: **v1.6.2**. Przyczyna braku gifów: deploy nie kopiował frontend/dist/assets. Fix w deploy.ps1 + gify w backend/static/assets/assets/exercise-gifs (5 plików).
