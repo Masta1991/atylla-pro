@@ -46,6 +46,8 @@ export default function PaymentsScreen({ navigation, route }) {
   const [packageOffset, setPackageOffset] = useState('0');
   const [sharedEnabled, setSharedEnabled] = useState(false);
   const [sharedIds, setSharedIds] = useState([]);
+  // Typ rozliczenia wybierany PRZY STARCIE (nie w karcie klienta).
+  const [billingChoice, setBillingChoice] = useState('package');
 
   // Unia eventów klienta + członków wspólnej puli (do liczenia i pickerów).
   const fetchUnionEvents = async (client) => {
@@ -100,18 +102,21 @@ export default function PaymentsScreen({ navigation, route }) {
   );
 
   // Deep-link z kalendarza (tryb PAKIET): otworz rozliczenia wskazanego klienta.
+  // Z szuflady (openStart): od razu modal startu rozliczenia.
   const deepLinkHandled = useRef(null);
   const deepClientId = route?.params?.clientId;
+  const deepOpenStart = route?.params?.openStart;
   useEffect(() => {
-    if (deepClientId && clients.length > 0 && deepLinkHandled.current !== deepClientId) {
+    if (deepClientId && clients.length > 0 && deepLinkHandled.current !== deepClientId + (deepOpenStart ? ':start' : '')) {
       const target = clients.find(c => c.id === deepClientId);
       if (target) {
-        deepLinkHandled.current = deepClientId;
-        navigation.setParams({ clientId: null });
-        openHistory(target);
+        deepLinkHandled.current = deepClientId + (deepOpenStart ? ':start' : '');
+        navigation.setParams({ clientId: null, openStart: null });
+        if (deepOpenStart) handleOpenStartBilling(target);
+        else openHistory(target);
       }
     }
-  }, [deepClientId, clients]);
+  }, [deepClientId, deepOpenStart, clients]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -139,6 +144,7 @@ export default function PaymentsScreen({ navigation, route }) {
       setPackageOffset('0');
       setSharedEnabled(false);
       setSharedIds([]);
+      setBillingChoice(client.billing_type === 'single' ? 'single' : 'package');
       setStartBillingModalVisible(true);
     } catch(e) {
       Alert.alert('Błąd', 'Nie można pobrać wydarzeń klienta.');
@@ -148,7 +154,8 @@ export default function PaymentsScreen({ navigation, route }) {
   const executeStartBilling = async () => {
     if (!selectedClient) return;
 
-    const isPackage = selectedClient.billing_type === 'package';
+    // Typ z modala (nie z karty klienta); typ zapisuje się na kliencie.
+    const isPackage = billingChoice === 'package';
     if (isPackage && !startEventId) {
       if (Platform.OS === 'web') window.alert('Błąd: Dla pakietów SSOT musisz wskazać trening startowy.');
       else Alert.alert('Błąd', 'Dla pakietów SSOT musisz wskazać trening startowy.');
@@ -168,8 +175,10 @@ export default function PaymentsScreen({ navigation, route }) {
             offset: parseInt(packageOffset, 10) || 0,
             shared_client_ids: sharedEnabled ? sharedIds : []
           });
+          await api.updateClient(selectedClient.id, { billing_type: 'package' });
       } else {
           await api.updateClient(selectedClient.id, {
+              billing_type: 'single',
               package_purchase_date: startEv?.event_date || new Date().toISOString().split('T')[0],
               shared_monthly_with: sharedEnabled ? sharedIds : []
           });
@@ -925,16 +934,31 @@ export default function PaymentsScreen({ navigation, route }) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: 'auto' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rozpocznij {selectedClient?.billing_type === 'package' ? 'Nowy Pakiet' : 'Nowe Rozliczanie'}</Text>
+              <Text style={styles.modalTitle}>Rozpocznij {billingChoice === 'package' ? 'Nowy Pakiet' : 'Nowe Rozliczanie'}</Text>
               <TouchableOpacity onPress={() => setStartBillingModalVisible(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.modalSubtitle}>{selectedClient?.name}</Text>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>1. {selectedClient?.billing_type === 'package' ? 'Wskaż trening startowy' : 'Trening początkowy (opcjonalnie)'}</Text>
+              <Text style={styles.label}>Rodzaj rozliczenia</Text>
+              <DropdownPicker
+                placeholder="Wybierz rodzaj..."
+                selectedValue={billingChoice}
+                onValueChange={setBillingChoice}
+                style={styles.pickerWrap}
+                dropdownIconColor={themeColors.textSecondary}
+                items={[
+                  { label: 'Pakiet (pula treningów)', value: 'package', color: themeColors.text },
+                  { label: 'Miesięczny (cykl od daty)', value: 'single', color: themeColors.text },
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>1. {billingChoice === 'package' ? 'Wskaż trening startowy' : 'Trening początkowy (opcjonalnie)'}</Text>
               <DropdownPicker
                   placeholder="Wybierz trening z kalendarza..."
                   selectedValue={startEventId}
@@ -945,7 +969,7 @@ export default function PaymentsScreen({ navigation, route }) {
               />
             </View>
 
-            {selectedClient?.billing_type === 'package' && (
+            {billingChoice === 'package' && (
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
                   <Text style={styles.label}>2. Wielkość puli</Text>
@@ -1008,7 +1032,7 @@ export default function PaymentsScreen({ navigation, route }) {
             )}
 
             <TouchableOpacity style={[styles.btn, styles.btnPrimary, { marginTop: 16 }]} onPress={executeStartBilling}>
-              <Text style={styles.btnPrimaryText}>{selectedClient?.billing_type === 'package' ? 'Otwórz Pakiet (SSOT)' : 'Rozpocznij rozliczanie'}</Text>
+              <Text style={styles.btnPrimaryText}>{billingChoice === 'package' ? 'Otwórz Pakiet (SSOT)' : 'Rozpocznij rozliczanie'}</Text>
             </TouchableOpacity>
           </View>
         </View>

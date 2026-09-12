@@ -565,6 +565,11 @@ def create_client_package(client_id: str, data: ClientPackageCreate, request: Re
     payload["client_id"] = client_id
     payload["trainer_id"] = user_id
     res = supabase.table("client_packages").insert(payload).execute()
+    # Typ rozliczenia ustawia się SAM przy starcie (nie ma go w karcie klienta).
+    try:
+        supabase.table("clients").update({"billing_type": "package", "updated_at": utcnow_iso()}).eq("id", client_id).execute()
+    except Exception:
+        pass
     return res.data[0]
 
 
@@ -607,9 +612,7 @@ def start_package_at(client_id: str, data: PackageStartAtRequest, request: Reque
     """2.0: start pakietu z poziomu kalendarza (szuflada). Tylko pakiety solo
     (wspoldzielone zakladamy w Rozliczeniach)."""
     supabase, user_id = get_user_supabase(request)
-    client = _client_must_be_mine(supabase, user_id, client_id)
-    if client.get("billing_type") != "package":
-        raise HTTPException(400, "To nie jest klient pakietowy")
+    _client_must_be_mine(supabase, user_id, client_id)
     existing = supabase.table("client_packages").select("id").eq("client_id", client_id).is_("end_training_id", None).execute()
     if existing.data:
         raise HTTPException(400, "Klient ma juz aktywny pakiet — najpierw go zakoncz")
@@ -626,6 +629,10 @@ def start_package_at(client_id: str, data: PackageStartAtRequest, request: Reque
         "size": size, "start_training_id": data.event_id, "offset": 0,
         "shared_client_ids": [],
     }).execute()
+    try:
+        supabase.table("clients").update({"billing_type": "package", "updated_at": utcnow_iso()}).eq("id", client_id).execute()
+    except Exception:
+        pass
     return res.data[0]
 
 
