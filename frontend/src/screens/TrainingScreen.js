@@ -537,15 +537,8 @@ export default function TrainingScreen({ navigation, route }) {
       );
       return;
     }
-    // Pusty trening (nie wybrano ćwiczeń — np. pusta Główna partia): po polsku,
-    // bez wołania backendu. Czyszczenie dnia robi się przyciskiem Usuń.
-    if (built.exercises.length === 0) {
-      showMessage(
-        'Pusty trening',
-        'Nie zaznaczono żadnych ćwiczeń — wybierz Główną partię i zaznacz ćwiczenia, potem zapisz.'
-      );
-      return;
-    }
+    // Bez ćwiczeń też wolno zapisać — sam wpis w kalendarzu (logi nietknięte).
+    // Czyszczenie dnia robi się przyciskiem Usuń.
     payload.exercises = built.exercises;
 
     if (isSavingRef.current) return;
