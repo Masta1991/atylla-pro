@@ -19,13 +19,6 @@ def _str_ids(v):
     return out
 
 
-def _stg(name):
-    # Tymczasowa diagnostyka pustej apki (2.0.5): znaczniki etapów lądują
-    # na stdout → logi Railway. Do usunięcia po namierzeniu padającego zapytania.
-    import sys as _sys
-    print(f"[weekdiag] {name}", file=_sys.stderr, flush=True)
-
-
 def _slot_done(event_date: str, event_hour: int) -> bool:
     """2.0: slot odbyty = minela pelna godzina slotu w Europe/Warsaw."""
     try:
@@ -108,15 +101,11 @@ def assign_chronological_numbers(events, supabase):
     ]))
     
     if not client_ids:
-        _stg("assign-empty")
         return events
 
-    _stg(f"pkgs-start n={len(client_ids)}")
     pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).limit(5000).execute()
     packages = pkgs_res.data or []
-    _stg(f"pkgs-done n={len(packages)}")
     # Pakiety współdzielone, w których członek (nie właściciel) ma eventy w zakresie.
-    _stg("shared-filter-start")
     try:
         extra_res = supabase.table("client_packages").select("*").filter(
             "shared_client_ids", "ov", "{" + ",".join(client_ids) + "}").limit(5000).execute()
@@ -128,7 +117,6 @@ def assign_chronological_numbers(events, supabase):
     except Exception:
         pass
     # Miesięczne współdzielenie: {cid: [member ids]} (puste pre-migracja).
-    _stg("monthly-start")
     monthly_shares = {}
     try:
         sh_res = supabase.table("clients").select("id,shared_monthly_with").in_("id", client_ids).execute()
@@ -161,7 +149,6 @@ def assign_chronological_numbers(events, supabase):
     # Nieobecności: trening nierozliczony z absencją = odwołany w porę,
     # wypada z numeracji (jak usunięty). Rozliczony z absencją zostaje.
     # Zakres: klienci z zapytania + członkowie wspólnych pul.
-    _stg("abs-start")
     abs_set = set()
     try:
         abs_res = supabase.table("absences").select("client_id,absence_date,absence_hour").in_("client_id", _fetch_ids).limit(5000).execute()
@@ -174,7 +161,6 @@ def assign_chronological_numbers(events, supabase):
         return (cid, ev_date, ev_hour) in abs_set or (cid, ev_date, None) in abs_set
     
     # Retrieve all client calendar events with pagination to avoid 1000-row PostgREST truncation
-    _stg(f"pages-start fetch={len(_fetch_ids)}")
     all_events_data = []
     page = 0
     page_size = 1000
@@ -192,7 +178,6 @@ def assign_chronological_numbers(events, supabase):
         if len(chunk) < page_size:
             break
         page += 1
-    _stg(f"pages-done total={len(all_events_data)}")
         
     all_client_events = {}
     client_info = {}
@@ -484,9 +469,7 @@ def assign_chronological_numbers(events, supabase):
                     
             ev["clients"]["has_active_billing_or_history"] = has_active_or_history
 
-    _stg("encode-start")
     pmap = _partner_names(supabase, events)
-    _stg("partner-done")
     for ev in events:
         pid = ev.get("partner_client_id")
         if pid and str(pid) in pmap:
@@ -530,7 +513,6 @@ def get_week_events(monday_date: str, request: Request):
 
     def _load():
         # Jawna lista kolumn zamiast * (lżejszy transfer niż pełne wiersze).
-        _stg("week-select-start")
         res = (
             supabase.table("calendar_events")
             .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
@@ -539,10 +521,8 @@ def get_week_events(monday_date: str, request: Request):
             .order("event_date,event_hour")
             .execute()
         )
-        _stg(f"week-select-done rows={(len(res.data) if res.data else 0)}")
         events = res.data or []
         out = assign_chronological_numbers(events, supabase)
-        _stg(f"assign-done events={len(out)}")
         return out
 
     try:
