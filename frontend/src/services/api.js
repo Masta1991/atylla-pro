@@ -305,13 +305,22 @@ export function updateCalendarEvent(date, hour, data) {
   return request(`/calendar/${date}/${hour}`, { method: 'PUT', body: data });
 }
 
-export function deleteCalendarEvent(date, hour, paid = false) {
-  // T4: atomowe odwołanie — flaga paid jedzie w tym samym requeście,
-  // brak osobnego settle przed delete (wyścig z audytu).
+export function deleteCalendarEvent(date, hour) {
+  // Usuń = TWARDE usunięcie wiersza (przypadek/test). Licznik pakietu
+  // przelicza się sam; kotwica aktywnego pakietu → 400 (przepływ delete-start).
   invalidateCache('calendar');
   invalidateCache('workouts');
   invalidateCache('clients');
-  return request(`/calendar/${date}/${hour}${paid ? '?paid=true' : ''}`, { method: 'DELETE' });
+  return request(`/calendar/${date}/${hour}`, { method: 'DELETE' });
+}
+
+export function deletePackageStart(date, hour, body) {
+  // Usunięcie początku pakietu: probe (sonda) / cancel (anuluj pakiet)
+  // / repoint (nowy początek). Backend liczy przyszłe treningi pakietu.
+  invalidateCache('calendar');
+  invalidateCache('workouts');
+  invalidateCache('clients');
+  return request(`/calendar/${date}/${hour}/delete-start`, { method: 'POST', body });
 }
 
 export function getCalendarStats(months) {
