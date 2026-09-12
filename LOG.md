@@ -1,5 +1,12 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.0 WDROŻONE (GitHub + Railway) — audyt T1–T11 + migracja 2.0 bez portalu
+- Commit c07681d + tagi v2.0.0/backup-v2.0.0 wypchnięte na master 12.09. Railway przebudowuje automatycznie.
+- Zakres: fixy audytu (T1 traversal, T2 auth maili, T3 env API, T4 atomowe odwołanie, T5/T6 pula+own-wins, T7 guarded batch, T8 klucze po ID, T9 close-cycle, T10 paginacja, T11 confirm.js), WeekSummary zamiast DayClose (DayClose usunięty), liczenie pozycyjne. Bez panelu klienta.
+- Bundle web index-ed9bbaf4 (1.6MB, 634 moduły) wskazuje prod Railway (zweryfikowane w bundle, brak localhost). Backend /version 2.0.0, 77 tras.
+- Backup pre-migracyjny: C:\Projects\Backups\atylla-pro\pre-2.0-migration-20260912\ (bundle + stash 1.7).
+- DO WKLADZENIA na PROD Supabase (raz, SQL Editor): database/migrations/004_case_insensitive_uniques.sql i 006_save_workout_batch_atomic.sql — aplikacja działa bez nich (fallback), ale 006 daje atomowość, a 004 unikalność słowników.
+
 ## 2026-08-09 — Wdrożenie Standardu Zarządzania i Skilla QA
 - **Zakres**: Wdrożenie pełnego pakietu governance wzorowanego na projekcie Jarvis (`AGENTS.md`, `PROJECT.md`, `implementation_plan.md`, `MODEL_HANDOFF.md`, `ATYLLA_INSTRUKCJA.md`, `memory/decisions.md`, `BACKUP_POLICY.md`).
 - **Wynik**: Struktura zarządzania projektem zsynchronizowana ze standardem korporacyjnym.
