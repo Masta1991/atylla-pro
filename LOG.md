@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.17: duchy usuniętych bez numerów (fix 1,3 Ewy)
+- Usunięte wiersze (np. Nieobecność bez płatności) zajmowały pozycje na kafelkach. Od teraz pomijane w numeracji miesięcznej. Deploy ./deploy.ps1 -Version 2.0.17 (bundle index-2eb758f0, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.16: jeden licznik + numery w tygodniu + jeden start
 - Bezpłatne odwołanie bez numeru (kafelek dogania licznik; Ewa: 1, –, 2). Numery [n/rozmiar] w Podsumowaniu tygodnia. Jeden przycisk „Rozpocznij pakiet” w szufladzie (panel: Pakiet/Miesięczny + rozmiar z palca). Starty na domkniętych zakresach ukryte + blokada w backendzie. Deploy ./deploy.ps1 -Version 2.0.16 (bundle index-1a58aa84, Railway przebudowuje).
 
