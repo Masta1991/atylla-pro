@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.15: typ i rozmiar przy starcie (nie w karcie klienta)
+- Z formularza klienta zniknęły: forma płatności, wielkość pakietu, data startu. Typ ustawia się sam przy starcie (pakiet/cykl), rozmiar z palca w modalu. Szuflada: „brak pakietu” bez rozliczenia + oba przyciski startu (pakiet → modal w Rozliczeniach, cykl od daty slotu). Historia i otwarte pakiety nietknięte (bez migracji). Deploy ./deploy.ps1 -Version 2.0.15 (bundle index-8ac7a876, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.14: koniec duchów ../10 na kafelkach
 - Kafelek brał rozmiar ze starej kolumny clients.package_size (stąd 1/10 przy pakiecie 7). Backend zeruje ją bez danych SSOT, frontend rysuje /rozmiar tylko gdy znany. Deploy ./deploy.ps1 -Version 2.0.14 (bundle index-6e3f7cb5, Railway przebudowuje).
 
