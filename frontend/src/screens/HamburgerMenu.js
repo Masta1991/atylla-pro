@@ -9,8 +9,8 @@ import { useTheme } from '../context/ThemeContext';
 const MENU_ITEMS = [
   { label: 'Klienci', icon: 'people', screen: 'Clients' },
   { label: 'Rozliczenia', icon: 'card-outline', screen: 'Payments' },
-  { label: 'Zamknij dzień', icon: 'checkmark-done-outline', screen: 'DayClose' },
   { label: 'Strefa Trenera', icon: 'trending-up', screen: 'Results' },
+  { label: 'Podsumowanie tygodnia', icon: 'calendar-outline', screen: 'WeekSummary' },
   { label: 'Absencje', icon: 'calendar-clear-outline', screen: 'Absences' },
   { label: 'Pomiary', icon: 'body', screen: 'Measurements' },
   { label: 'Raporty', icon: 'bar-chart', screen: 'Reports' },

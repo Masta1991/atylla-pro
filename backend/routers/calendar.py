@@ -19,6 +19,22 @@ def _str_ids(v):
     return out
 
 
+def _slot_done(event_date: str, event_hour: int) -> bool:
+    """2.0: slot odbyty = minela pelna godzina slotu w Europe/Warsaw."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime as _dt
+        WARSAW = ZoneInfo("Europe/Warsaw")
+        now = _dt.now(WARSAW)
+        y, m, d = (int(x) for x in str(event_date).split("-"))
+        h = int(event_hour)
+        if h + 1 >= 24:
+            return now.date().isoformat() > str(event_date)
+        return now > _dt(y, m, d, h + 1, 0, 0, tzinfo=WARSAW)
+    except Exception:
+        return False
+
+
 def _partner_names(supabase, events):
     """Imiona współćwiczących hurtem; puste pre-migracja (brak kolumny)."""
     pids = {str(e.get("partner_client_id")) for e in events if e.get("partner_client_id")}
@@ -267,15 +283,23 @@ def assign_chronological_numbers(events, supabase):
 
                     e_id = e["id"]
 
-                    # Pozycja = kolejnosc WSZYSTKICH zapisow w cyklu (nie tylko rozliczonych),
-                    # zeby kazdy trening mial od razu swoj docelowy numer.
+                    # 2.0: liczenie POZYCYJNE — kazdy trening wliczony do cyklu
+                    # (aktywny lub odwolany-oplacony) ma numer i liczy sie do
+                    # stanu. Znak $ nie bierze udzialu w liczeniu; is_settled
+                    # znaczy wylacznie "oplacone" przy odwolanym treningu.
+                    # tile_number (pozycja) zawsze rosnie; licznik rozliczen
+                    # (current_count) tylko za odbyte + odwolane-oplacone.
                     position += 1
                     event_positions[e_id] = position
                     event_positions[f"{e_id}_size"] = pkg_size
 
-                    if e["is_settled"]:
+                    if e.get("status") == "cancelled":
+                        if e.get("is_settled"):
+                            current_count += 1
+                            event_counts[e_id] = current_count
+                            event_counts[f"{e_id}_size"] = pkg_size
+                    elif _slot_done(e["event_date"], e["event_hour"]):
                         current_count += 1
-
                         event_counts[e_id] = current_count
                         event_counts[f"{e_id}_size"] = pkg_size
         else:
@@ -353,18 +377,23 @@ def assign_chronological_numbers(events, supabase):
                     
             for ck, e_ids in event_order_single.items():
                 current_count = 0
+                by_id = {e["id"]: e for e in evs}
                 for pos_idx, e_id in enumerate(e_ids):
-                    # Pozycja w cyklu (do numeru na kafelku od razu).
+                    # 2.0: pozycja (kafelek) rosnie zawsze; licznik rozliczen
+                    # tylko za odbyte + odwolane-oplacone.
                     event_positions[e_id] = pos_idx + 1
-                    # Find the event to check if it's settled
-                    ev = next((x for x in evs if x["id"] == e_id), None)
-                    if ev and ev.get("is_settled"):
+                    _e = by_id.get(e_id) or {}
+                    if _e.get("status") == "cancelled":
+                        if _e.get("is_settled"):
+                            current_count += 1
+                            event_counts[e_id] = current_count
+                    elif _e and _slot_done(_e.get("event_date", ""), _e.get("event_hour", 0)):
                         current_count += 1
                         event_counts[e_id] = current_count
                 if e_ids:
                     # Pierwszy trening cyklu = START.
                     single_start_ids.add(e_ids[0])
-                    # Zamknięty cykl: ostatni rozliczony trening (do end_date) = OSTATNI.
+                    # Zamknięty cykl: ostatni trening cyklu (do end_date) = OSTATNI.
                     ed = None
                     if ck != "single":
                         for h in history:
@@ -374,8 +403,7 @@ def assign_chronological_numbers(events, supabase):
                     if ed:
                         by_id = {e["id"]: e for e in evs}
                         cands = [x for x in e_ids
-                                 if (by_id.get(x) or {}).get("is_settled")
-                                 and (by_id.get(x) or {}).get("event_date", "") <= ed]
+                                 if (by_id.get(x) or {}).get("event_date", "") <= ed]
                         if cands:
                             single_last_ids.add(cands[-1])
 
@@ -490,6 +518,37 @@ def get_week_events(monday_date: str, request: Request):
     )
     events = res.data or []
     return assign_chronological_numbers(events, supabase)
+
+
+@router.get("/week-summary/{monday_date}")
+def get_week_summary(monday_date: str, request: Request):
+    """2.0: podsumowanie tygodnia pon–nd dla Strefy Trenera.
+
+    Zwraca WSZYSTKIE zapisy (takze usuniete — widac odwolania) + absencje
+    z zakresu. Statusy interpretuje frontend (odbyty/planowany/odwolany).
+    """
+    from datetime import datetime, timedelta
+    try:
+        monday = datetime.strptime(monday_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Zly format daty (RRRR-MM-DD)")
+    sunday = monday + timedelta(days=6)
+
+    supabase, user_id = get_user_supabase(request)
+    evs = supabase.table("calendar_events") \
+        .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)") \
+        .eq("trainer_id", user_id) \
+        .gte("event_date", monday.isoformat()).lte("event_date", sunday.isoformat()) \
+        .order("event_date").order("event_hour").execute()
+    abss = supabase.table("absences") \
+        .select("id,client_id,absence_date,absence_hour,clients(name)") \
+        .eq("trainer_id", user_id) \
+        .gte("absence_date", monday.isoformat()).lte("absence_date", sunday.isoformat()) \
+        .order("absence_date").execute()
+    return {
+        "monday": monday.isoformat(), "sunday": sunday.isoformat(),
+        "events": evs.data or [], "absences": abss.data or [],
+    }
 
 
 @router.get("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
@@ -804,52 +863,39 @@ def get_calendar_stats(months: int = Query(1), request: Request = None):
 
 @router.post("/{event_date}/{event_hour}/settle")
 def settle_event(event_date: str, event_hour: int, request: Request):
+    """2.0: prymityw 'oplacone' — uzywany WYLACZNIE przez sciezke platnego
+    odwolania (usuniecie/nieobecnosc z platnoscia). Nie sluzy do rozliczania
+    odbytych treningow (te licza sie pozycyjnie)."""
     supabase, _ = get_user_supabase(request)
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
     if not ev.data:
         raise HTTPException(404, "Workout not found in calendar")
-        
+
     if ev.data.get("is_settled"):
         return {"status": "already settled"}
-        
+
     client_id = ev.data.get("client_id")
     if not client_id:
         raise HTTPException(400, "No client assigned to this workout")
-        
+
     supabase.table("calendar_events").update({"is_settled": True}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
-    
+
     return {"status": "settled"}
 
 
-@router.post("/{event_date}/{event_hour}/unsettle")
-def unsettle_event(event_date: str, event_hour: int, request: Request):
-    """Cofniecie rozliczenia (np. rozliczony trening bez pakietu).
-
-    Tylko flaga is_settled -> False. Id wiersza zostaje, wiec kotwice
-    pakietow (start/end_training_id) i numeracja przeliczaja sie same.
-    """
-    supabase, _ = get_user_supabase(request)
-    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).single().execute()
-    if not ev.data:
-        raise HTTPException(404, "Workout not found in calendar")
-
-    if not ev.data.get("is_settled"):
-        return {"status": "already unsettled"}
-
-    supabase.table("calendar_events").update({"is_settled": False}).eq("event_date", event_date).eq("event_hour", event_hour).execute()
-
-    return {"status": "unsettled"}
-
-
 @router.delete("/{event_date}/{event_hour}")
-def delete_event(event_date: str, event_hour: int, request: Request):
-    """Soft-delete: set status='deleted', log to deleted_workouts, and create absence."""
+def delete_event(event_date: str, event_hour: int, request: Request, paid: bool = False):
+    """T4: atomowe odwołanie. Jeden request ustawia opłacenie i status razem —
+    brak wyścigu settle vs delete. paid=True → cancelled+is_settled (liczy się
+    do pakietu); paid=False → dotychczasowa ścieżka (cancelled tylko gdy już
+    opłacony, inaczej deleted)."""
     supabase, user_id = get_user_supabase(request)
 
     ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
 
     if ev.data and len(ev.data) > 0:
         event = ev.data[0]
+        settled = bool(event.get("is_settled")) or paid
         supabase.table("deleted_workouts").insert({
             "event_date": event_date,
             "event_hour": event_hour,
@@ -858,8 +904,9 @@ def delete_event(event_date: str, event_hour: int, request: Request):
             "trainer_id": user_id,
         }).execute()
         
-        # Decide status: if it was settled, it must remain on the calendar as 'cancelled' to hold the billing number
-        new_status = "cancelled" if event.get("is_settled") else "deleted"
+        # Decide status: if it was settled (or paid in this call), it must remain
+        # on the calendar as 'cancelled' to hold the billing number
+        new_status = "cancelled" if settled else "deleted"
         
         # Also delete workout logs for this client on this date to prevent stale data
         client_id = event.get("client_id")
@@ -873,10 +920,10 @@ def delete_event(event_date: str, event_hour: int, request: Request):
                 "trainer_id": user_id,
             }, on_conflict="client_id,absence_date,absence_hour").execute()
 
-        # Soft delete or cancel
-        supabase.table("calendar_events").update({"status": new_status, "updated_at": "now()"}).eq("id", event["id"]).execute()
+        # Soft delete or cancel — one write sets status AND paid flag together
+        supabase.table("calendar_events").update({"status": new_status, "is_settled": settled, "updated_at": "now()"}).eq("id", event["id"]).execute()
 
-    return {"status": "deleted"}
+    return {"status": new_status, "is_settled": settled}
 
 
 @router.delete("/events/{event_date}/{event_hour}/hard")

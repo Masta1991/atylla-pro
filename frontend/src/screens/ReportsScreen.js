@@ -83,6 +83,10 @@ export default function ReportsScreen({ navigation }) {
   const [workoutData, setWorkoutData] = useState(null);
   const [fullHistory, setFullHistory] = useState([]);
   const [measurements, setMeasurements] = useState([]);
+  // Podział źródeł 1.7: trening z trenerem (= dzień z eventem kalendarza) vs prywatny.
+  const [showTrainer, setShowTrainer] = useState(true);
+  const [showPrivate, setShowPrivate] = useState(true);
+  const [trainerDates, setTrainerDates] = useState(new Set());
 
   useEffect(() => {
     api.getClients().then(setClients).catch(() => {});
@@ -106,10 +110,19 @@ export default function ReportsScreen({ navigation }) {
       const cutoff = new Date();
       cutoff.setMonth(cutoff.getMonth() - months);
       const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const todayStr = new Date().toISOString().slice(0, 10);
 
       const filtered = (history || []).filter(
         w => w.session_date >= cutoffStr
       );
+
+      // Dni z eventami kalendarza tego klienta = treningi z trenerem.
+      let tDates = new Set();
+      try {
+        const evs = await api.getCalendarEvents(cutoffStr, todayStr, selectedClient).catch(() => []);
+        tDates = new Set((evs || []).filter(e => e.status !== 'deleted').map(e => e.event_date));
+      } catch {}
+      setTrainerDates(tDates);
 
       const filteredMeas = (meas || []).filter(
         m => m.measure_date >= cutoffStr
@@ -134,6 +147,18 @@ export default function ReportsScreen({ navigation }) {
   const stats = useMemo(() => {
     if (!workoutData) return null;
 
+    // Filtr źródeł 1.7 (checkboxy na górze raportu).
+    const inScope = (w) => {
+      const isT = trainerDates.has(w.session_date);
+      if (isT && !showTrainer) return false;
+      if (!isT && !showPrivate) return false;
+      return true;
+    };
+    const scoped = workoutData.filter(inScope);
+    const scopedDays = new Set(scoped.map(w => w.session_date));
+    const scopedTrainerDays = new Set(scoped.filter(w => trainerDates.has(w.session_date)).map(w => w.session_date));
+    const scopedPrivateDays = new Set(scoped.filter(w => !trainerDates.has(w.session_date)).map(w => w.session_date));
+
     const sessionsByDate = {};
     const bodyPartCount = {};
     const exerciseWeights = {};
@@ -141,6 +166,7 @@ export default function ReportsScreen({ navigation }) {
     const weeklyBodyParts = {};
 
     workoutData.forEach(w => {
+      if (!inScope(w)) return;
       const d = w.session_date;
       sessionsByDate[d] = (sessionsByDate[d] || 0) + 1;
 
@@ -169,7 +195,7 @@ export default function ReportsScreen({ navigation }) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
 
-    const totalSessions = new Set(workoutData.map(w => w.session_date)).size;
+    const totalSessions = scopedDays.size;
 
     // Serie tygodniowe z PEŁNEJ historii (nie tylko okres raportu).
     const mondayOf = (dateStr) => {
@@ -260,6 +286,8 @@ export default function ReportsScreen({ navigation }) {
 
     return {
       totalSessions,
+      trainerDays: scopedTrainerDays.size,
+      privateDays: scopedPrivateDays.size,
       topBodyParts,
       topStrength,
       allStrength,
@@ -273,9 +301,9 @@ export default function ReportsScreen({ navigation }) {
       freqWeeks,
       freqMax,
       freqAvg,
-      trainedDays: [...allDays],
+      trainedDays: [...scopedDays],
     };
-  }, [workoutData, fullHistory, measurements, allExercises, clientExercises]);
+  }, [workoutData, fullHistory, measurements, allExercises, clientExercises, trainerDates, showTrainer, showPrivate]);
 
   const clientName = clients.find(c => c.id === selectedClient)?.name || '';
   const calBase = new Date();
@@ -421,6 +449,23 @@ export default function ReportsScreen({ navigation }) {
         </TouchableOpacity>
 
         {stats && (
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: themeColors.surface, borderRadius: 10, borderWidth: 1, borderColor: themeColors.border, padding: 10 }}
+              onPress={() => setShowTrainer(v => !v)}>
+              <Ionicons name={showTrainer ? 'checkbox' : 'square-outline'} size={20} color={showTrainer ? C.accent : themeColors.textMuted} />
+              <Text style={{ color: themeColors.text, fontWeight: '700', fontSize: 13 }}>Z trenerem</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: themeColors.surface, borderRadius: 10, borderWidth: 1, borderColor: themeColors.border, padding: 10 }}
+              onPress={() => setShowPrivate(v => !v)}>
+              <Ionicons name={showPrivate ? 'checkbox' : 'square-outline'} size={20} color={showPrivate ? C.accent : themeColors.textMuted} />
+              <Text style={{ color: themeColors.text, fontWeight: '700', fontSize: 13 }}>Prywatne</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {stats && (
           <>
             <View nativeID="report-part-1" style={isCapturing ? { width: 540, padding: 24, backgroundColor: themeColors.background } : null}>
               <View style={styles.tileGrid}>
@@ -454,7 +499,7 @@ export default function ReportsScreen({ navigation }) {
               <View style={styles.tile}>
                 <Text style={styles.tileLabel}>Sesje treningowe</Text>
                 <Text style={styles.tileValue}>{stats.totalSessions}</Text>
-                <Text style={styles.tileSub}>w wybranym okresie</Text>
+                <Text style={styles.tileSub}>w wybranym okresie • z trenerem: {stats.trainerDays} • prywatne: {stats.privateDays}</Text>
               </View>
               <View style={styles.tile}>
                 <Text style={styles.tileLabel}>Top 3 partie</Text>

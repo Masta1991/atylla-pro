@@ -1,7 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// const API_BASE = 'http://127.0.0.1:8000';
-const API_BASE = 'https://atylla-pro-production.up.railway.app';
+// API_BASE (T3): jawna konfiguracja środowiska.
+// EXPO_PUBLIC_API_URL ma pierwszeństwo (wstrzyknięte w buildzie).
+// Bez niego: dev -> lokalny backend 8000, prod build -> Railway.
+// PWA MUSI być budowana ze jawnym EXPO_PUBLIC_API_URL, inaczej gotowy bundle
+// wskazuje prod (to był błąd ENV-01/STATIC-ENV-01 w audycie 2.0).
+const SANDBOX_API_URL = 'http://127.0.0.1:8000';
+const PROD_API_URL = 'https://atylla-pro-production.up.railway.app';
+function resolveApiBase() {
+  try {
+    const fromEnv = typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL;
+    if (fromEnv) return fromEnv;
+  } catch (e) {}
+  if (typeof __DEV__ !== 'undefined' && __DEV__) return SANDBOX_API_URL;
+  return PROD_API_URL;
+}
+const API_BASE = resolveApiBase();
+
+export function getApiBase() {
+  return API_BASE;
+}
 
 let authToken = null;
 let refreshToken = null;
@@ -116,7 +134,26 @@ export function deleteClientPackage(packageId) {
   return request(`/clients/packages/${packageId}`, { method: 'DELETE' });
 }
 
-// ── In-Memory Mock Database for Offline Demo Mode ───────────────────────────
+export function closeClientCycle(clientId, payload) {
+  // T9: domknięcie cyklu miesięcznego — liczy backend (start..koniec),
+  // frontend nie kopiuje bieżącego licznika.
+  invalidateCache('clients');
+  invalidateCache('calendar');
+  return request(`/clients/${clientId}/close-cycle`, { method: 'POST', body: payload });
+}
+
+// 2.0: start/koniec pakietu z szuflady kalendarza (solo; wspoldzielone w Rozliczeniach).
+export function startPackageAt(clientId, payload) {
+  invalidateCache('clients');
+  return request(`/clients/${clientId}/packages/start-at`, { method: 'POST', body: payload });
+}
+
+export function endPackageAt(clientId, payload) {
+  invalidateCache('clients');
+  return request(`/clients/${clientId}/packages/end-at`, { method: 'POST', body: payload });
+}
+
+// ── Cache słowników + danych treningu (stale-while-revalidate) ───────────────
 
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -124,6 +161,16 @@ let clientsCache = null;
 let workoutTypesCache = null;
 let muscleGroupsCache = null;
 let exercisesGroupedCache = null;
+// Cache danych treningu: słowniki dynamiczne + eventy + logi (krótki TTL, SWR).
+let plansCache = null;
+let planExercisesCache = {};
+let calendarEventCache = {};
+let clientWorkoutsCache = {};
+const TRAINING_CACHE_TTL_MS = 30000;
+
+function isFresh(entry) {
+  return entry && (Date.now() - entry.ts) < TRAINING_CACHE_TTL_MS;
+}
 
 export function invalidateCache(type) {
   if (!type || type === 'clients') {
@@ -133,7 +180,28 @@ export function invalidateCache(type) {
   if (!type || type === 'workoutTypes') workoutTypesCache = null;
   if (!type || type === 'muscleGroups') muscleGroupsCache = null;
   if (!type || type === 'exercisesGrouped') exercisesGroupedCache = null;
-  historyCache = {};
+  if (!type || type === 'plans') {
+    plansCache = null;
+    planExercisesCache = {};
+  }
+  if (!type || type === 'calendar') calendarEventCache = {};
+  if (!type || type === 'workouts') clientWorkoutsCache = {};
+  try { historyCache = {}; } catch {}
+}
+
+// Prefetch słowników w tle (nie blokuje UI, błędy ignorowane).
+export function prefetchTrainingDicts() {
+  getClients().catch(() => {});
+  getWorkoutTypes().catch(() => {});
+  getMuscleGroups().catch(() => {});
+  getExercisesGrouped().catch(() => {});
+  getPlans().catch(() => {});
+}
+
+// Prefetch konkretnego slotu kalendarza (wywoływane przy otwarciu szuflady).
+export function prefetchCalendarEvent(date, hour) {
+  if (!date || hour == null) return;
+  getCalendarEvent(date, hour).catch(() => {});
 }
 
 export function login(email, password) {
@@ -201,13 +269,18 @@ export function getWeekEvents(mondayDate) {
   return request(`/calendar/week/${mondayDate}`);
 }
 
-export function getCalendarEvent(date, hour) {
-  
-  return request(`/calendar/${date}/${hour}`);
+export async function getCalendarEvent(date, hour) {
+  const key = `${date}|${hour}`;
+  const cached = calendarEventCache[key];
+  if (isFresh(cached)) return cached.data;
+  const res = await request(`/calendar/${date}/${hour}`);
+  calendarEventCache[key] = { data: res, ts: Date.now() };
+  return res;
 }
 
-export function createCalendarEvent(data) {
-  
+export async function createCalendarEvent(data) {
+  invalidateCache('calendar');
+  if (data?.client_id) invalidateCache('workouts');
   return request('/calendar/', { method: 'POST', body: data });
 }
 
@@ -220,18 +293,25 @@ export function clearWeekEvents(mondayDate) {
 }
 
 export function swapEvents(data) {
-  
+  invalidateCache('calendar');
+  invalidateCache('workouts');
+  invalidateCache('clients');
   return request('/calendar/swap', { method: 'POST', body: data });
 }
 
 export function updateCalendarEvent(date, hour, data) {
-  
+  invalidateCache('calendar');
+  if (data?.client_id) invalidateCache('workouts');
   return request(`/calendar/${date}/${hour}`, { method: 'PUT', body: data });
 }
 
-export function deleteCalendarEvent(date, hour) {
-  
-  return request(`/calendar/${date}/${hour}`, { method: 'DELETE' });
+export function deleteCalendarEvent(date, hour, paid = false) {
+  // T4: atomowe odwołanie — flaga paid jedzie w tym samym requeście,
+  // brak osobnego settle przed delete (wyścig z audytu).
+  invalidateCache('calendar');
+  invalidateCache('workouts');
+  invalidateCache('clients');
+  return request(`/calendar/${date}/${hour}${paid ? '?paid=true' : ''}`, { method: 'DELETE' });
 }
 
 export function getCalendarStats(months) {
@@ -239,40 +319,36 @@ export function getCalendarStats(months) {
 }
 
 export function getCalendarEvents(dateFrom, dateTo, clientId) {
-  let query = '?';
-  if (dateFrom) query += `date_from=${dateFrom}&`;
-  if (dateTo) query += `date_to=${dateTo}&`;
-  if (clientId) query += `client_id=${clientId}`;
-  return request(`/calendar/${query}`);
+  const params = new URLSearchParams();
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  if (clientId) params.append('client_id', clientId);
+  const qs = params.toString();
+  return request(`/calendar/${qs ? `?${qs}` : ''}`);
 }
 
 export function settleWorkout(date, hour) {
+  // 2.0: prymityw "oplacone" — tylko sciezka platnego odwolania (usuniecie /
+  // nieobecnosc z platnoscia). Brak UI do rozliczania odbytych treningow.
   invalidateCache('clients');
+  invalidateCache('calendar');
   return request(`/calendar/${date}/${hour}/settle`, { method: 'POST' });
 }
 
-export function unsettleWorkout(date, hour) {
-  invalidateCache('clients');
-  return request(`/calendar/${date}/${hour}/unsettle`, { method: 'POST' });
-}
-
-export function getDaySummary(day) {
-  return request(`/day/summary/${day}`);
-}
-
-export function approveDay(day, decisions) {
-  invalidateCache('clients');
-  return request('/day/approve', { method: 'POST', body: { day, decisions } });
-}
+// DayClose usuniety w 2.0 (decyzja 2026-09-07) — brak getDaySummary/approveDay.
 
 
 
 // ── Workouts ────────────────────────────────────────────────────────────────
 
-export function getClientWorkouts(clientId, date) {
-  
+export async function getClientWorkouts(clientId, date) {
+  const key = `${clientId}|${date || ''}`;
+  const cached = clientWorkoutsCache[key];
+  if (isFresh(cached)) return cached.data;
   const params = date ? `?session_date=${date}` : '';
-  return request(`/workouts/client/${clientId}${params}`);
+  const res = await request(`/workouts/client/${clientId}${params}`);
+  clientWorkoutsCache[key] = { data: res, ts: Date.now() };
+  return res;
 }
 
 let historyCache = {};
@@ -295,7 +371,7 @@ export async function getClientHistory(clientId) {
 
 export async function saveWorkoutBatch(data) {
   invalidateHistoryCache(data.client_id);
-  
+  invalidateCache('workouts');
   return request('/workouts/batch', { method: 'POST', body: data });
 }
 
@@ -387,35 +463,43 @@ export async function getExercisesGrouped() {
   return res;
 }
 
-export function getPlans() {
-  
-  return request('/config/plans');
+export async function getPlans() {
+  if (isFresh(plansCache)) return plansCache.data;
+  const res = await request('/config/plans');
+  plansCache = { data: res, ts: Date.now() };
+  return res;
 }
 
 export function createPlan(data) {
-  
+  invalidateCache('plans');
   return request('/config/plans', { method: 'POST', body: data });
 }
 
 export function deletePlan(id) {
-  
+  invalidateCache('plans');
   return request(`/config/plans/${id}`, { method: 'DELETE' });
 }
 
-export function getPlanExercises(planId) {
-  
-  return request(`/config/plans/${planId}/exercises`);
+export async function getPlanExercises(planId) {
+  const cached = planExercisesCache[planId];
+  if (isFresh(cached)) return cached.data;
+  const res = await request(`/config/plans/${planId}/exercises`);
+  planExercisesCache[planId] = { data: res, ts: Date.now() };
+  return res;
 }
 
 export function addExerciseToPlan(planId, data) {
+  delete planExercisesCache[planId];
   return request(`/config/plans/${planId}/exercises`, { method: 'POST', body: data });
 }
 
 export function updatePlanExercise(planExerciseId, data) {
+  planExercisesCache = {};
   return request(`/config/plan-exercises/${planExerciseId}`, { method: 'PUT', body: data });
 }
 
 export function removeExerciseFromPlan(planExerciseId) {
+  planExercisesCache = {};
   return request(`/config/plan-exercises/${planExerciseId}`, { method: 'DELETE' });
 }
 
@@ -470,4 +554,38 @@ export function deleteExercise(id) {
 export function updateExercise(id, data) {
   invalidateCache('exercisesGrouped');
   return request(`/config/exercises/${id}`, { method: 'PUT', body: data });
+}
+
+// ── Panel klienta 1.7 (lokalnie, bez migracji) ─────────────────────────────
+// Prywatny trening = workout_logs bez eventu kalendarza tego dnia.
+// Trening z trenerem = dzien z eventem kalendarza (client_id) — eventy sa SSOT.
+
+export async function getClientSourceMap(clientId, dateFrom, dateTo) {
+  // Zwraca { trainerDates: Set<string>, privateDates: string[], sessionsByDate: {} }
+  const [history, events] = await Promise.all([
+    getClientHistory(clientId).catch(() => []),
+    getCalendarEvents(dateFrom, dateTo, clientId).catch(() => []),
+  ]);
+  const trainerDates = new Set(
+    (events || [])
+      .filter(e => e.status !== 'deleted')
+      .map(e => e.event_date)
+  );
+  const sessionsByDate = {};
+  (history || []).forEach(w => {
+    const d = w.session_date;
+    if (!sessionsByDate[d]) sessionsByDate[d] = [];
+    sessionsByDate[d].push(w);
+  });
+  const privateDates = Object.keys(sessionsByDate).filter(d => !trainerDates.has(d));
+  return { trainerDates, privateDates, sessionsByDate, history: history || [], events: events || [] };
+}
+
+export function classifySessionDate(sessionDate, trainerDates) {
+  return trainerDates.has(sessionDate) ? 'trainer' : 'private';
+}
+
+// 2.0: podsumowanie tygodnia (Strefa Trenera) — wszystkie statusy + absencje.
+export function getWeekSummary(mondayDate) {
+  return request(`/calendar/week-summary/${mondayDate}`);
 }

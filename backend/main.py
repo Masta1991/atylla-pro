@@ -3,12 +3,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from routers import clients, calendar, workouts, measurements, config_router, auth, email_router, dayclose
+from routers import clients, calendar, workouts, measurements, config_router, auth, email_router
 
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="1.6.7",
+    version="2.0.0",
 )
 
 from fastapi import Request
@@ -30,15 +30,24 @@ async def global_exception_handler(request: Request, exc: Exception):
         f.write("=== ERROR ===\n")
         f.write(traceback.format_exc())
         f.write("\n")
+    # Celowo generyczny komunikat do klienta (bez wycieku szczegolow bledu).
     return JSONResponse(
         status_code=500,
-        content={"detail": exc_str},
+        content={"detail": "Internal server error"},
     )
 
-# CORS — allow frontend (Expo dev + production)
+# CORS — jawna lista originów (wildcard + credentials odrzucaja przegladarki).
+# 1.x: backend 8000 + Expo web 3001; prod: Railway + PWA.
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3001",
+    "http://localhost:3001",
+    "https://atylla-pro-production.up.railway.app",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +61,7 @@ app.include_router(workouts.router)
 app.include_router(measurements.router)
 app.include_router(config_router.router)
 app.include_router(email_router.router)
-app.include_router(dayclose.router)
+# dayclose usuniety w 2.0 (decyzja 2026-09-07) — tabela day_approvals zostaje w bazie nietknieta.
 
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -104,17 +113,27 @@ if os.path.isdir(STATIC_DIR):
         # If it looks like an API call, skip SPA fallback (will 404 naturally)
         if any(full_path.startswith(p) for p in API_PREFIXES):
             return JSONResponse(status_code=404, content={"detail": "Not found"})
+        # T1: block path traversal — resolved path must stay inside STATIC_DIR.
+        # Anything outside (e.g. /%2e%2e/models.py) falls back to SPA shell.
+        static_root = os.path.realpath(STATIC_DIR)
+        candidate = os.path.realpath(os.path.join(static_root, full_path))
+        try:
+            inside = os.path.commonpath([static_root, candidate]) == static_root
+        except ValueError:
+            inside = False
+        if not inside:
+            return FileResponse(os.path.join(static_root, "index.html"))
         # Serve specific static file if it exists
-        file_path = os.path.join(STATIC_DIR, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
+        if os.path.isfile(candidate):
+            return FileResponse(candidate)
         # Otherwise return SPA shell
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+        return FileResponse(os.path.join(static_root, "index.html"))
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 
 

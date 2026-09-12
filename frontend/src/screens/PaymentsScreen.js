@@ -12,6 +12,13 @@ import AppLayout from '../components/AppLayout';
 import DropdownPicker from '../components/DropdownPicker';
 import { useTheme } from '../context/ThemeContext';
 
+// 2.0: stan treningu ze statusu i czasu (trening 8-9 o 9:01 to odbyty).
+function isSlotPassed(dateStr, hour) {
+  const end = new Date(dateStr + 'T00:00:00');
+  end.setHours(Number(hour) + 1, 0, 0, 0);
+  return Date.now() > end.getTime();
+}
+
 export default function PaymentsScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
   const styles = React.useMemo(() => makeStyles(C, themeColors), [C, themeColors]);
@@ -127,7 +134,7 @@ export default function PaymentsScreen({ navigation, route }) {
       });
       setClientEvents(sorted);
       setSelectedClient(client);
-      setStartEventId(sorted.find(e => !e.is_settled)?.id || '');
+      setStartEventId(sorted.find(e => e.status !== 'deleted')?.id || '');
       setPackageSize(String(client.package_size || 10));
       setPackageOffset('0');
       setSharedEnabled(false);
@@ -149,11 +156,7 @@ export default function PaymentsScreen({ navigation, route }) {
     }
 
     const startEv = startEventId ? clientEvents.find(e => e.id === startEventId) : null;
-    if (startEv && startEv.is_settled) {
-        if (Platform.OS === 'web') window.alert('Błąd: Nie możesz wybrać już rozliczonego treningu jako punkt startowy nowego pakietu.');
-        else Alert.alert('Błąd', 'Nie możesz wybrać już rozliczonego treningu jako punkt startowy nowego pakietu.');
-        return;
-    }
+    // 2.0: startem moze byc kazdy nieusuniety trening (liczenie pozycyjne).
     try {
       setStartBillingModalVisible(false);
       setLoading(true);
@@ -193,7 +196,8 @@ export default function PaymentsScreen({ navigation, route }) {
       setSelectedClient(client);
       // Końcem pakietu może być tylko trening z AKTUALNEGO cyklu:
       // po starcie aktywnego pakietu i nieużyty w innych pakietach.
-      let candidates = sorted.filter(e => e.is_settled);
+      // 2.0: koncem moze byc kazdy nieusuniety trening (liczenie pozycyjne).
+      let candidates = sorted.filter(e => e.status !== 'deleted');
       if (client.billing_type === 'package') {
         try {
           const pkgs = await fetchUnionPackages(client);
@@ -222,11 +226,11 @@ export default function PaymentsScreen({ navigation, route }) {
   const executeEndBilling = async () => {
     if (!selectedClient) return;
     
-    // Allow closing without selecting an event if there are NO settled events available
-    const settledEvents = clientEvents.filter(e => e.is_settled);
-    if (settledEvents.length > 0 && !endEventId) {
-        if (Platform.OS === 'web') window.alert('Błąd: Masz w kalendarzu rozliczone treningi, musisz wskazać jeden z nich jako zamykający.');
-        else Alert.alert('Błąd', 'Masz w kalendarzu rozliczone treningi, musisz wskazać jeden z nich jako zamykający.');
+    // 2.0: zamkniecie bez wskazania treningu tylko gdy brak treningow w ogole.
+    const existingTrainings = clientEvents.filter(e => e.status !== 'deleted');
+    if (existingTrainings.length > 0 && !endEventId) {
+        if (Platform.OS === 'web') window.alert('Błąd: Wskaż trening zamykający ten cykl.');
+        else Alert.alert('Błąd', 'Wskaż trening zamykający ten cykl.');
         return;
     }
     
@@ -242,13 +246,8 @@ export default function PaymentsScreen({ navigation, route }) {
         return;
     }
     
-    // Walidacja chronologii i statusu
+    // Walidacja chronologii (2.0: bez wymogu rozliczenia — liczenie pozycyjne).
     const endEv = clientEvents.find(e => e.id === endEventId);
-    if (endEv && !endEv.is_settled) {
-        if (Platform.OS === 'web') window.alert('Błąd: Nie możesz zamknąć pakietu na treningu, który nie został jeszcze rozliczony.');
-        else Alert.alert('Błąd', 'Nie możesz zamknąć pakietu na treningu, który nie został jeszcze rozliczony.');
-        return;
-    }
     if (endEv && selectedClient.package_purchase_date) {
         if (new Date(endEv.event_date) < new Date(selectedClient.package_purchase_date)) {
             if (Platform.OS === 'web') window.alert('Błąd SSOT: Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu.');
@@ -273,18 +272,9 @@ export default function PaymentsScreen({ navigation, route }) {
                     await api.deleteClientPackage(selectedClient.active_package_id);
                 }
             } else {
-                const history = [...(selectedClient.payment_history || [])];
-                history.push({
-                    action: 'end',
-                    end_date: endEv?.event_date || new Date().toISOString().split('T')[0],
-                    purchase_date: selectedClient.package_purchase_date,
-                    archived_at: new Date().toISOString(),
-                    package_size: 0,
-                    completed_count: selectedClient.package_current_count || 0
-                });
-                await api.updateClient(selectedClient.id, {
-                    payment_history: history,
-                    package_purchase_date: null
+                // T9: liczy backend (close-cycle start..koniec), nie kopiujemy licznika.
+                await api.closeClientCycle(selectedClient.id, {
+                    end_date: endEv?.event_date || new Date().toISOString().split('T')[0]
                 });
             }
             if (Platform.OS === 'web') window.alert('Sukces: Pakiet został domknięty. Zarchiwizowano historię.');
@@ -390,7 +380,7 @@ export default function PaymentsScreen({ navigation, route }) {
     const rows = inRange.map(e => ({
       key: e.id, date: e.event_date, hour: e.event_hour,
       partner: e.partner_name || null,
-      state: e.status === 'cancelled' ? (e.is_settled ? 'cancel-settled' : 'cancel') : (e.is_settled ? 'done' : 'planned'),
+      state: e.status === 'cancelled' ? (e.is_settled ? 'cancel-settled' : 'cancel') : (isSlotPassed(e.event_date, e.event_hour) ? 'done' : 'planned'),
     }));
     const evKeys = new Set(inRange.map(e => `${e.event_date}|${e.event_hour}`));
     abs.forEach((a, i) => {
@@ -567,7 +557,7 @@ export default function PaymentsScreen({ navigation, route }) {
                     client_id: editClient.id,
                     event_date: today,
                     event_hour: hour,
-                    is_settled: true,
+                    is_settled: false,
                     status: 'active',
                     note: editComment ? `[KOREKTA] ${editComment}` : '[KOREKTA] Ręczne dodanie treningów'
                 });
@@ -669,7 +659,7 @@ export default function PaymentsScreen({ navigation, route }) {
                   <View style={[styles.infoRow, { marginTop: 4 }]}>
                     <Ionicons name="information-circle-outline" size={16} color={themeColors.danger} />
                     <Text style={styles.infoText}>
-                      Z tego odwołane i rozliczone: <Text style={[styles.infoValue, { color: themeColors.danger }]}>{client.cancelled_settled_count}</Text>
+                      Z tego odwołane, opłacone: <Text style={[styles.infoValue, { color: themeColors.danger }]}>{client.cancelled_settled_count}</Text>
                     </Text>
                   </View>
                 )}
@@ -795,10 +785,11 @@ export default function PaymentsScreen({ navigation, route }) {
                   : (item.end_date || 'Cykl otwarty');
                 const stateStyle = (s) => s === 'done'
                   ? { color: '#1dd1a1' }
-                  : (s === 'cancel-settled' ? { color: '#e67e22' } : { color: themeColors.danger });
+                  : (s === 'cancel-settled' ? { color: '#e67e22' }
+                  : (s === 'planned' ? { color: '#f1c40f' } : { color: '#ff6b6b' }));
                 const stateLabel = (s) => s === 'done' ? 'odbyty'
-                  : (s === 'cancel-settled' ? 'odwołany • rozliczony'
-                  : (s === 'planned' ? 'nierozliczony' : 'odwołany • bez rozliczenia'));
+                  : (s === 'cancel-settled' ? 'odwołany • opłacony'
+                  : (s === 'planned' ? 'planowany' : 'odwołany • bez płatności'));
                 return (
                   <View style={styles.historyItem}>
                     <TouchableOpacity
@@ -950,7 +941,7 @@ export default function PaymentsScreen({ navigation, route }) {
                   onValueChange={setStartEventId}
                   style={styles.pickerWrap}
                   dropdownIconColor={themeColors.textSecondary}
-                  items={clientEvents.filter(e => !e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Nierozliczony)`, value: e.id, color: themeColors.text }))}
+                  items={clientEvents.filter(e => e.status !== 'deleted').map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''}`, value: e.id, color: themeColors.text }))}
               />
             </View>
 
@@ -1043,9 +1034,9 @@ export default function PaymentsScreen({ navigation, route }) {
             
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Zaznacz trening końcowy z kalendarza</Text>
-              {endCandidates.filter(e => e.is_settled).length === 0 ? (
+              {endCandidates.filter(e => e.status !== 'deleted').length === 0 ? (
                 <Text style={{ fontSize: 13, color: themeColors.textMuted, fontStyle: 'italic', paddingVertical: 10 }}>
-                  Brak odbytych (rozliczonych) treningów do wyboru. Pakiet zostanie zamknięty z dzisiejszą datą.
+                  Brak treningów do wyboru. Pakiet zostanie zamknięty z dzisiejszą datą.
                 </Text>
               ) : (
                 <DropdownPicker
@@ -1054,7 +1045,7 @@ export default function PaymentsScreen({ navigation, route }) {
                     onValueChange={setEndEventId}
                     style={styles.pickerWrap}
                     dropdownIconColor={themeColors.textSecondary}
-                    items={endCandidates.filter(e => e.is_settled).map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''} (Rozliczony)`, value: e.id, color: themeColors.text }))}
+                    items={endCandidates.filter(e => e.status !== 'deleted').map(e => ({ label: `${e.event_date} ${e.event_hour}:00 | ${e.workout_types?.name || ''}`, value: e.id, color: themeColors.text }))}
                 />
               )}
               <Text style={{ fontSize: 12, color: themeColors.textMuted, marginTop: 6 }}>

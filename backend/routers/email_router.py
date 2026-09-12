@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import io, base64, httpx
 from config import RESEND_API_KEY
+from database import get_user_supabase
 
 router = APIRouter(prefix="/email", tags=["email"])
 
@@ -54,6 +55,15 @@ def send_via_resend(payload: dict):
 
 @router.post("/send-report")
 def send_report(data: EmailReportRequest, request: Request):
+    # T2: wysyłka tylko dla zalogowanego trenera (blokuje anonimowe odpalanie
+    # wysyłki z konta aplikacji). 401 bez nagłówka Authorization.
+    get_user_supabase(request)
+    if len(data.recipient or "") > 254:
+        raise HTTPException(400, "Recipient too long")
+    if len(data.top_body_parts or []) > 50 or len(data.top_strength or []) > 50:
+        raise HTTPException(400, "Payload too large")
+    if len(data.weekly_sessions or []) > 120 or len(data.strength_data or []) > 2000:
+        raise HTTPException(400, "Payload too large")
     delta_weight = round(data.weight_end - data.weight_start, 1) if data.weight_start is not None and data.weight_end is not None else None
     delta_fat = round(data.fat_end - data.fat_start, 1) if data.fat_start is not None and data.fat_end is not None else None
     delta_muscle = round(data.muscle_end - data.muscle_start, 1) if data.muscle_start is not None and data.muscle_end is not None else None
@@ -198,6 +208,15 @@ def send_report(data: EmailReportRequest, request: Request):
 
 @router.post("/send-plan")
 def send_plan(data: EmailPlanRequest, request: Request):
+    # T2: jak wyżej — wymagany JWT trenera; limity rozmiaru przeciw spam-abuse.
+    get_user_supabase(request)
+    if len(data.recipient or "") > 254:
+        raise HTTPException(400, "Recipient too long")
+    if len(data.plans or []) > 20:
+        raise HTTPException(400, "Too many plans")
+    for p in (data.plans or []):
+        if len(p.get("exercises", []) or []) > 100:
+            raise HTTPException(400, "Too many exercises")
     plans_html = ""
     for p in (data.plans or []):
         name = p.get("name", "")

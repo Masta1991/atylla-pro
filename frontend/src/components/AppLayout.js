@@ -147,13 +147,14 @@ function AppLayout({ navigation, title, children, hideBottom, showBack }) {
         <View style={styles.iosBottom}>
           {notchSvg}
 
+          {/* 2.0: lewy przycisk trenera = TYDZIEN (Podsumowanie tygodnia). DayClose usuniety. */}
           <TouchableOpacity
             style={[styles.bottomSideBtn, { left: screenWidth / 4 - 35 }]}
-            onPress={() => navigation.navigate('DayClose')}
+            onPress={() => navigation.navigate('WeekSummary')}
             activeOpacity={0.6}
           >
-            <MaterialCommunityIcons name="check-decagram-outline" size={32} color={bottomIconColor} />
-            <Text style={[styles.bottomText, { color: bottomTextColor }]}>DZIEŃ</Text>
+            <MaterialCommunityIcons name="calendar-week-outline" size={32} color={bottomIconColor} />
+            <Text style={[styles.bottomText, { color: bottomTextColor }]}>TYDZIEŃ</Text>
           </TouchableOpacity>
 
           <View style={[styles.homeButtonWrapper, { left: screenWidth / 2 - 40 }]}>

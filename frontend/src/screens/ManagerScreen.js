@@ -5,6 +5,7 @@ import { SPACING } from '../assets/theme';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import * as api from '../services/api';
+import { showMessage, showError, confirmAction } from '../services/confirm';
 
 function getMonday(date) {
   const d = new Date(date);
@@ -222,7 +223,7 @@ export default function ManagerScreen({ navigation }) {
   async function copyScheduleToNextWeek() {
     const toCopy = activeScheduleItems.filter((_, i) => scheduleSelected.has(i));
     if (toCopy.length === 0) {
-      Alert.alert('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
+      showMessage('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
       return;
     }
 
@@ -235,13 +236,12 @@ export default function ManagerScreen({ navigation }) {
     }
 
     if (warnings.length > 0) {
-      Alert.alert(
+      // T11: confirmAction działa na web (window.confirm) i mobile.
+      confirmAction(
         'Konflikty Absencji',
         warnings.join('\n\n') + '\n\nCzy chcesz kontynuować? Konfliktowe treningi nie zostaną skopiowane.',
-        [
-          { text: 'Anuluj', style: 'cancel' },
-          { text: 'Kopiuj resztę', style: 'destructive', onPress: () => performScheduleCopy(toCopy) }
-        ]
+        'Kopiuj resztę',
+        () => performScheduleCopy(toCopy)
       );
     } else {
       performScheduleCopy(toCopy);
@@ -283,10 +283,10 @@ export default function ManagerScreen({ navigation }) {
         events: newEvents
       });
 
-      Alert.alert('Sukces', `Wygenerowano przyszły tydzień (wstawiono ${newEvents.length} treningów, pominięto ${skippedAbsences} absencji).`);
+      showMessage('Sukces', `Wygenerowano przyszły tydzień (wstawiono ${newEvents.length} treningów, pominięto ${skippedAbsences} absencji).`);
       setCurrentMonday(new Date(currentMonday.getTime() + 7 * 86400000));
     } catch (e) {
-      Alert.alert('Błąd', `Wystąpił błąd podczas nadpisywania tygodnia: ${e.message}`);
+      showError(`Wystąpił błąd podczas nadpisywania tygodnia: ${e.message}`);
     }
     setCopying(false);
     setCopying(false);
@@ -296,7 +296,7 @@ export default function ManagerScreen({ navigation }) {
   async function copyOtherToNextWeek() {
     const toCopy = otherEvents.filter((_, i) => otherSelected.has(i));
     if (toCopy.length === 0) {
-      Alert.alert('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
+      showMessage('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
       return;
     }
 
@@ -309,13 +309,11 @@ export default function ManagerScreen({ navigation }) {
     }
 
     if (warnings.length > 0) {
-      Alert.alert(
+      confirmAction(
         'Konflikty Absencji',
         warnings.join('\n\n') + '\n\nCzy chcesz kontynuować? Konfliktowe treningi nie zostaną skopiowane.',
-        [
-          { text: 'Anuluj', style: 'cancel' },
-          { text: 'Kopiuj resztę', style: 'destructive', onPress: () => performOtherCopy(toCopy) }
-        ]
+        'Kopiuj resztę',
+        () => performOtherCopy(toCopy)
       );
     } else {
       performOtherCopy(toCopy);
@@ -351,9 +349,9 @@ export default function ManagerScreen({ navigation }) {
     setCopying(false);
 
     if (errors.length > 0) {
-      Alert.alert('Błędy', `Skopiowano ${copied}, nieudane: ${errors.length}\n${errors.slice(0, 3).join('\n')}`);
+      showMessage('Błędy', `Skopiowano ${copied}, nieudane: ${errors.length}\n${errors.slice(0, 3).join('\n')}`);
     } else {
-      Alert.alert('Sukces', `Skopiowano ${copied} treningów na następny tydzień.`);
+      showMessage('Sukces', `Skopiowano ${copied} treningów na następny tydzień.`);
       setCurrentMonday(new Date(currentMonday.getTime() + 7 * 86400000));
     }
   }
@@ -362,7 +360,7 @@ export default function ManagerScreen({ navigation }) {
   async function copyScheduleToNextMonth() {
     const toCopy = activeScheduleItems.filter((_, i) => scheduleSelected.has(i));
     if (toCopy.length === 0) {
-      Alert.alert('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
+      showMessage('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
       return;
     }
     const warnings = [];
@@ -373,10 +371,8 @@ export default function ManagerScreen({ navigation }) {
       }
     }
     if (warnings.length > 0) {
-      Alert.alert('Konflikty Absencji', warnings.join('\n\n') + '\n\nKontynuować? Konfliktowe treningi zostaną pominięte.', [
-        { text: 'Anuluj', style: 'cancel' },
-        { text: 'Kopiuj resztę', style: 'destructive', onPress: () => performScheduleCopyMonth(toCopy) }
-      ]);
+      confirmAction('Konflikty Absencji', warnings.join('\n\n') + '\n\nKontynuować? Konfliktowe treningi zostaną pominięte.',
+        'Kopiuj resztę', () => performScheduleCopyMonth(toCopy));
     } else {
       performScheduleCopyMonth(toCopy);
     }
@@ -416,10 +412,10 @@ export default function ManagerScreen({ navigation }) {
         events: newEvents
       });
 
-      Alert.alert('Sukces', `Wygenerowano przyszły miesiąc (wstawiono ${newEvents.length} treningów, pominięto ${skippedAbsences} absencji).`);
+      showMessage('Sukces', `Wygenerowano przyszły miesiąc (wstawiono ${newEvents.length} treningów, pominięto ${skippedAbsences} absencji).`);
       setCurrentMonday(new Date(currentMonday.getTime() + 28 * 86400000));
     } catch (e) {
-      Alert.alert('Błąd', `Wystąpił błąd podczas nadpisywania tygodnia w przyszłym miesiącu: ${e.message}`);
+      showError(`Wystąpił błąd podczas nadpisywania tygodnia w przyszłym miesiącu: ${e.message}`);
     }
     setCopying(false);
   }
@@ -427,7 +423,7 @@ export default function ManagerScreen({ navigation }) {
   async function copyOtherToNextMonth() {
     const toCopy = otherEvents.filter((_, i) => otherSelected.has(i));
     if (toCopy.length === 0) {
-      Alert.alert('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
+      showMessage('Brak zaznaczonych', 'Zaznacz treningi do skopiowania.');
       return;
     }
     const warnings = [];
@@ -438,10 +434,8 @@ export default function ManagerScreen({ navigation }) {
       }
     }
     if (warnings.length > 0) {
-      Alert.alert('Konflikty Absencji', warnings.join('\n\n') + '\n\nKontynuować? Konfliktowe treningi zostaną pominięte.', [
-        { text: 'Anuluj', style: 'cancel' },
-        { text: 'Kopiuj resztę', style: 'destructive', onPress: () => performOtherCopyMonth(toCopy) }
-      ]);
+      confirmAction('Konflikty Absencji', warnings.join('\n\n') + '\n\nKontynuować? Konfliktowe treningi zostaną pominięte.',
+        'Kopiuj resztę', () => performOtherCopyMonth(toCopy));
     } else {
       performOtherCopyMonth(toCopy);
     }
@@ -464,9 +458,9 @@ export default function ManagerScreen({ navigation }) {
     }
     setCopying(false);
     if (errors.length > 0) {
-      Alert.alert('Błędy', `Skopiowano ${copied}, nieudane: ${errors.length}\n${errors.slice(0, 3).join('\n')}`);
+      showMessage('Błędy', `Skopiowano ${copied}, nieudane: ${errors.length}\n${errors.slice(0, 3).join('\n')}`);
     } else {
-      Alert.alert('Sukces', `Skopiowano ${copied} treningów na następny miesiąc.`);
+      showMessage('Sukces', `Skopiowano ${copied} treningów na następny miesiąc.`);
       setCurrentMonday(new Date(currentMonday.getTime() + 28 * 86400000));
     }
   }
@@ -507,10 +501,10 @@ export default function ManagerScreen({ navigation }) {
         events: newEvents
       });
 
-      Alert.alert('Sukces', 'Tydzień został całkowicie wyczyszczony.');
+      showMessage('Sukces', 'Tydzień został całkowicie wyczyszczony.');
       loadData();
     } catch (e) {
-      Alert.alert('Błąd', 'Nie udało się wyczyścić tygodnia: ' + e.message);
+      showError('Nie udało się wyczyścić tygodnia: ' + e.message);
     }
     setCopying(false);
   }
