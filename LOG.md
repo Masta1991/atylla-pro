@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.3: widoczne błędy odczytu (diagnoza pustej apki)
+- Kalendarz i Klienci pokazują raz komunikat z nazwą padającego endpointu zamiast cichego pustego ekranu. Deploy ./deploy.ps1 -Version 2.0.3 (bundle index-69adf331, Railway przebudowuje). Po odczycie komunikatu — fix przyczyny.
+
 ## 2026-09-12 — v2.0.2: fix NULL offset/size pakietu (pusta apka na prodzie)
 - Przyczyna pustej apki: pakiet z `offset/size = NULL` wywalał `TypeError` w liczeniu → 500 na `/clients/` (i numeracji kalendarza) → PWA pokazywała pusto i cicho. Weryfikacja: stres-test offline na danych z NULL-ami/UUID (wcześniej 500, po fixie 200 na clients/single/week/stats/week-summary). Deploy ./deploy.ps1 -Version 2.0.2 (bundle index-ae014d22, Railway przebudowuje).
 
