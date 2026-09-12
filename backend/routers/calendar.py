@@ -355,9 +355,13 @@ def assign_chronological_numbers(events, supabase):
             event_order_single = {}
             for e in evs:
                 ev_date = e["event_date"]
+                # Usunięte wiersze (np. Nieobecność bez płatności) nie zajmują
+                # numerów — inaczej duchy przesuwałyby żywe treningi (Ewa: 1,3).
+                if e.get("status") == "deleted":
+                    continue
                 # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
                 # FIX 2026-09-07 jak wyzej: AKTYWNY trening ignoruje absencje.
-                if e.get("status") != "deleted" and e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
+                if e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
                     continue
                 # Bezpłatne odwołanie (także bez absencji) nie dostaje numeru.
                 if e.get("status") == "cancelled" and not e.get("is_settled"):
