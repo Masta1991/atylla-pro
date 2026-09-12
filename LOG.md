@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.13: koniec zombie-pakietów 0/10
+- Przyczyna stanu Agaty: wipe tygodnia (Menadżer) po cichu odcinał starty ŻYWYCH pakietów → pakiet bez startu, licznik 0, „Brak danych”. Fix: bulk wipe ANULUJE pakiety zakotwiczone w kasowanym zakresie (z ostrzeżeniem w modalu), odpinanie dotyczy tylko zamkniętych, strażnik początku jest ślepy na członków puli. Deploy ./deploy.ps1 -Version 2.0.13 (bundle index-343e952b, Railway przebudowuje). Naprawa Agaty: Twardy Reset na jej karcie.
+
 ## 2026-09-12 — v2.0.12: detach przez service-role + prawdziwe timestampty
 - Odpinanie kotwic nie zapisywało się (podejrzenie: RLS chowa wiersz albo magiczny "now()" w update). Fix: skan service-role z kontrolą trenera (cudzych nie ruszamy) + `utcnow_iso()` zamiast `"now()"` we wszystkich 14 update (calendar/clients/measurements/workouts). Deploy ./deploy.ps1 -Version 2.0.12 (bundle index-0325d9d6, Railway przebudowuje).
 
