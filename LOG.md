@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.5: diagnostyka tygodnia (znaczniki [weekdiag] w logach)
+- Znaczniki etapów zapytań tygodnia na stderr (tymczasowe, do usunięcia po fixie). Deploy ./deploy.ps1 -Version 2.0.5 (bundle index-28bfa019, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.4: odporny odczyt (retry + lżejszy tydzień)
 - Log Railway pokazał: Supabase zrywa połączenie w trakcie zapytania tygodnia (`RemoteProtocolError`). Fix: `supabase_retry` (3 próby, tylko błędy transportu) na `/calendar/week` i `/clients/` + jawna lista kolumn zamiast `*` w tygodniu + czytelny 502 zamiast generycznego 500. Deploy ./deploy.ps1 -Version 2.0.4 (bundle index-cd7bb5fd, Railway przebudowuje).
 
