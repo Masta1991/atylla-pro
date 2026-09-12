@@ -1,5 +1,8 @@
 # Dziennik Zmian i Testów — Atylla Pro
 
+## 2026-09-12 — v2.0.16: jeden licznik + numery w tygodniu + jeden start
+- Bezpłatne odwołanie bez numeru (kafelek dogania licznik; Ewa: 1, –, 2). Numery [n/rozmiar] w Podsumowaniu tygodnia. Jeden przycisk „Rozpocznij pakiet” w szufladzie (panel: Pakiet/Miesięczny + rozmiar z palca). Starty na domkniętych zakresach ukryte + blokada w backendzie. Deploy ./deploy.ps1 -Version 2.0.16 (bundle index-1a58aa84, Railway przebudowuje).
+
 ## 2026-09-12 — v2.0.15: typ i rozmiar przy starcie (nie w karcie klienta)
 - Z formularza klienta zniknęły: forma płatności, wielkość pakietu, data startu. Typ ustawia się sam przy starcie (pakiet/cykl), rozmiar z palca w modalu. Szuflada: „brak pakietu” bez rozliczenia + oba przyciski startu (pakiet → modal w Rozliczeniach, cykl od daty slotu). Historia i otwarte pakiety nietknięte (bez migracji). Deploy ./deploy.ps1 -Version 2.0.15 (bundle index-8ac7a876, Railway przebudowuje).
 
