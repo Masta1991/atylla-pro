@@ -223,7 +223,7 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
         {showEv ? (
           <View style={{ alignItems: 'center', width: '100%', paddingHorizontal: 2 }}>
             <Text style={[styles.eventText, (ev.clients?.name || '').length > 18 && { fontSize: 10 }, { color: accent }]} numberOfLines={billingLabel ? 1 : 2}>
-              {(ev.clients?.name ? `${ev.clients.name}${ev.tile_number != null ? ` [${ev.tile_number}${ev.clients.billing_type === 'package' ? '/' + (ev.clients.package_size || 10) : ''}]` : (ev.clients.has_active_billing_or_history ? ` [${ev.clients.package_current_count || 0}${ev.clients.billing_type === 'package' ? '/' + (ev.clients.package_size || 10) : ''}]` : '')}` : '—')}
+              {(ev.clients?.name ? `${ev.clients.name}${ev.tile_number != null ? ` [${ev.tile_number}${ev.clients.billing_type === 'package' ? (ev.clients.package_size ? '/' + ev.clients.package_size : '') : ''}]` : (ev.clients.has_active_billing_or_history ? ` [${ev.clients.package_current_count || 0}${ev.clients.billing_type === 'package' ? (ev.clients.package_size ? '/' + ev.clients.package_size : '') : ''}]` : '')}` : '—')}
               {!billingLabel && (ev.training_plans?.name || ev.workout_types?.name) ? '\n' + (ev.training_plans?.name || ev.workout_types?.name) : ''}
             </Text>
             {showEv && ev.partner_name && (
