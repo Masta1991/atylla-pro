@@ -204,6 +204,8 @@ def assign_chronological_numbers(events, supabase):
     # Starty i końce cykli miesięcznych (do odznak START CYKLU / OSTATNI).
     single_start_ids = set()
     single_last_ids = set()
+    # Treningi w DOMKNIĘTYCH zakresach (szuflada chowa na nich przyciski startu).
+    closed_ids = set()
 
     # Właściciele aktywnych pakietów + członkowie cudzych pul (own-wins:
     # członek z własnym aktywnym pakietem rozlicza się sam).
@@ -282,6 +284,10 @@ def assign_chronological_numbers(events, supabase):
                     # active + absencja to zawsze zastepstwo/ponowny wpis).
                     if e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], e["event_date"], e["event_hour"]):
                         continue
+                    # Bezpłatne odwołanie (także bez absencji) nie dostaje numeru —
+                    # pozycje idą w ślad za licznikiem (kafelek = rozliczenia).
+                    if e.get("status") == "cancelled" and not e.get("is_settled"):
+                        continue
 
                     e_id = e["id"]
 
@@ -294,6 +300,8 @@ def assign_chronological_numbers(events, supabase):
                     position += 1
                     event_positions[e_id] = position
                     event_positions[f"{e_id}_size"] = pkg_size
+                    if end_id:
+                        closed_ids.add(e_id)
 
                     if e.get("status") == "cancelled":
                         if e.get("is_settled"):
@@ -351,8 +359,12 @@ def assign_chronological_numbers(events, supabase):
                 # FIX 2026-09-07 jak wyzej: AKTYWNY trening ignoruje absencje.
                 if e.get("status") != "deleted" and e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
                     continue
+                # Bezpłatne odwołanie (także bez absencji) nie dostaje numeru.
+                if e.get("status") == "cancelled" and not e.get("is_settled"):
+                    continue
                 cycle_key = "single"
                 belongs_to_history = False
+                cycle_ed = None
                 for h in history:
                     if h.get("action") == "end":
                         pd = h.get("purchase_date") or "0000-00-00"
@@ -362,6 +374,7 @@ def assign_chronological_numbers(events, supabase):
                                 continue
                             cycle_key = f"pkg_{pd}"
                             belongs_to_history = True
+                            cycle_ed = ed
                             break
                 if not belongs_to_history:
                     if purchase_date and ev_date >= purchase_date:
@@ -371,11 +384,13 @@ def assign_chronological_numbers(events, supabase):
                         # We do NOT want to fall back to a historical start date if the history was explicitly closed.
                         # If there's an active purchase_date, it would be caught above.
                         # If not, it means the cycle is completely closed and no new one started.
-                
+
                 if cycle_key != "before_any":
                     if cycle_key not in event_order_single:
                         event_order_single[cycle_key] = []
                     event_order_single[cycle_key].append(e["id"])
+                    if belongs_to_history and cycle_ed and cycle_ed != "9999-12-31":
+                        closed_ids.add(e["id"])
                     
             for ck, e_ids in event_order_single.items():
                 current_count = 0
@@ -472,6 +487,8 @@ def assign_chronological_numbers(events, supabase):
                     ev["tile_number"] = event_positions[e_id]
                     
             ev["clients"]["has_active_billing_or_history"] = has_active_or_history
+            # Szuflada chowa przyciski startu na domkniętych pakietach/cyklach.
+            ev["in_closed_cycle"] = e_id in closed_ids
 
     pmap = _partner_names(supabase, events)
     for ev in events:
@@ -551,10 +568,16 @@ def get_week_summary(monday_date: str, request: Request):
 
     supabase, user_id = get_user_supabase(request)
     evs = supabase.table("calendar_events") \
-        .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,clients!calendar_events_client_id_fkey(name),workout_types(name),training_plans(name)") \
+        .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,clients!calendar_events_client_id_fkey(name,billing_type,package_size,package_current_count,package_purchase_date,payment_history),workout_types(name),training_plans(name)") \
         .eq("trainer_id", user_id) \
         .gte("event_date", monday.isoformat()).lte("event_date", sunday.isoformat()) \
         .order("event_date").order("event_hour").execute()
+    # Numery pozycji tym samym silnikiem co kalendarz (pule, cykle, historia).
+    try:
+        numbered = assign_chronological_numbers([e for e in (evs.data or [])], supabase)
+        evs = type("R", (), {"data": numbered})()
+    except Exception:
+        pass
     abss = supabase.table("absences") \
         .select("id,client_id,absence_date,absence_hour,clients(name)") \
         .eq("trainer_id", user_id) \
@@ -960,6 +983,21 @@ def delete_event(event_date: str, event_hour: int, request: Request):
         raise HTTPException(400, "Trening jest początkiem aktywnego pakietu — odśwież szufladę i użyj opcji początku pakietu.")
     _hard_delete(supabase, user_id, event, event_date, event_hour)
     return {"status": "deleted"}
+
+
+def _event_in_closed_range(supabase, event_id):
+    """Czy trening leży w DOMKNIĘTYM pakiecie/cyklu? Ten sam silnik co flaga
+    w szufladzie (assign) — jeden wynik w obu miejscach."""
+    try:
+        res = supabase.table("calendar_events") \
+            .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count, package_purchase_date, payment_history)") \
+            .eq("id", event_id).single().execute()
+        if not res.data:
+            return False
+        out = assign_chronological_numbers([res.data], supabase)
+        return bool(out and out[0].get("in_closed_cycle"))
+    except Exception:
+        return False
 
 
 def _any_active_anchor(supabase, event):

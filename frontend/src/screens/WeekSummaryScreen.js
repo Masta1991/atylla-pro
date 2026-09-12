@@ -64,12 +64,19 @@ export default function WeekSummaryScreen({ navigation }) {
       const d = new Date(monday); d.setDate(d.getDate() + i);
       const key = iso(d);
       const devs = events.filter(e => e.event_date === key)
-        .map(e => ({
-          key: e.id, hour: e.event_hour,
-          name: e.clients?.name || '—',
-          what: e.training_plans?.name || e.workout_types?.name || '',
-          state: evState(e),
-        }));
+        .map(e => {
+          const num = e.tile_number != null
+            ? (e.clients?.billing_type === 'package' && e.clients?.package_size
+              ? `${e.tile_number}/${e.clients.package_size}` : `${e.tile_number}`)
+            : null;
+          return {
+            key: e.id, hour: e.event_hour,
+            name: e.clients?.name || '—',
+            what: e.training_plans?.name || e.workout_types?.name || '',
+            state: evState(e),
+            num,
+          };
+        });
       extraAbs.filter(a => a.absence_date === key).forEach(a => {
         devs.push({
           key: `abs-${a.id}`, hour: a.absence_hour,
@@ -128,7 +135,7 @@ export default function WeekSummaryScreen({ navigation }) {
                 <View key={r.key} style={styles.row}>
                   <Text style={styles.hour}>{r.hour != null ? `${r.hour}:00` : '—'}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowName} numberOfLines={1}>{r.name}{r.what ? ` • ${r.what}` : ''}</Text>
+                    <Text style={styles.rowName} numberOfLines={1}>{r.name}{r.num ? ` [${r.num}]` : ''}{r.what ? ` • ${r.what}` : ''}</Text>
                     <Text style={{ color: meta.color, fontSize: 12, fontWeight: '700' }}>{meta.label}</Text>
                   </View>
                 </View>

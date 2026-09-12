@@ -561,6 +561,9 @@ def get_client_packages(client_id: str, request: Request):
 @router.post("/{client_id}/packages", response_model=ClientPackageResponse, status_code=201)
 def create_client_package(client_id: str, data: ClientPackageCreate, request: Request):
     supabase, user_id = get_user_supabase(request)
+    from routers.calendar import _event_in_closed_range
+    if data.start_training_id and _event_in_closed_range(supabase, data.start_training_id):
+        raise HTTPException(400, "Trening leży w domkniętym pakiecie/cyklu — zacznij od nowego treningu")
     payload = data.model_dump(mode='json')
     payload["client_id"] = client_id
     payload["trainer_id"] = user_id
@@ -617,6 +620,9 @@ def start_package_at(client_id: str, data: PackageStartAtRequest, request: Reque
     if existing.data:
         raise HTTPException(400, "Klient ma juz aktywny pakiet — najpierw go zakoncz")
     ev = _event_must_be_bookable(supabase, user_id, client_id, data.event_id)
+    from routers.calendar import _event_in_closed_range
+    if _event_in_closed_range(supabase, data.event_id):
+        raise HTTPException(400, "Trening leży w domkniętym pakiecie/cyklu — zacznij od nowego treningu")
     used = supabase.table("client_packages").select("id").eq("client_id", client_id) \
         .or_(f"start_training_id.eq.{data.event_id},end_training_id.eq.{data.event_id}").execute()
     if used.data:
