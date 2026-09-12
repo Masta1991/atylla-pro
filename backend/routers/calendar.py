@@ -647,6 +647,18 @@ def replace_week(data: ReplaceWeekRequest, request: Request):
     saturday = monday + timedelta(days=5)
 
     try:
+        # 0. Kotwice pakietów wskazujące na kasowany zakres: odepnij najpierw
+        # (inaczej DELETE łamie FK start_training_id).
+        try:
+            doomed = supabase.table("calendar_events").select("id") \
+                .gte("event_date", monday.isoformat()) \
+                .lte("event_date", saturday.isoformat()) \
+                .eq("trainer_id", user_id) \
+                .eq("is_settled", False) \
+                .execute()
+            _detach_anchors(supabase, [r["id"] for r in (doomed.data or []) if r.get("id")])
+        except Exception:
+            pass
         # 1. Hard delete all calendar_events between monday and saturday for this trainer
         supabase.table("calendar_events") \
             .delete() \
@@ -695,6 +707,16 @@ def clear_week(monday_date: str, request: Request):
     sunday = monday + timedelta(days=6)
 
     try:
+        try:
+            doomed = supabase.table("calendar_events").select("id") \
+                .gte("event_date", monday.isoformat()) \
+                .lte("event_date", sunday.isoformat()) \
+                .eq("trainer_id", user_id) \
+                .eq("is_settled", False) \
+                .execute()
+            _detach_anchors(supabase, [r["id"] for r in (doomed.data or []) if r.get("id")])
+        except Exception:
+            pass
         supabase.table("calendar_events") \
             .delete() \
             .gte("event_date", monday.isoformat()) \
@@ -951,14 +973,32 @@ def _hard_delete(supabase, user_id, event, event_date, event_hour):
                 .eq("absence_date", event_date).eq("absence_hour", event_hour).execute()
         except Exception:
             pass
-    # Koniec pakietu wskazujący na kasowany trening: odepnij (pakiet się otwiera).
-    try:
-        supabase.table("client_packages").update(
-            {"end_training_id": None, "updated_at": "now()"}).eq("end_training_id", event["id"]).execute()
-    except Exception:
-        pass
+    # Kotwice pakietów (start KONIECZNIE — FK RESTRICT, koniec dla porządku):
+    # odepnij, żeby twarde kasowanie nie łamało klucza obcego.
+    _detach_anchors(supabase, [event["id"]])
     supabase.table("calendar_events").delete().eq("id", event["id"]).execute()
     return "deleted"
+
+
+def _detach_anchors(supabase, event_ids):
+    """Odepnij kotwice pakietów (start/end) wskazujące na kasowane treningi.
+    Bez tego DELETE łamie FK client_packages_start_training_id_fkey (RESTRICT)."""
+    ids = [str(i) for i in (event_ids or []) if i]
+    if not ids:
+        return
+    try:
+        rows = supabase.table("client_packages").select("id,start_training_id,end_training_id").execute()
+        for p in (rows.data or []):
+            patch = {}
+            if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
+                patch["start_training_id"] = None
+            if p.get("end_training_id") and str(p.get("end_training_id")) in ids:
+                patch["end_training_id"] = None
+            if patch:
+                patch["updated_at"] = "now()"
+                supabase.table("client_packages").update(patch).eq("id", p["id"]).execute()
+    except Exception:
+        pass
 
 
 class DeleteStartRequest(BaseModel):
