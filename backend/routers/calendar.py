@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
-from database import get_user_supabase
+from database import get_user_supabase, supabase_retry
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
     CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest
@@ -505,20 +505,29 @@ def list_events(
 def get_week_events(monday_date: str, request: Request):
     """Get events from Monday to Saturday of a given week."""
     from datetime import datetime, timedelta
+    import httpx as _httpx
     monday = datetime.strptime(monday_date, "%Y-%m-%d").date()
     saturday = monday + timedelta(days=5)
 
     supabase, _ = get_user_supabase(request)
-    res = (
-        supabase.table("calendar_events")
-        .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
-        .gte("event_date", monday.isoformat())
-        .lte("event_date", saturday.isoformat())
-        .order("event_date,event_hour")
-        .execute()
-    )
-    events = res.data or []
-    return assign_chronological_numbers(events, supabase)
+
+    def _load():
+        # Jawna lista kolumn zamiast * (lżejszy transfer niż pełne wiersze).
+        res = (
+            supabase.table("calendar_events")
+            .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
+            .gte("event_date", monday.isoformat())
+            .lte("event_date", saturday.isoformat())
+            .order("event_date,event_hour")
+            .execute()
+        )
+        events = res.data or []
+        return assign_chronological_numbers(events, supabase)
+
+    try:
+        return supabase_retry(_load)
+    except _httpx.TransportError:
+        raise HTTPException(502, "Baza chwilowo nie odpowiada (Supabase). Spróbuj ponownie.")
 
 
 @router.get("/week-summary/{monday_date}")
