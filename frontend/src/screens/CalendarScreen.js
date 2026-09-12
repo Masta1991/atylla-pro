@@ -6,6 +6,7 @@ import { Svg, Path, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../assets/theme';
 import * as api from '../services/api';
+import { showMessage } from '../services/confirm';
 import { useDeviceType } from '../ui/device';
 import { useTheme } from '../context/ThemeContext';
 import { APP_VERSION } from '../version';
@@ -378,6 +379,8 @@ function CalendarScreen({ navigation, route }) {
   };
   const displayDateLabel = getDisplayDateLabel();
 
+  // Diagnoza pustej apki: cichy catch zamieniamy na jednorazowy widoczny komunikat.
+  const loadErrShown = useRef(false);
   const loadWeek = useCallback(async () => {
     try {
       const [evData, absData] = await Promise.all([
@@ -386,7 +389,12 @@ function CalendarScreen({ navigation, route }) {
       ]);
       setEvents((evData || []).filter(e => e.status !== 'deleted'));
       setAbsences(absData || []);
-    } catch (e) {}
+    } catch (e) {
+      if (!loadErrShown.current) {
+        loadErrShown.current = true;
+        showMessage('Błąd pobierania', 'Kalendarz: ' + e.message);
+      }
+    }
   }, [monday]);
 
   useFocusEffect(

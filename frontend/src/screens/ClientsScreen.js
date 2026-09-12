@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   Alert, ActivityIndicator, RefreshControl, Platform
@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { SPACING } from '../assets/theme';
 import * as api from '../services/api';
+import { showMessage } from '../services/confirm';
 import AppLayout from '../components/AppLayout';
 import { useTheme } from '../context/ThemeContext';
 
@@ -21,6 +22,7 @@ export default function ClientsScreen({ navigation }) {
   const [workoutTypes, setWorkoutTypes] = useState(global.cachedWorkoutTypesMap || {});
   const [loading, setLoading] = useState(!global.cachedClients);
   const [openId, setOpenId] = useState(null); // rozwijana karta klienta (jak 2.0)
+  const loadErrShown = useRef(false); // diagnoza pustej apki: błąd raz, widocznie
 
   useEffect(() => {
     async function loadCachedData() {
@@ -64,6 +66,10 @@ export default function ClientsScreen({ navigation }) {
       AsyncStorage.setItem('cached_workout_types_map', JSON.stringify(map)).catch(() => {});
     } catch (e) {
       console.log('Load clients error', e);
+      if (!loadErrShown.current) {
+        loadErrShown.current = true;
+        showMessage('Błąd pobierania', 'Klienci: ' + e.message);
+      }
     } finally {
       setLoading(false);
     }
