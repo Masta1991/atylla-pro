@@ -8,6 +8,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { View, ActivityIndicator } from 'react-native';
 import { COLORS } from './src/assets/theme';
 
+import AppDialogHost from './src/components/AppDialogHost';
 import LoginScreen from './src/screens/LoginScreen';
 import CalendarScreen from './src/screens/CalendarScreen';
 import HamburgerMenu from './src/screens/HamburgerMenu';
@@ -17,6 +18,7 @@ import ClientFormScreen from './src/screens/ClientFormScreen';
 import MeasurementsScreen from './src/screens/MeasurementsScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import PlansScreen from './src/screens/PlansScreen';
+import WorkoutGeneratorScreen from './src/screens/WorkoutGeneratorScreen';
 import ManagerScreen from './src/screens/ManagerScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
@@ -63,7 +65,9 @@ function AppNavigator() {
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Results" component={ResultsScreen} />
           <Stack.Screen name="Payments" component={PaymentsScreen} />
+          <Stack.Screen name="ClientPayments" component={PaymentsScreen} />
           <Stack.Screen name="Plans" component={PlansScreen} />
+          <Stack.Screen name="WorkoutGenerator" component={WorkoutGeneratorScreen} />
           <Stack.Screen name="Manager" component={ManagerScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="MuscleExercises" component={MuscleExercisesScreen} />
@@ -78,17 +82,21 @@ function AppNavigator() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { recordActivity } = useAuth();
   return (
-    <AuthProvider>
       <ThemeProvider>
-        <SafeAreaProvider style={{ flex: 1 }}>
-          <NavigationContainer>
+        <SafeAreaProvider style={{ flex: 1 }} onTouchStart={recordActivity}>
+          <NavigationContainer onStateChange={recordActivity}>
             <StatusBar style="light" />
             <AppNavigator />
           </NavigationContainer>
+          <AppDialogHost />
         </SafeAreaProvider>
       </ThemeProvider>
-    </AuthProvider>
   );
+}
+
+export default function App() {
+  return <AuthProvider><AppContent /></AuthProvider>;
 }

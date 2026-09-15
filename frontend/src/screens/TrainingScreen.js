@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, ActivityIndicator,
 } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import DropdownPicker from '../components/DropdownPicker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../assets/theme';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import * as api from '../services/api';
-import { showMessage, showError } from '../services/confirm';
+import { showMessage, showError, askConfirmation } from '../services/confirm';
 
 export default function TrainingScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
@@ -37,7 +38,7 @@ export default function TrainingScreen({ navigation, route }) {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })());
-  const [selectedHour, setSelectedHour] = useState(hour?.toString() || '');
+  const [selectedHour, setSelectedHour] = useState(hour?.toString() || '12');
   const [selectedType, setSelectedType] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedMainGroup, setSelectedMainGroup] = useState('');
@@ -48,6 +49,11 @@ export default function TrainingScreen({ navigation, route }) {
   const [recognition, setRecognition] = useState(null);
   // 2.0: brak stanu rozliczenia — paid (is_settled) tylko z zaladowanego eventu.
   const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const savedEventRef = useRef(null);
+  const logsRequestRef = useRef(0);
+  const autosaveErrorShownRef = useRef(false);
+  const duplicateConfirmedRef = useRef(null);
+  const selectionRequestRef = useRef(0);
   // Event zaladowany na wejscie (do blokady zmiany daty startu pakietu).
   const [loadedEvent, setLoadedEvent] = useState(null);
   const skipNextAutosaveRef = useRef(false);
@@ -71,13 +77,18 @@ export default function TrainingScreen({ navigation, route }) {
   const [supersetMode, setSupersetMode] = useState({});
   const [supersetSelection, setSupersetSelection] = useState({});
 
-  async function loadClientWorkoutLogs(clientId, dateStr, groupedExercises) {
+  async function loadClientWorkoutLogs(clientId, dateStr, groupedExercises, eventId) {
     if (!clientId || !dateStr) return;
+    if (!eventId) { mapLogsToState([], groupedExercises); return true; }
+    const generation = ++logsRequestRef.current;
     try {
-      const logs = await api.getClientWorkouts(clientId, dateStr);
+      const logs = await api.getClientWorkouts(clientId, dateStr, eventId);
+      if (generation !== logsRequestRef.current) return false;
       mapLogsToState(logs, groupedExercises);
+      return true;
     } catch (e) {
       console.error('Error loading workout logs:', e);
+      throw e;
     }
   }
 
@@ -113,6 +124,8 @@ export default function TrainingScreen({ navigation, route }) {
           if (!newAddedParts.includes(foundPart)) {
             newAddedParts.push(foundPart);
           }
+        } else {
+          throw new Error('Nie rozpoznano ćwiczenia z historii. Zapis zablokowany — odśwież słowniki.');
         }
       });
 
@@ -130,41 +143,76 @@ export default function TrainingScreen({ navigation, route }) {
     }
   }
 
-  const handleClientChange = (val) => {
+  const selectSession = async (clientId, dateStr, hourStr) => {
+    const generation = ++selectionRequestRef.current;
+    ++logsRequestRef.current;
     setIsReadyToSave(false);
-    setSelectedClient(val);
-    const cl = clients.find(c => c.id === val);
-    if (cl?.default_workout_type_id) {
-      setSelectedType(cl.default_workout_type_id);
+    try {
+      const event = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) && Number(hourStr)>=6 && Number(hourStr)<=21
+        ? await api.getCalendarEvent(dateStr, Number(hourStr), true, true).catch(error => {
+            if(error.status===404)return null; throw error;
+          }) : null;
+      if(generation!==selectionRequestRef.current)return;
+      const sameSession = event?.client_id===clientId && event?.status!=='deleted';
+      const dayEvents = clientId && !sameSession
+        ? await api.getCalendarEvents(dateStr,dateStr,clientId,false) : [];
+      if(generation!==selectionRequestRef.current)return;
+      const duplicate = dayEvents.some(e=>e.id!==event?.id && e.status!=='deleted');
+      if(duplicate && !await askConfirmation('Kolejny trening tego dnia',
+          'Trening dla tego klienta jest już zarejestrowany tego dnia. Kliknij OK, aby dodać kolejny, lub Anuluj, aby wrócić.')) {
+        if(generation===selectionRequestRef.current)setIsReadyToSave(true);
+        return;
+      }
+      if(generation!==selectionRequestRef.current)return;
+      duplicateConfirmedRef.current=duplicate ? clientId+'|'+dateStr+'|'+Number(hourStr) : null;
+      savedEventRef.current=event;
+      setLoadedEvent(sameSession ? event : null);
+      setSelectedClient(clientId);
+      setSelectedDate(dateStr);
+      setSelectedHour(hourStr);
+      setExerciseWeights({});
+      setAddedParts(sameSession ? event.added_groups||[] : []);
+      setSelectedMainGroup(sameSession ? event.main_group||'' : '');
+      setNote(sameSession ? event.note||'' : '');
+      setPartnerClient(sameSession ? event.partner_client_id||'' : '');
+      const client=clients.find(c=>c.id===clientId);
+      setSelectedType(sameSession ? event.workout_type_id||'' : client?.default_workout_type_id||'');
+      setSelectedPlan(sameSession ? event.plan_id||'' : '');
+      await loadClientWorkoutLogs(clientId,dateStr,exercisesByGroup,sameSession ? event.id : null);
+      if(generation===selectionRequestRef.current) {
+        skipNextAutosaveRef.current=true;
+        setIsReadyToSave(true);
+      }
+    } catch(error) {
+      if(generation===selectionRequestRef.current)showError(error.message);
     }
-    if (cl?.default_plan_id) {
-      setSelectedPlan(cl.default_plan_id);
-    }
-    loadClientWorkoutLogs(val, selectedDate, exercisesByGroup).finally(() => setIsReadyToSave(true));
   };
-
-  const handleDateChange = (val) => {
-    setIsReadyToSave(false);
+  const handleClientChange = val => selectSession(val,selectedDate,selectedHour);
+  const handleDateChange = val => {
     setSelectedDate(val);
-    loadClientWorkoutLogs(selectedClient, val, exercisesByGroup).finally(() => setIsReadyToSave(true));
+    setIsReadyToSave(false);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(val))selectSession(selectedClient,val,selectedHour);
+  };
+  const handleHourChange = val => {
+    setSelectedHour(val);
+    setIsReadyToSave(false);
+    if(Number(val)>=6 && Number(val)<=21)selectSession(selectedClient,selectedDate,val);
   };
 
-  const handlePlanChange = (val) => {
+  const handlePlanChange = async (val) => {
     setIsReadyToSave(false);
     setSelectedPlan(val);
     if (val) {
-      loadPlanExercises(val);
+      await loadPlanExercises(val);
     }
-    setTimeout(() => setIsReadyToSave(true), 100);
+    setIsReadyToSave(true);
   };
 
   const handleMainGroupChange = (val) => {
-    setIsReadyToSave(false);
     setSelectedMainGroup(val);
     if (val && !addedParts.includes(val)) {
       setAddedParts(prev => [...prev, val]);
     }
-    setTimeout(() => setIsReadyToSave(true), 100);
   };
 
   const generateUUID = () => {
@@ -178,11 +226,17 @@ export default function TrainingScreen({ navigation, route }) {
     let cancelled = false;
     async function init() {
       const { ev: passedEv } = route.params || {};
-      const [cl, wt, mg, ex] = await Promise.all([
-        api.getClients().catch(() => []),
-        api.getPlans().catch(() => []),
-        api.getMuscleGroups().catch(() => []),
-        api.getExercisesGrouped().catch(() => ({})),
+      const providedEvent = passedEv && passedDate && passedHourMatches(passedEv, hour) ? passedEv : null;
+      const [cl, wt, mg, ex, fetchedEvent] = await Promise.all([
+        api.getClients(),
+        api.getPlans(),
+        api.getMuscleGroups(),
+        api.getExercisesGrouped(),
+        providedEvent ? Promise.resolve(providedEvent) :
+          (passedDate && hour ? api.getCalendarEvent(passedDate, parseInt(hour), true).catch(error => {
+            if (error.status === 404) return null;
+            throw error;
+          }) : Promise.resolve(null)),
       ]);
       if (cancelled) return;
 
@@ -200,15 +254,10 @@ export default function TrainingScreen({ navigation, route }) {
       let activePlan = '';
 
       // Fast path: slot z kalendarza ma już cały event (prefetch przy szufladzie).
-      let existingEvent = passedEv && passedDate && passedHourMatches(passedEv, hour) ? passedEv : null;
-      if (passedDate && hour && !existingEvent) {
-        try {
-          existingEvent = await api.getCalendarEvent(passedDate, parseInt(hour));
-        } catch (err) {
-          console.log('No existing calendar event:', err.message);
-        }
-      }
+      savedEventRef.current = fetchedEvent;
+      const existingEvent = fetchedEvent?.status === 'deleted' ? null : fetchedEvent;
       if (existingEvent) {
+        savedEventRef.current = existingEvent;
         activeClient = existingEvent.client_id || '';
         activeType = existingEvent.workout_type_id || '';
         activePlan = existingEvent.plan_id || '';
@@ -242,8 +291,9 @@ export default function TrainingScreen({ navigation, route }) {
       // Plan i logi rownolegle (wczesniej wodospad: plan -> logi = 2x RTT po sobie).
       const planObj = activePlan ? (wt || []).find(p => p.id === activePlan) : null;
       const [planExList, logsRaw] = await Promise.all([
-        planObj ? api.getPlanExercises(activePlan).catch(() => []) : Promise.resolve(null),
-        activeClient ? api.getClientWorkouts(activeClient, passedDate || selectedDate).catch(() => []) : Promise.resolve(null),
+        planObj ? api.getPlanExercises(activePlan) : Promise.resolve(null),
+        existingEvent?.id && existingEvent.client_id===activeClient
+          ? api.getClientWorkouts(activeClient, passedDate || selectedDate, existingEvent.id) : Promise.resolve([]),
       ]);
       if (cancelled) return;
 
@@ -271,7 +321,13 @@ export default function TrainingScreen({ navigation, route }) {
         setIsReadyToSave(true);
       }
     }
-    init();
+    init().catch(error => {
+      if (!cancelled) {
+        setLoading(false);
+        setIsReadyToSave(false);
+        Alert.alert('Błąd pobierania treningu', error.message);
+      }
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -284,7 +340,7 @@ export default function TrainingScreen({ navigation, route }) {
     setExerciseWeights(prev => {
       const copy = { ...prev };
       Object.keys(copy).forEach(key => {
-        if (key.startsWith(`${partName}_`)) {
+        if (key.startsWith(`${partName}|||`)) {
           delete copy[key];
         }
       });
@@ -495,18 +551,37 @@ export default function TrainingScreen({ navigation, route }) {
   // 2.0: brak recznego rozliczania (handleSettle usuniety) — treningi licza
   // sie pozycyjnie; is_settled znaczy wylacznie "oplacone" przy odwolanym.
 
+  async function persistWorkout(payload) {
+    const key=payload.client_id+'|'+payload.event_date+'|'+payload.event_hour;
+    const body={...payload,confirm_duplicate:duplicateConfirmedRef.current===key,
+      reactivate:savedEventRef.current?.status==='deleted',
+      expected_event_id:savedEventRef.current?.id,
+      expected_updated_at:savedEventRef.current?.updated_at};
+    try { return await api.saveCalendarWorkout(body); }
+    catch(error) {
+      if(error.code!=='duplicate_session')throw error;
+      if(!await askConfirmation('Kolejny trening tego dnia',error.message))return null;
+      duplicateConfirmedRef.current=key;
+      return api.saveCalendarWorkout({...body,confirm_duplicate:true});
+    }
+  }
+
   async function handleSave() {
+    if (!isReadyToSave) {
+      Alert.alert('Zapis niedostępny', 'Poczekaj na pełne wczytanie treningu. Po błędzie otwórz go ponownie.');
+      return;
+    }
     if (!selectedClient) {
       Alert.alert('Błąd', 'Wybierz podopiecznego.');
       return;
     }
     // Startu pakietu nie przenosimy z ekranu Treningu (DELETE+CREATE gubilby
     // kotwice pakietu). Do przenoszenia sluzy przycisk Przenies w kalendarzu.
-    if (loadedEvent?.is_start_of_package && originalDate && originalHour
+    if (originalDate && originalHour
         && (originalDate !== selectedDate || originalHour !== String(selectedHour))) {
       Alert.alert(
-        'Punkt Startowy 🐶',
-        'Ten trening rozpoczyna pakiet. Daty startu nie zmienisz tutaj — użyj przycisku Przenieś w kalendarzu albo wskaż nowy start w Rozliczeniach.'
+        'Przenoszenie treningu',
+        'Użyj przycisku Przenieś w kalendarzu. Zachowa to trening, jego ćwiczenia i powiązanie z pakietem.'
       );
       return;
     }
@@ -537,24 +612,16 @@ export default function TrainingScreen({ navigation, route }) {
       );
       return;
     }
-    // Bez ćwiczeń też wolno zapisać — sam wpis w kalendarzu (logi nietknięte).
-    // Czyszczenie dnia robi się przyciskiem Usuń.
+    // Pusta lista usuwa ćwiczenia tylko z tego konkretnego treningu.
     payload.exercises = built.exercises;
 
     if (isSavingRef.current) return;
     isSavingRef.current = true;
     try {
-      // If date or hour changed, remove the old calendar entry
-      if (originalDate && originalHour && (originalDate !== selectedDate || originalHour !== selectedHour)) {
-        try {
-          await api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10));
-        } catch (e) {
-          Alert.alert('Błąd', 'Nie udało się przenieść treningu: ' + e.message);
-          return;
-        }
-      }
-      await api.saveCalendarWorkout(payload);
-      showMessage('Sukces', 'Trening został zapisany.');
+      const saved = await persistWorkout(payload);
+      if (!saved) return;
+      savedEventRef.current = saved.event;
+      await showMessage('Sukces', 'Trening został zapisany.');
       navigation.goBack();
     } catch (e) {
       showError(e.message);
@@ -565,7 +632,8 @@ export default function TrainingScreen({ navigation, route }) {
 
   // Real-time autosave
   useEffect(() => {
-    if (!isReadyToSave || !selectedClient) return;
+    if (!isReadyToSave || !selectedClient || !savedEventRef.current?.id
+        || savedEventRef.current.client_id!==selectedClient || savedEventRef.current.status!=='active') return;
 
 
     const performAutoSave = async () => {
@@ -600,26 +668,26 @@ export default function TrainingScreen({ navigation, route }) {
       payload.exercises = built.exercises;
 
       // Start pakietu: autosave nie rusza daty (jak handleSave — tylko Przenies).
-      const startMoved = loadedEvent?.is_start_of_package && originalDate && originalHour
+      const startMoved = originalDate && originalHour
         && (originalDate !== selectedDate || originalHour !== String(selectedHour));
       if (isSavingRef.current) return;
       isSavingRef.current = true;
       try {
-        // If date or hour changed, remove the old calendar entry
-        if (!startMoved && originalDate && originalHour && (originalDate !== selectedDate || originalHour !== selectedHour)) {
-          try {
-            await api.deleteCalendarEvent(originalDate, parseInt(originalHour, 10));
-          } catch (e) {
-            if (__DEV__) console.error('Autosave move failed:', e.message);
-            return;
-          }
-        }
         if (!startMoved) {
-          await api.saveCalendarWorkout(payload);
+          const saved = await api.saveCalendarWorkout({...payload,
+            reactivate: savedEventRef.current?.status === 'deleted',
+            expected_event_id: savedEventRef.current?.id,
+            expected_updated_at: savedEventRef.current?.updated_at});
+          savedEventRef.current = saved.event;
+          autosaveErrorShownRef.current = false;
         }
         if (__DEV__) console.log('Real-time workout autosave successful.');
       } catch (err) {
         if (__DEV__) console.error('Real-time workout autosave error:', err.message);
+        if (!autosaveErrorShownRef.current) {
+          autosaveErrorShownRef.current = true;
+          Alert.alert('Brak potwierdzenia automatycznego zapisu', err.message + '\nNie zamykaj formularza bez sprawdzenia zapisu.');
+        }
       } finally {
         isSavingRef.current = false;
       }
@@ -682,7 +750,7 @@ export default function TrainingScreen({ navigation, route }) {
           <View style={{ flex: 0.8 }}>
             <Text style={styles.label}>Godz.</Text>
             <View style={styles.pickerWrap}>
-              <TextInput style={[styles.input, { height: 50, borderWidth: 0 }]} value={selectedHour} onChangeText={setSelectedHour} placeholder="6-21" placeholderTextColor={themeColors.textMuted} keyboardType="numeric" />
+              <TextInput style={[styles.input, { height: 50, borderWidth: 0 }]} value={selectedHour} onChangeText={handleHourChange} placeholder="6-21" placeholderTextColor={themeColors.textMuted} keyboardType="numeric" />
             </View>
           </View>
         </View>
@@ -817,6 +885,7 @@ export default function TrainingScreen({ navigation, route }) {
                           
                           <View style={styles.stepperDisplay}>
                             <TextInput
+                              accessibilityLabel={`Ciężar: ${ex.name}`}
                               style={styles.stepperInput}
                               value={exerciseWeights[key]?.weight || '0'}
                               onChangeText={v => updateWeight(part, ex.id, 'weight', v)}
@@ -916,8 +985,9 @@ export default function TrainingScreen({ navigation, route }) {
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.cancelBtnText}>POWRÓT</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>ZAPISZ TRENING</Text>
+          <TouchableOpacity accessibilityRole="button" disabled={!isReadyToSave}
+            accessibilityState={{disabled:!isReadyToSave}} style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveBtnText}>{isReadyToSave ? 'ZAPISZ TRENING' : 'WCZYTYWANIE…'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Alert, ActivityIndicator, RefreshControl, Platform
+  ActivityIndicator, RefreshControl, Platform
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppAlert as Alert } from '../services/confirm';
 import { useFocusEffect } from '@react-navigation/native';
 import { SPACING } from '../assets/theme';
 import * as api from '../services/api';
@@ -24,29 +24,6 @@ export default function ClientsScreen({ navigation }) {
   const [openId, setOpenId] = useState(null); // rozwijana karta klienta (jak 2.0)
   const loadErrShown = useRef(false); // diagnoza pustej apki: błąd raz, widocznie
 
-  useEffect(() => {
-    async function loadCachedData() {
-      try {
-        const storedClients = await AsyncStorage.getItem('cached_clients');
-        const storedWorkoutTypes = await AsyncStorage.getItem('cached_workout_types_map');
-        if (storedClients && !global.cachedClients) {
-          const parsed = JSON.parse(storedClients);
-          setClients(parsed);
-          global.cachedClients = parsed;
-          setLoading(false);
-        }
-        if (storedWorkoutTypes && !global.cachedWorkoutTypesMap) {
-          const parsed = JSON.parse(storedWorkoutTypes);
-          setWorkoutTypes(parsed);
-          global.cachedWorkoutTypesMap = parsed;
-        }
-      } catch (e) {
-        console.log('Error loading cache from storage', e);
-      }
-    }
-    loadCachedData();
-  }, []);
-
   const loadClients = useCallback(async () => {
     try {
       const [data, wt] = await Promise.all([
@@ -57,13 +34,11 @@ export default function ClientsScreen({ navigation }) {
       const fetchedClients = data || [];
       setClients(fetchedClients);
       global.cachedClients = fetchedClients;
-      AsyncStorage.setItem('cached_clients', JSON.stringify(fetchedClients)).catch(() => {});
 
       const map = {};
       (wt || []).forEach(t => { map[t.id] = t.name; });
       setWorkoutTypes(map);
       global.cachedWorkoutTypesMap = map;
-      AsyncStorage.setItem('cached_workout_types_map', JSON.stringify(map)).catch(() => {});
     } catch (e) {
       console.log('Load clients error', e);
       if (!loadErrShown.current) {
@@ -78,17 +53,10 @@ export default function ClientsScreen({ navigation }) {
   useFocusEffect(useCallback(() => { loadClients(); }, [loadClients]));
 
   async function handleDelete(id, name) {
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Usunąć ${name}?`)) {
-        await api.deleteClient(id);
-        loadClients();
-      }
-    } else {
-      Alert.alert('Usuń klienta', `Usunąć ${name}?`, [
+    Alert.alert('Usuń klienta', `Usunąć ${name}?`, [
         { text: 'Anuluj', style: 'cancel' },
         { text: 'Usuń', style: 'destructive', onPress: async () => { await api.deleteClient(id); loadClients(); } },
       ]);
-    }
   }
 
   if (loading) {

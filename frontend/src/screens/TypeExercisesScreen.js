@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Alert, LayoutAnimation } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, LayoutAnimation } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import DropdownPicker from '../components/DropdownPicker';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '../assets/theme';

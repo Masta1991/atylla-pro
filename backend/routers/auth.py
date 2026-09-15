@@ -1,7 +1,11 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from supabase import create_client
 from config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_KEY
-from models import LoginRequest, LoginResponse
+from models import LoginRequest, LoginResponse, RefreshRequest
+import httpx
+from supabase_auth.errors import AuthApiError, AuthRetryableError
+from database import _http1_options, get_user_supabase
+from session_policy import issue_lease, verify_lease
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -12,7 +16,7 @@ def seed_new_trainer(trainer_id: str):
     Uses batch inserts for maximum performance.
     """
     try:
-        admin = create_client(SUPABASE_URL, SUPABASE_KEY)
+        admin = create_client(SUPABASE_URL, SUPABASE_KEY, options=_http1_options())
 
         # Create trainer profile
         admin.table("trainer_profiles").upsert({
@@ -82,7 +86,7 @@ def login(data: LoginRequest, background_tasks: BackgroundTasks):
     """Login trainer via Supabase Auth. Auto-seeds data for new trainers asynchronously."""
     try:
         clean_email = data.email.strip().lower()
-        auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY, options=_http1_options())
         res = auth_client.auth.sign_in_with_password({
             "email": clean_email,
             "password": data.password,
@@ -90,7 +94,7 @@ def login(data: LoginRequest, background_tasks: BackgroundTasks):
         user_id = res.user.id
 
         # Check if this is a new trainer (no trainer_profiles entry)
-        admin = create_client(SUPABASE_URL, SUPABASE_KEY)
+        admin = create_client(SUPABASE_URL, SUPABASE_KEY, options=_http1_options())
         profile = admin.table("trainer_profiles").select("id").eq("id", user_id).execute()
         if not profile.data:
             background_tasks.add_task(seed_new_trainer, user_id)
@@ -99,20 +103,40 @@ def login(data: LoginRequest, background_tasks: BackgroundTasks):
             "access_token": res.session.access_token,
             "refresh_token": res.session.refresh_token,
             "user_id": user_id,
+            **issue_lease(user_id),
         }
-    except Exception as e:
-        raise HTTPException(401, f"Login failed: {str(e)}")
+    except (httpx.TransportError, AuthRetryableError):
+        raise HTTPException(503, 'Usługa logowania chwilowo niedostępna.')
+    except AuthApiError as exc:
+        if exc.status >= 500:
+            raise HTTPException(503, 'Usługa logowania chwilowo niedostępna.')
+        raise HTTPException(401, 'Nieprawidłowy e-mail lub hasło.')
 
 
 @router.post("/refresh")
-def refresh_token(refresh_token: str):
-    """Refresh the access token."""
+def refresh_token(data: RefreshRequest):
+    """Rotate the token pair without extending application inactivity."""
+    lease = verify_lease(data.idle_token)
     try:
-        auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-        res = auth_client.auth.refresh_session(refresh_token)
+        auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY, options=_http1_options())
+        res = auth_client.auth.refresh_session(data.refresh_token)
+        if not res.user or str(res.user.id) != lease['sub']:
+            raise HTTPException(401, 'Sesja nie należy do tego użytkownika.')
         return {
             "access_token": res.session.access_token,
             "refresh_token": res.session.refresh_token,
         }
-    except Exception as e:
-        raise HTTPException(401, f"Token refresh failed: {str(e)}")
+    except (httpx.TransportError, AuthRetryableError):
+        raise HTTPException(503, "Usługa logowania chwilowo niedostępna.")
+    except AuthApiError as exc:
+        if exc.status >= 500:
+            raise HTTPException(503, "Usługa logowania chwilowo niedostępna.")
+        raise HTTPException(401, "Token refresh failed")
+
+
+@router.post('/activity')
+def user_activity(request: Request):
+    """A foreground interaction renews a still-active lease, never an expired one."""
+    _, user_id = get_user_supabase(request)
+    lease = verify_lease(request.headers.get('X-Atylla-Session'))
+    return issue_lease(user_id, lease['sid'])

@@ -16,6 +16,7 @@ const MENU_ITEMS = [
   { label: 'Raporty', icon: 'bar-chart', screen: 'Reports' },
   { label: 'Menadżer', icon: 'copy', screen: 'Manager' },
   { label: 'Plany treningowe', icon: 'clipboard', screen: 'Plans' },
+  { label: 'Generator ćwiczeń i planów', icon: 'create-outline', screen: 'WorkoutGenerator' },
   { label: 'Ustawienia', icon: 'settings', screen: 'Settings' },
 ];
 
@@ -37,8 +38,9 @@ export default function HamburgerMenu({ navigation }) {
               key={idx}
               style={styles.item}
               onPress={() => {
-                navigation.goBack();
-                setTimeout(() => navigation.navigate(item.screen), 100);
+                // Replace the menu route directly: no intermediate Calendar focus
+                // and two unnecessary weekly API reads before every destination.
+                navigation.replace(item.screen);
               }}
             >
               <Ionicons name={item.icon} size={20} color={themeColors.textSecondary} />

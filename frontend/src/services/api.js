@@ -26,27 +26,150 @@ let refreshToken = null;
 let isRefreshing = false;
 let refreshPromise = null;
 let onSessionExpired = null;
+let sessionGeneration = 0;
+let cacheRevision = 0;
+const pendingReads = new Map();
+export const SESSION_STORAGE_KEY = 'atylla_session_v2';
+let idleToken = null;
+let idleExpiresAt = null;
+let sessionId = null;
+let sessionEmail = null;
+let sessionRevision = 0;
+let storageQueue = Promise.resolve();
+let activityPromise = null;
+
+function withSessionLock(work) {
+  // Browser tabs share one refresh token. Serialize rotations and logout across
+  // tabs where Web Locks is available; the local queue also covers native apps.
+  const run = () => typeof navigator !== 'undefined' && navigator.locks
+    ? navigator.locks.request('atylla-session-v2', work) : work();
+  const pending = storageQueue.then(run, run);
+  storageQueue = pending.catch(() => {});
+  return pending;
+}
+
+function sessionRecord() {
+  return { access_token: authToken, refresh_token: refreshToken, idle_token: idleToken,
+    idle_expires_at: idleExpiresAt, session_id: sessionId, email: sessionEmail,
+    revision: sessionRevision };
+}
+
+async function persistSessionUnlocked(generation) {
+  if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+  const record = sessionRecord();
+  // One durable record: never save an access token with the previous refresh token.
+  await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(record));
+  if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+}
+
+export async function saveAuthSession(data, email) {
+  if (!data.access_token || !data.refresh_token || !data.idle_token || !data.session_id) {
+    throw new Error('Serwer zwrócił niepełną sesję. Spróbuj zalogować się ponownie.');
+  }
+  setAuthToken(data.access_token, data.refresh_token, { ...data, email });
+  const generation = sessionGeneration;
+  try {
+    await withSessionLock(() => persistSessionUnlocked(generation));
+  } catch (error) {
+    if (generation === sessionGeneration) clearAuthToken();
+    throw error;
+  }
+}
+
+export async function restoreAuthSession() {
+  const generation = sessionGeneration;
+  const text = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+  if (generation !== sessionGeneration) return null;
+  let saved = null;
+  try { saved = text ? JSON.parse(text) : null; } catch {}
+  if (!saved?.access_token || !saved?.refresh_token || !saved?.idle_token || !saved?.session_id) {
+    // Old sessions lack the server-signed inactivity lease. Require one login on
+    // upgrade instead of silently minting an unlimited bypass for old refresh tokens.
+    clearAuthToken();
+    return null;
+  }
+  if (saved.access_token !== authToken || saved.idle_token !== idleToken || saved.session_id !== sessionId) {
+    setAuthToken(saved.access_token, saved.refresh_token, saved);
+  }
+  return saved;
+}
+
+export async function clearStoredSession() {
+  clearAuthToken();
+  await withSessionLock(async () => {
+    await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
+    for (const key of ['auth_token', 'refresh_token', 'auth_email']) await AsyncStorage.removeItem(key);
+  });
+}
+
+async function expireSession() {
+  // Clear visible identity immediately; a late callback must not log out a new login.
+  const callback = onSessionExpired;
+  const cleared = clearStoredSession();
+  if (callback) callback();
+  await cleared;
+}
 
 export function setSessionExpiredCallback(cb) {
   onSessionExpired = cb;
 }
 
-export function setAuthToken(token, rToken) {
+export function setAuthToken(token, rToken, lease = {}) {
+  sessionGeneration += 1;
   authToken = token;
-  if (rToken) refreshToken = rToken;
+  refreshToken = rToken || null;
+  idleToken = lease.idle_token || null;
+  idleExpiresAt = lease.idle_expires_at || null;
+  sessionId = lease.session_id || null;
+  sessionEmail = lease.email || null;
+  sessionRevision = lease.revision || 0;
+  activityPromise = null;
+  isRefreshing = false;
+  refreshPromise = null;
+  invalidateCache();
 }
 
 export function clearAuthToken() {
+  sessionGeneration += 1;
   authToken = null;
   refreshToken = null;
+  idleToken = null;
+  idleExpiresAt = null;
+  sessionId = null;
+  sessionEmail = null;
+  activityPromise = null;
+  isRefreshing = false;
+  refreshPromise = null;
+  invalidateCache();
 }
 
 const headers = (token) => ({
   'Content-Type': 'application/json',
   ...(token && { Authorization: `Bearer ${token}` }),
+  ...(token && idleToken && { 'X-Atylla-Session': idleToken }),
 });
 
-async function request(path, options = {}) {
+function request(path, options = {}) {
+  const method = options.method || 'GET';
+  if (path.startsWith('/auth/')) return performRequest(path, options);
+  if (method !== 'GET') {
+    invalidateCache();
+    return performRequest(path, options).finally(() => invalidateCache());
+  }
+  const revision = cacheRevision;
+  const key = `${sessionGeneration}|${revision}|${options.token || ''}|${path}`;
+  if (!pendingReads.has(key)) {
+    const pending = performRequest(path, options).then(data => {
+      if (revision !== cacheRevision) throw new Error('Dane zostały zmienione. Odśwież widok.');
+      return data;
+    }).finally(() => pendingReads.delete(key));
+    pendingReads.set(key, pending);
+  }
+  return pendingReads.get(key);
+}
+
+async function performRequest(path, options = {}) {
+  const requestGeneration = sessionGeneration;
   const { token, method = 'GET', body } = options;
   const effectiveToken = token || authToken;
   const config = {
@@ -57,57 +180,122 @@ async function request(path, options = {}) {
   if (body) config.body = JSON.stringify(body);
 
   let res = await fetch(`${API_BASE}${path}`, config);
+  if (requestGeneration !== sessionGeneration) throw new Error('Sesja została zmieniona.');
 
-  if (res.status === 401 && refreshToken && !path.startsWith('/auth/')) {
+  let firstError = null;
+  if (res.status === 401) firstError = await res.json().catch(() => ({}));
+  if (firstError?.detail?.code === 'idle_session_expired') {
+    await expireSession();
+    throw new Error(firstError.detail.message);
+  }
+
+  if (res.status === 401 && refreshToken && path !== '/auth/login' && path !== '/auth/refresh') {
+    const generation = sessionGeneration;
     if (!isRefreshing) {
       isRefreshing = true;
-      refreshPromise = fetch(`${API_BASE}/auth/refresh?refresh_token=${encodeURIComponent(refreshToken)}`, {
+      refreshPromise = withSessionLock(async () => {
+        if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+        const storedText = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+        const stored = storedText ? JSON.parse(storedText) : null;
+        if (sessionId && (!stored || stored.session_id !== sessionId)) throw new Error('Sesja została zmieniona.');
+        if (stored && stored.session_id === sessionId && stored.revision > sessionRevision) {
+          authToken = stored.access_token; refreshToken = stored.refresh_token;
+          idleToken = stored.idle_token; idleExpiresAt = stored.idle_expires_at;
+          sessionRevision = stored.revision;
+          if (authToken !== effectiveToken) return authToken;
+        }
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      }).then(async (refreshRes) => {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken, ...(idleToken && { idle_token: idleToken }) }),
+        });
+        if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
         if (refreshRes.ok) {
           const newData = await refreshRes.json();
+          if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+          if (!newData.access_token || !newData.refresh_token) throw new Error('Odnowienie sesji chwilowo niedostępne. Spróbuj ponownie.');
           authToken = newData.access_token;
           refreshToken = newData.refresh_token;
-          await AsyncStorage.setItem('auth_token', authToken);
-          await AsyncStorage.setItem('refresh_token', refreshToken);
+          sessionRevision += 1;
+          await persistSessionUnlocked(generation);
           return authToken;
+        } else if (refreshRes.status === 401) {
+          const error = new Error('Sesja wygasła. Zaloguj się ponownie.');
+          error.sessionExpired = true;
+          throw error;
         } else {
-          clearAuthToken();
-          await AsyncStorage.removeItem('auth_token');
-          await AsyncStorage.removeItem('refresh_token');
-          if (onSessionExpired) onSessionExpired();
-          throw new Error('Session expired');
+          throw new Error('Odnowienie sesji chwilowo niedostępne. Spróbuj ponownie.');
         }
+      }).catch(async error => {
+        // This runs after the cross-tab lock is released, so clearing cannot deadlock.
+        if (error.sessionExpired && generation === sessionGeneration) await expireSession();
+        throw error;
       }).finally(() => {
-        isRefreshing = false;
+        if (generation === sessionGeneration) isRefreshing = false;
       });
     }
 
     try {
       const newToken = await refreshPromise;
+      if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
       config.headers = headers(newToken);
       res = await fetch(`${API_BASE}${path}`, config);
+      firstError = null;
     } catch (err) {
-      throw new Error("Session expired, please log in again.");
+      throw err;
     }
   }
 
+  if (requestGeneration !== sessionGeneration) throw new Error('Sesja została zmieniona.');
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    const err = firstError || await res.json().catch(() => ({ detail: res.statusText }));
     // Wygasla sesja bez mozliwosci odswiezenia (brak refresh tokenu albo
     // odswiezenie sie nie powiodlo): wymus wylogowanie na ekran Login
     // zamiast cichego pustego kalendarza.
-    if ((res.status === 401 || res.status === 403) && !path.startsWith('/auth/') && (authToken || refreshToken)) {
-      clearAuthToken();
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('refresh_token');
-      if (onSessionExpired) onSessionExpired();
-      throw new Error('Sesja wygasla, zaloguj sie ponownie.');
+    if (res.status === 401 && path !== '/auth/login' && (authToken || refreshToken)) {
+      await expireSession();
+      throw new Error(err.detail?.message || 'Sesja wygasła, zaloguj się ponownie.');
     }
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const error = new Error(err.detail?.message || err.detail || `HTTP ${res.status}`);
+    error.status = res.status;
+    error.code = err.detail?.code;
+    throw error;
   }
-  return res.status !== 204 ? res.json() : null;
+  const data = res.status !== 204 ? await res.json() : null;
+  if (requestGeneration !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+  return data;
+}
+
+export function noteUserActivity() {
+  if (!authToken || !idleToken || (typeof document !== 'undefined' && document.hidden)) return Promise.resolve(false);
+  if (activityPromise) return activityPromise;
+  const generation = sessionGeneration;
+  const pending = request('/auth/activity', { method: 'POST', body: {} }).then(async data => {
+    if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+    if (!data.idle_token || data.session_id !== sessionId || !Number.isFinite(data.idle_expires_at)) {
+      throw new Error('Nie udało się potwierdzić aktywności sesji.');
+    }
+    await withSessionLock(async () => {
+      if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+      const storedText = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+      const stored = storedText ? JSON.parse(storedText) : null;
+      if (!stored || stored.session_id !== sessionId) throw new Error('Sesja została zmieniona.');
+      if (generation !== sessionGeneration) throw new Error('Sesja została zmieniona.');
+      if (stored.revision > sessionRevision) {
+        authToken = stored.access_token; refreshToken = stored.refresh_token;
+        idleToken = stored.idle_token; idleExpiresAt = stored.idle_expires_at;
+        sessionRevision = stored.revision;
+      }
+      if (data.idle_expires_at >= idleExpiresAt) {
+        idleToken = data.idle_token; idleExpiresAt = data.idle_expires_at;
+      }
+      sessionRevision += 1;
+      await persistSessionUnlocked(generation);
+    });
+    return true;
+  }).finally(() => { if (activityPromise === pending) activityPromise = null; });
+  activityPromise = pending;
+  return pending;
 }
 
 export function getClientPackages(clientId) {
@@ -119,9 +307,10 @@ export function createClientPackage(clientId, payload) {
   return request(`/clients/${clientId}/packages`, { method: 'POST', body: payload });
 }
 
-export async function hardResetClient(clientId) {
+export async function hardResetClient(clientId, expectedUpdatedAt) {
   invalidateCache('clients');
-  return await request(`/clients/${clientId}/hard-reset`, { method: 'POST' });
+  invalidateCache('calendar');
+  return await request(`/clients/${clientId}/hard-reset`, { method: 'POST', body: { expected_updated_at: expectedUpdatedAt } });
 }
 
 export function endClientPackage(packageId, payload) {
@@ -158,6 +347,7 @@ export function endPackageAt(clientId, payload) {
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 let clientsCache = null;
+let clientsCacheAt = 0;
 let workoutTypesCache = null;
 let muscleGroupsCache = null;
 let exercisesGroupedCache = null;
@@ -173,6 +363,12 @@ function isFresh(entry) {
 }
 
 export function invalidateCache(type) {
+  cacheRevision += 1;
+  if (!type && typeof global !== 'undefined') {
+    global.cachedWorkoutTypes = null;
+    global.cachedWorkoutTypesMap = null;
+    global.cachedExercisesByGroup = null;
+  }
   if (!type || type === 'clients') {
     clientsCache = null;
     if (typeof global !== 'undefined') global.cachedClients = null;
@@ -220,9 +416,10 @@ export function login(email, password) {
 // reczne przeciagniecie (RefreshControl) trafialo w ten sam cache.
 // Ekrany z danymi rozliczeniowymi wymuszaja swieze pobranie (force=true).
 export async function getClients(force = false) {
-  if (clientsCache && !force) return clientsCache;
+  if (clientsCache && !force && Date.now() - clientsCacheAt < TRAINING_CACHE_TTL_MS) return clientsCache;
   const res = await request('/clients/');
   clientsCache = res;
+  clientsCacheAt = Date.now();
   return res;
 }
 
@@ -251,9 +448,11 @@ export function deleteClient(id) {
 
 // ── Calendar ────────────────────────────────────────────────────────────────
 
-export function getAbsences(dateFrom) {
-  const query = dateFrom ? `?date_from=${dateFrom}` : '';
-  return request(`/calendar/absences${query}`);
+export function getAbsences(dateFrom, dateTo) {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('date_from', dateFrom);
+  if (dateTo) params.set('date_to', dateTo);
+  return request(`/calendar/absences?${params}`);
 }
 
 export function createAbsence(data) {
@@ -269,11 +468,11 @@ export function getWeekEvents(mondayDate) {
   return request(`/calendar/week/${mondayDate}`);
 }
 
-export async function getCalendarEvent(date, hour) {
-  const key = `${date}|${hour}`;
+export async function getCalendarEvent(date, hour, includeDeleted = false, force = false) {
+  const key = `${date}|${hour}|${includeDeleted}`;
   const cached = calendarEventCache[key];
-  if (isFresh(cached)) return cached.data;
-  const res = await request(`/calendar/${date}/${hour}`);
+  if (!force && isFresh(cached)) return cached.data;
+  const res = await request(`/calendar/${date}/${hour}${includeDeleted ? '?include_deleted=true' : ''}`);
   calendarEventCache[key] = { data: res, ts: Date.now() };
   return res;
 }
@@ -327,11 +526,13 @@ export function getCalendarStats(months) {
   return request(`/calendar/stats?months=${months}`);
 }
 
-export function getCalendarEvents(dateFrom, dateTo, clientId) {
+export function getCalendarEvents(dateFrom, dateTo, clientId, billing = true, includeDeleted = false) {
   const params = new URLSearchParams();
   if (dateFrom) params.append('date_from', dateFrom);
   if (dateTo) params.append('date_to', dateTo);
   if (clientId) params.append('client_id', clientId);
+  if (!billing) params.append('billing', 'false');
+  if (includeDeleted) params.append('include_deleted', 'true');
   const qs = params.toString();
   return request(`/calendar/${qs ? `?${qs}` : ''}`);
 }
@@ -350,12 +551,14 @@ export function settleWorkout(date, hour) {
 
 // ── Workouts ────────────────────────────────────────────────────────────────
 
-export async function getClientWorkouts(clientId, date) {
-  const key = `${clientId}|${date || ''}`;
+export async function getClientWorkouts(clientId, date, calendarEventId) {
+  const key = `${clientId}|${date || ''}|${calendarEventId || ''}`;
   const cached = clientWorkoutsCache[key];
   if (isFresh(cached)) return cached.data;
-  const params = date ? `?session_date=${date}` : '';
-  const res = await request(`/workouts/client/${clientId}${params}`);
+  const params = new URLSearchParams();
+  if (date) params.set('session_date', date);
+  if (calendarEventId) params.set('calendar_event_id', calendarEventId);
+  const res = await request(`/workouts/client/${clientId}?${params}`);
   clientWorkoutsCache[key] = { data: res, ts: Date.now() };
   return res;
 }
@@ -371,10 +574,9 @@ export function invalidateHistoryCache(clientId) {
 }
 
 export async function getClientHistory(clientId) {
-  
-  if (historyCache[clientId]) return historyCache[clientId];
+  if (isFresh(historyCache[clientId])) return historyCache[clientId].data;
   const res = await request(`/workouts/client/${clientId}/history`);
-  historyCache[clientId] = res;
+  historyCache[clientId] = {data: res, ts: Date.now()};
   return res;
 }
 
@@ -399,27 +601,13 @@ export async function saveCalendarWorkout(data) {
     added_groups: data.added_groups,
     is_replacement: !!data.is_replacement,
     replaced_client_id: data.replaced_client_id || null,
+    expected_event_id: data.expected_event_id || null,
+    expected_updated_at: data.expected_updated_at || null,
+    reactivate: !!data.reactivate,
+    confirm_duplicate: !!data.confirm_duplicate,
+    exercises: data.exercises || [],
   };
-  await createCalendarEvent(calendarPayload);
-
-  // Zapis bez ćwiczeń: sam wpis w kalendarzu, logów nie ruszamy
-  // (ani nie dopisujemy, ani nie czyścimy — czyszczenie robi Usuń).
-  if (!data.exercises || data.exercises.length === 0) return [];
-
-  const batchPayload = {
-    client_id: data.client_id,
-    session_date: data.event_date,
-    week_number: 1,
-    logs: data.exercises.map(ex => ({
-      client_id: data.client_id,
-      exercise_id: ex.exercise_id,
-      weight_kg: ex.weight_kg,
-      reps: ex.reps,
-      week_number: 1,
-      session_date: data.event_date,
-    })),
-  };
-  return saveWorkoutBatch(batchPayload);
+  return request('/calendar/save-workout', {method: 'POST', body: calendarPayload});
 }
 
 // ── Measurements ────────────────────────────────────────────────────────────
@@ -516,16 +704,6 @@ export function removeExerciseFromPlan(planExerciseId) {
   return request(`/config/plan-exercises/${planExerciseId}`, { method: 'DELETE' });
 }
 
-export function sendReportEmail(data) {
-  
-  return request('/email/send-report', { method: 'POST', body: data });
-}
-
-export function sendPlanEmail(data) {
-  
-  return request('/email/send-plan', { method: 'POST', body: data });
-}
-
 export function createWorkoutType(name) {
   
   invalidateCache('workoutTypes');
@@ -601,4 +779,18 @@ export function classifySessionDate(sessionDate, trainerDates) {
 // 2.0: podsumowanie tygodnia (Strefa Trenera) — wszystkie statusy + absencje.
 export function getWeekSummary(mondayDate) {
   return request(`/calendar/week-summary/${mondayDate}`);
+}
+
+export function getTrainerOverview(year, month, clientId = '') {
+  return request(`/trainer/overview?year=${year}&month=${month}${clientId ? `&client_id=${encodeURIComponent(clientId)}` : ''}`);
+}
+export function getManagerData(source) {
+  return request(`/trainer/manager?source=${source}`);
+}
+export function previewWeekCopy(data) {
+  return request('/trainer/copy-preview', {method:'POST',body:data});
+}
+export async function commitWeekCopy(data) {
+  try { return await request('/trainer/copy', {method:'POST',body:data}); }
+  finally { invalidateCache('calendar'); invalidateCache('clients'); invalidateCache('workouts'); }
 }

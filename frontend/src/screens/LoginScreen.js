@@ -34,7 +34,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const data = await login(cleanEmail, cleanPassword);
-      await signIn(data.access_token, cleanEmail, data.refresh_token);
+      await signIn(data, cleanEmail);
     } catch (err) {
       let msg = err.message || 'Logowanie nieudane';
       if (msg.includes('401') || msg.toLowerCase().includes('invalid login credentials')) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../assets/theme';
@@ -104,32 +105,6 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
 
-
-        <Text style={styles.sectionTitle}>Zarządzanie Treningami</Text>
-        <TouchableOpacity 
-          style={styles.navButton} 
-          onPress={() => navigation.navigate('MuscleExercises')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.navButtonIcon}>
-            <Ionicons name="barbell-outline" size={24} color={C.accent} />
-          </View>
-          <Text style={styles.navButtonText}>Ćwiczenia z podziałem na partie mięśniowe</Text>
-          <Ionicons name="chevron-forward" size={20} color={themeColors.textMuted} />
-        </TouchableOpacity>
-
-
-        <TouchableOpacity 
-          style={styles.navButton} 
-          onPress={() => navigation.navigate('PlanManager')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.navButtonIcon}>
-            <Ionicons name="create-outline" size={24} color={C.accent} />
-          </View>
-          <Text style={styles.navButtonText}>Edytor planów treningowych</Text>
-          <Ionicons name="chevron-forward" size={20} color={themeColors.textMuted} />
-        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Aktualizacja</Text>
         <View style={[styles.navButton, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>

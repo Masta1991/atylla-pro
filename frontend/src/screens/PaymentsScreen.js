@@ -1,23 +1,18 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Alert, ActivityIndicator, RefreshControl, Modal, FlatList, TextInput, Platform
+  ActivityIndicator, RefreshControl, Modal, FlatList, TextInput, Platform
 } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '../assets/theme';
 import * as api from '../services/api';
+import { packageTrainingRows, slotHasEnded as isSlotPassed } from '../services/billingHistory';
 import AppLayout from '../components/AppLayout';
 import DropdownPicker from '../components/DropdownPicker';
 import { useTheme } from '../context/ThemeContext';
-
-// 2.0: stan treningu ze statusu i czasu (trening 8-9 o 9:01 to odbyty).
-function isSlotPassed(dateStr, hour) {
-  const end = new Date(dateStr + 'T00:00:00');
-  end.setHours(Number(hour) + 1, 0, 0, 0);
-  return Date.now() > end.getTime();
-}
 
 export default function PaymentsScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
@@ -26,6 +21,10 @@ export default function PaymentsScreen({ navigation, route }) {
   const [clients, setClients] = useState(global.cachedClients || []);
   const [loading, setLoading] = useState(!global.cachedClients);
   const [refreshing, setRefreshing] = useState(false);
+  const isClientView = route?.name === 'ClientPayments';
+  const visibleClients = isClientView
+    ? clients.filter(client => client.id === route?.params?.clientId)
+    : clients;
   
   // History modal states
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
@@ -52,13 +51,7 @@ export default function PaymentsScreen({ navigation, route }) {
   // Unia eventów klienta + członków wspólnej puli (do liczenia i pickerów).
   const fetchUnionEvents = async (client) => {
     const ids = [client.id, ...((client.shared_with || []).filter(id => id !== client.id))];
-    const all = [];
-    for (const id of ids) {
-      try {
-        const evs = await api.getCalendarEvents(null, null, id);
-        all.push(...(evs || []));
-      } catch (e) {}
-    }
+    const all = (await Promise.all(ids.map(id => api.getCalendarEvents(null, null, id, false, true)))).flat();
     const seen = new Set();
     return all.filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)));
   };
@@ -101,19 +94,17 @@ export default function PaymentsScreen({ navigation, route }) {
     }, [loadData])
   );
 
-  // Deep-link z kalendarza (tryb PAKIET): otworz rozliczenia wskazanego klienta.
-  // Z szuflady (openStart): od razu modal startu rozliczenia.
+  // Tylko jawne openStart otwiera modal. Tryb PAKIET pokazuje główną kartę klienta.
   const deepLinkHandled = useRef(null);
   const deepClientId = route?.params?.clientId;
   const deepOpenStart = route?.params?.openStart;
   useEffect(() => {
-    if (deepClientId && clients.length > 0 && deepLinkHandled.current !== deepClientId + (deepOpenStart ? ':start' : '')) {
+    if (deepOpenStart && deepClientId && clients.length > 0 && deepLinkHandled.current !== deepClientId + ':start') {
       const target = clients.find(c => c.id === deepClientId);
       if (target) {
-        deepLinkHandled.current = deepClientId + (deepOpenStart ? ':start' : '');
-        navigation.setParams({ clientId: null, openStart: null });
-        if (deepOpenStart) handleOpenStartBilling(target);
-        else openHistory(target);
+        deepLinkHandled.current = deepClientId + ':start';
+        navigation.setParams({ openStart: null });
+        handleOpenStartBilling(target);
       }
     }
   }, [deepClientId, deepOpenStart, clients]);
@@ -157,8 +148,7 @@ export default function PaymentsScreen({ navigation, route }) {
     // Typ z modala (nie z karty klienta); typ zapisuje się na kliencie.
     const isPackage = billingChoice === 'package';
     if (isPackage && !startEventId) {
-      if (Platform.OS === 'web') window.alert('Błąd: Dla pakietów SSOT musisz wskazać trening startowy.');
-      else Alert.alert('Błąd', 'Dla pakietów SSOT musisz wskazać trening startowy.');
+      Alert.alert('Błąd', 'Dla pakietów SSOT musisz wskazać trening startowy.');
       return;
     }
 
@@ -184,12 +174,10 @@ export default function PaymentsScreen({ navigation, route }) {
           });
       }
 
-      if (Platform.OS === 'web') window.alert('Sukces: Rozpoczęto nowe rozliczanie SSOT.');
-      else Alert.alert('Sukces', 'Rozpoczęto nowe rozliczanie SSOT.');
+      Alert.alert('Sukces', 'Rozpoczęto nowe rozliczanie SSOT.');
       loadData();
     } catch (e) {
-      if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-      else Alert.alert('Błąd', e.message);
+      Alert.alert('Błąd', e.message);
       setLoading(false);
     }
   };
@@ -238,20 +226,17 @@ export default function PaymentsScreen({ navigation, route }) {
     // 2.0: zamkniecie bez wskazania treningu tylko gdy brak treningow w ogole.
     const existingTrainings = clientEvents.filter(e => e.status !== 'deleted');
     if (existingTrainings.length > 0 && !endEventId) {
-        if (Platform.OS === 'web') window.alert('Błąd: Wskaż trening zamykający ten cykl.');
-        else Alert.alert('Błąd', 'Wskaż trening zamykający ten cykl.');
+        Alert.alert('Błąd', 'Wskaż trening zamykający ten cykl.');
         return;
     }
     
     const isPackage = selectedClient.billing_type === 'package';
     if (isPackage && !selectedClient.active_package_id) {
-        if (Platform.OS === 'web') window.alert('Błąd: Ten podopieczny nie ma obecnie aktywnego pakietu do zamknięcia.');
-        else Alert.alert('Błąd', 'Ten podopieczny nie ma obecnie aktywnego pakietu do zamknięcia.');
+        Alert.alert('Błąd', 'Ten podopieczny nie ma obecnie aktywnego pakietu do zamknięcia.');
         return;
     }
     if (!isPackage && !selectedClient.package_purchase_date) {
-        if (Platform.OS === 'web') window.alert('Błąd: Ten podopieczny nie ma aktywnego cyklu rozliczeniowego.');
-        else Alert.alert('Błąd', 'Ten podopieczny nie ma aktywnego cyklu rozliczeniowego.');
+        Alert.alert('Błąd', 'Ten podopieczny nie ma aktywnego cyklu rozliczeniowego.');
         return;
     }
     
@@ -259,8 +244,7 @@ export default function PaymentsScreen({ navigation, route }) {
     const endEv = clientEvents.find(e => e.id === endEventId);
     if (endEv && selectedClient.package_purchase_date) {
         if (new Date(endEv.event_date) < new Date(selectedClient.package_purchase_date)) {
-            if (Platform.OS === 'web') window.alert('Błąd SSOT: Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu.');
-            else Alert.alert('Błąd SSOT 🐶', 'Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu. Nie możesz zamknąć w przeszłość! Wybierz poprawny trening.');
+            Alert.alert('Błąd SSOT 🐶', 'Wskazany trening końcowy odbył się wcześniej niż punkt startowy tego pakietu. Nie możesz zamknąć w przeszłość! Wybierz poprawny trening.');
             return;
         }
     }
@@ -283,25 +267,19 @@ export default function PaymentsScreen({ navigation, route }) {
             } else {
                 // T9: liczy backend (close-cycle start..koniec), nie kopiujemy licznika.
                 await api.closeClientCycle(selectedClient.id, {
+                    expected_updated_at: selectedClient.updated_at,
                     end_date: endEv?.event_date || new Date().toISOString().split('T')[0]
                 });
             }
-            if (Platform.OS === 'web') window.alert('Sukces: Pakiet został domknięty. Zarchiwizowano historię.');
-            else Alert.alert('Sukces', 'Pakiet został domknięty. Zarchiwizowano historię.');
+            Alert.alert('Sukces', 'Pakiet został domknięty. Zarchiwizowano historię.');
             loadData();
         } catch (e) {
-            if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-            else Alert.alert('Błąd', e.message);
+            Alert.alert('Błąd', e.message);
             setLoading(false);
         }
     };
 
-    if (Platform.OS === 'web') {
-        if (window.confirm('Czy na pewno chcesz zarchiwizować ten cykl? (Możesz to cofnąć usuwając go z Historii)')) {
-            commitArchiving();
-        }
-    } else {
-        Alert.alert(
+    Alert.alert(
             'Archiwizacja Pakietu 🐶',
             'Zamykanie pakietu służy do zarchiwizowania zakończonego cyklu w Historii. Czy na pewno zarchiwizować?',
             [
@@ -309,19 +287,12 @@ export default function PaymentsScreen({ navigation, route }) {
                 { text: 'Tak, zarchiwizuj', style: 'destructive', onPress: commitArchiving }
             ]
         );
-    }
   };
 
   // Unia pakietów klienta + członków wspólnej puli (ta sama historia u obojga).
   const fetchUnionPackages = async (client) => {
     const ids = [client.id, ...((client.shared_with || []).filter(id => id !== client.id))];
-    const all = [];
-    for (const id of ids) {
-      try {
-        const p = await api.getClientPackages(id);
-        all.push(...(p || []));
-      } catch (e) {}
-    }
+    const all = (await Promise.all(ids.map(id => api.getClientPackages(id)))).flat();
     const seen = new Set();
     return all.filter(p => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   };
@@ -329,17 +300,18 @@ export default function PaymentsScreen({ navigation, route }) {
   const openHistory = async (client) => {
     setLoading(true);
     try {
-        const abs = await api.getAbsences().catch(() => []);
-        setClientAbsences((abs || []).filter(a => a.client_id === client.id));
+        const [abs, evs, pkgs] = await Promise.all([
+          api.getAbsences(), fetchUnionEvents(client),
+          client.billing_type === 'package' ? fetchUnionPackages(client) : Promise.resolve([]),
+        ]);
+        const pool=new Set([client.id,...(client.shared_with||[])]);
+        setClientAbsences((abs || []).filter(a => pool.has(a.client_id)));
         setExpandedHistoryId(null);
         if (client.billing_type === 'package') {
-            const pkgs = await fetchUnionPackages(client);
-            const evs = await fetchUnionEvents(client);
             const sorted = (pkgs || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
             setClientPackages(sorted);
             setClientEvents(evs || []);
         } else {
-            const evs = await fetchUnionEvents(client).catch(() => []);
             // Unia historii miesięcznych członków puli + karta bieżącego (otwartego) cyklu na górze.
             const ownHist = client.payment_history || [];
             const othersHist = [];
@@ -372,36 +344,7 @@ export default function PaymentsScreen({ navigation, route }) {
   // Zakres wyznacza TYLKO pakiet/cykl (start..koniec) — bez odcięcia "do dziś",
   // żeby zaplanowane przyszłe treningi też się liczyły.
   function packageTrainings(item, isPackage) {
-    const evs = (clientEvents || []).slice().sort((a, b) =>
-      a.event_date === b.event_date ? a.event_hour - b.event_hour : (a.event_date < b.event_date ? -1 : 1));
-    let from = '0000-00-00', to = null;
-    if (isPackage) {
-      const s = evs.find(e => e.id === item.start_training_id);
-      const en = evs.find(e => e.id === item.end_training_id);
-      if (s) from = s.event_date;
-      if (en) to = en.event_date;
-    } else {
-      if (item.purchase_date) from = item.purchase_date;
-      if (item.end_date) to = item.end_date;
-    }
-    const inRange = evs.filter(e => e.event_date >= from && (to === null || e.event_date <= to));
-    const abs = (clientAbsences || []).filter(a => a.absence_date >= from && (to === null || a.absence_date <= to));
-    const rows = inRange.map(e => ({
-      key: e.id, date: e.event_date, hour: e.event_hour,
-      partner: e.partner_name || null,
-      state: e.status === 'cancelled' ? (e.is_settled ? 'cancel-settled' : 'cancel') : (isSlotPassed(e.event_date, e.event_hour) ? 'done' : 'planned'),
-    }));
-    const evKeys = new Set(inRange.map(e => `${e.event_date}|${e.event_hour}`));
-    abs.forEach((a, i) => {
-      if (!evKeys.has(`${a.absence_date}|${a.absence_hour}`)) {
-        rows.push({ key: `abs-${i}`, date: a.absence_date, hour: a.absence_hour, state: 'cancel-free' });
-      }
-    });
-    rows.sort((a, b) => a.date === b.date ? a.hour - b.hour : (a.date < b.date ? -1 : 1));
-    const done = rows.filter(r => r.state === 'done').length;
-    const cSettled = rows.filter(r => r.state === 'cancel-settled').length;
-    const cFree = rows.filter(r => r.state === 'cancel-free' || r.state === 'cancel').length;
-    return { rows, done, cSettled, cFree, from, to };
+    return packageTrainingRows(item, isPackage, clientEvents, clientAbsences, isSlotPassed);
   }
 
   const handleDeleteHistoryItem = (item) => {
@@ -416,22 +359,15 @@ export default function PaymentsScreen({ navigation, route }) {
                   const newHistory = history.filter(h => h.archived_at !== item.archived_at);
                   await api.updateClient(selectedClient.id, { payment_history: newHistory });
               }
-              if (Platform.OS === 'web') alert('Sukces: Wpis z historii został usunięty.');
-              else Alert.alert('Sukces', 'Wpis z historii został usunięty.');
+              Alert.alert('Sukces', 'Wpis z historii został usunięty.');
               loadData();
           } catch(e) {
-              if (Platform.OS === 'web') alert('Błąd: ' + e.message);
-              else Alert.alert('Błąd', e.message);
+              Alert.alert('Błąd', e.message);
               setLoading(false);
           }
       };
 
-      if (Platform.OS === 'web') {
-          if (window.confirm('Dzień 0 (Twarde Usuwanie) 🐶\n\nTa operacja całkowicie usunie ten wpis z historii SSOT. Czy jesteś absolutnie pewien, że chcesz go wyzerować?')) {
-              executeDelete();
-          }
-      } else {
-          Alert.alert(
+      Alert.alert(
               'Dzień 0 (Twarde Usuwanie) 🐶', 
               'Ta operacja całkowicie usunie ten wpis z historii SSOT. Czy jesteś absolutnie pewien, że chcesz go wyzerować?',
               [
@@ -439,30 +375,22 @@ export default function PaymentsScreen({ navigation, route }) {
                   { text: 'Tak, skasuj', style: 'destructive', onPress: executeDelete }
               ]
           );
-      }
   };
 
   const handleHardReset = async (client) => {
       const executeReset = async () => {
           setLoading(true);
           try {
-              await api.hardResetClient(client.id);
-              if (Platform.OS === 'web') alert('Sukces: Pakiety zostały bezpowrotnie zresetowane do zera.');
-              else Alert.alert('Sukces', 'Pakiety zostały bezpowrotnie zresetowane do zera.');
+              await api.hardResetClient(client.id, client.updated_at);
+              Alert.alert('Sukces', 'Pakiety zostały bezpowrotnie zresetowane do zera.');
               loadData();
           } catch(e) {
-              if (Platform.OS === 'web') alert('Błąd: ' + e.message);
-              else Alert.alert('Błąd', e.message);
+              Alert.alert('Błąd', e.message);
               setLoading(false);
           }
       };
 
-      if (Platform.OS === 'web') {
-          if (window.confirm(`TWARDY RESET 🚨\n\nTa operacja wyzeruje absolutnie wszystkie powiązania pakietowe i daty startowe dla ${client.name}. Używaj tylko w sytuacjach awaryjnych! Kontynuować?`)) {
-              executeReset();
-          }
-      } else {
-          Alert.alert(
+      Alert.alert(
               'TWARDY RESET 🚨',
               `Ta operacja wyzeruje absolutnie wszystkie powiązania pakietowe i daty startowe dla ${client.name}. Używaj tylko w sytuacjach awaryjnych! Kontynuować?`,
               [
@@ -470,7 +398,6 @@ export default function PaymentsScreen({ navigation, route }) {
                   { text: 'Tak, Zeruj', style: 'destructive', onPress: executeReset }
               ]
           );
-      }
   };
 
   const openEditModal = (client) => {
@@ -600,10 +527,12 @@ export default function PaymentsScreen({ navigation, route }) {
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
       >
-        <Text style={styles.title}>Status Płatności Podopiecznych</Text>
-        <Text style={styles.subtitle}>Sprawdź statusy pakietów oraz rozliczenia miesięczne swoich klientów.</Text>
+        <Text style={styles.title}>{isClientView ? 'Rozliczenia klienta' : 'Status Płatności Podopiecznych'}</Text>
+        <Text style={styles.subtitle}>{isClientView
+          ? 'Pakiet, bieżące rozliczenie i historia wybranej osoby.'
+          : 'Sprawdź statusy pakietów oraz rozliczenia miesięczne swoich klientów.'}</Text>
         
-        {clients.map(client => {
+        {visibleClients.map(client => {
           const isPackage = client.billing_type === 'package';
           const isSingle = client.billing_type === 'single' || (!client.billing_type && !isPackage);
           const size = client.package_size || 0;
@@ -611,7 +540,7 @@ export default function PaymentsScreen({ navigation, route }) {
           const isOverLimit = isPackage && current > size;
           
           return (
-            <View key={client.id} style={[styles.card, isOverLimit && styles.cardWarning]}>
+            <View key={client.id} testID={`payment-card-${client.id}`} style={[styles.card, isOverLimit && styles.cardWarning]}>
               <View style={styles.cardHeader}>
                 <View style={styles.clientMeta}>
                   <View style={styles.avatar}>
@@ -651,7 +580,7 @@ export default function PaymentsScreen({ navigation, route }) {
                 <View style={styles.infoRow}>
                   <Ionicons name="calendar-outline" size={16} color={themeColors.textSecondary} />
                   <Text style={styles.infoText}>
-                    Od: <Text style={styles.infoValue}>{client.package_purchase_date || 'brak daty'}</Text>
+                    Od: <Text style={styles.infoValue}>{client.package_pending_start ? 'oczekuje na kolejny trening' : (client.package_purchase_date || 'brak daty')}</Text>
                   </Text>
                 </View>
 
@@ -691,7 +620,7 @@ export default function PaymentsScreen({ navigation, route }) {
               </View>
 
               <View style={[styles.cardActions, { flexWrap: 'wrap', gap: 8 }]}>
-                {!client.package_purchase_date && (
+                {!client.package_purchase_date && !client.active_package_id && (
                   <TouchableOpacity
                     style={[styles.btn, styles.btnPrimary, { flex: 1, minWidth: '48%' }]}
                     onPress={() => handleOpenStartBilling(client)}
@@ -737,10 +666,10 @@ export default function PaymentsScreen({ navigation, route }) {
           );
         })}
 
-        {clients.length === 0 && (
+        {visibleClients.length === 0 && (
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={48} color={themeColors.textMuted} />
-            <Text style={styles.emptyText}>Brak klientów do wyświetlenia.</Text>
+            <Text style={styles.emptyText}>{isClientView ? 'Nie znaleziono wybranego klienta. Wróć do kalendarza i odśwież dane.' : 'Brak klientów do wyświetlenia.'}</Text>
           </View>
         )}
       </ScrollView>
@@ -787,7 +716,9 @@ export default function PaymentsScreen({ navigation, route }) {
                 const expanded = expandedHistoryId === hid;
                 const t = packageTrainings(item, isPkg);
                 const startLabel = isPkg
-                  ? ((clientEvents.find(e => e.id === item.start_training_id)?.event_date) || 'Brak danych')
+                  ? (item.id === selectedClient?.active_package_id
+                    ? (selectedClient.package_pending_start ? 'Oczekuje na trening' : selectedClient.package_purchase_date)
+                    : ((clientEvents.find(e => e.id === item.start_training_id)?.event_date) || 'Brak danych'))
                   : item.purchase_date;
                 const endLabel = isPkg
                   ? ((clientEvents.find(e => e.id === item.end_training_id)?.event_date) || 'Pakiet otwarty')
@@ -820,7 +751,7 @@ export default function PaymentsScreen({ navigation, route }) {
                           </Text>
                         </View>
                         <Text style={[styles.historyDate, { marginTop: 6 }]}>
-                          Treningi: {t.rows.length} • odbyte: {t.done} • odwołane rozl.: {t.cSettled} • odwołane bez: {t.cFree}
+                          {t.incomplete ? 'Niepełna historia — brak granicy pakietu. Odśwież dane.' : `Treningi: ${t.rows.length} • odbyte: ${t.done} • odwołane rozl.: ${t.cSettled} • odwołane bez: ${t.cFree}`}
                         </Text>
                         {isPkg && (
                           <Text style={[styles.historyCountText, { fontSize: 12, color: themeColors.textMuted, marginTop: 2 }]}>

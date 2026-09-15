@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, ActivityIndicator,
 } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import DropdownPicker from '../components/DropdownPicker';
 import { SPACING } from '../assets/theme';
 import { useTheme } from '../context/ThemeContext';

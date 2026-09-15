@@ -47,6 +47,8 @@ class ClientUpdate(BaseModel):
     shared_monthly_with: Optional[List[UUID]] = None
 
 class ClientResponse(ClientBase):
+    package_pending_start: bool = False
+    effective_start_training_id: Optional[UUID] = None
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -73,6 +75,20 @@ class CalendarEventBase(BaseModel):
 
 class CalendarEventCreate(CalendarEventBase):
     pass
+
+
+class CalendarWorkoutExercise(BaseModel):
+    exercise_id: UUID
+    weight_kg: Optional[float] = None
+    reps: Optional[int] = None
+
+
+class CalendarWorkoutSave(CalendarEventBase):
+    reactivate: bool = False
+    confirm_duplicate: bool = False
+    exercises: List[CalendarWorkoutExercise] = Field(default_factory=list, max_length=1000)
+    expected_event_id: Optional[UUID] = None
+    expected_updated_at: Optional[datetime] = None
 
 class ReplaceWeekRequest(BaseModel):
     monday_date: date
@@ -104,9 +120,9 @@ class EndBillingRequest(BaseModel):
 
 class CalendarSwapRequest(BaseModel):
     date1: date
-    hour1: int
+    hour1: int = Field(ge=6, le=21)
     date2: date
-    hour2: int
+    hour2: int = Field(ge=6, le=21)
 
 class CalendarEventResponse(CalendarEventBase):
     id: UUID
@@ -121,6 +137,7 @@ class CalendarEventResponse(CalendarEventBase):
     billing_flag: Optional[str] = None  # LAST | OVERFLOW (pakiet), None w pozostałych
     tile_number: Optional[int] = None  # pozycja w pakiecie/cyklu (od razu, bez rozliczenia)
     partner_name: Optional[str] = None  # imię współćwiczącego (liczone, nie kolumna)
+    in_closed_cycle: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -129,10 +146,10 @@ class CalendarEventResponse(CalendarEventBase):
 class AbsenceBase(BaseModel):
     client_id: UUID
     absence_date: date
-    absence_hour: Optional[int] = None
+    absence_hour: Optional[int] = Field(default=None, ge=6, le=21)
 
 class AbsenceCreate(AbsenceBase):
-    pass
+    paid: bool = False
 
 class AbsenceResponse(AbsenceBase):
     id: UUID
@@ -157,12 +174,14 @@ class WorkoutLogCreate(WorkoutLogBase):
 class WorkoutLogBatch(BaseModel):
     """Batch save multiple workout logs at once"""
     client_id: UUID
+    calendar_event_id: Optional[UUID] = None
     session_date: date
     week_number: int
     logs: List[WorkoutLogCreate]
 
 class WorkoutLogResponse(WorkoutLogBase):
     id: UUID
+    calendar_event_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -297,7 +316,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=16384)
+    idle_token: Optional[str] = Field(default=None, max_length=4096)
+
+
 class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     user_id: UUID
+    idle_token: str
+    idle_expires_at: int
+    session_id: UUID
+    idle_timeout_seconds: int

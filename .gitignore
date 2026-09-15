@@ -23,6 +23,13 @@ backend/error.log
 *.db
 *.sqlite3
 
+# Local credentials and disposable local QA/build output
+**/.env
+**/.env.*
+!**/.env.example
+docs/credentials_and_docs/
+.tmp/
+
 # Node / frontend dependencies (in case they are tracked by root)
 **/node_modules/
 **/dist/

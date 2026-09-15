@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  TextInput, Alert, Platform
+  TextInput, Platform
 } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DropdownPicker from '../components/DropdownPicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -90,8 +91,7 @@ export default function ClientFormScreen({ navigation, route }) {
 
   async function handleSave() {
     if (!name.trim()) { 
-      if (Platform.OS === 'web') window.alert('Błąd: Podaj imię i nazwisko');
-      else Alert.alert('Błąd', 'Podaj imię i nazwisko');
+      Alert.alert('Błąd', 'Podaj imię i nazwisko');
       return; 
     }
     try {
@@ -108,11 +108,7 @@ export default function ClientFormScreen({ navigation, route }) {
       }
       navigation.goBack();
     } catch (e) {
-      if (Platform.OS === 'web') {
-        window.alert('Błąd zapisu: ' + (e.message || JSON.stringify(e)));
-      } else {
-        Alert.alert('Błąd', e.message);
-      }
+      Alert.alert('Błąd', e.message);
     }
   }
 

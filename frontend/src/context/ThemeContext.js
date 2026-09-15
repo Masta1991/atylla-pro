@@ -25,6 +25,7 @@ export const LIGHT_COLORS = {
   success: '#1A7F37',
   warning: '#9A6700',
   white: '#ffffff',
+  black: '#000000',
 };
 
 export const DARK_COLORS = {
@@ -39,6 +40,7 @@ export const DARK_COLORS = {
   success: '#3fb950',
   warning: '#d29922',
   white: '#ffffff',
+  black: '#000000',
 };
 
 const ThemeContext = createContext({

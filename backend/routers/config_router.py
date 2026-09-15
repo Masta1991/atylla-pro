@@ -91,7 +91,8 @@ def list_exercises_grouped(request: Request):
     result = {}
     for g in (groups.data or []):
         result[g["name"]] = [
-            {"id": e["id"], "name": e["name"], "unit": e.get("unit", "KG")}
+            {"id": e["id"], "name": e["name"], "unit": e.get("unit", "KG"),
+             "muscle_group_id": e["muscle_group_id"], "sort_order": e.get("sort_order", 0)}
             for e in (exercises.data or [])
             if e["muscle_group_id"] == g["id"]
         ]
@@ -191,7 +192,9 @@ def add_exercise_to_plan(plan_id: str, data: PlanExerciseCreate, request: Reques
 @router.put("/plan-exercises/{id}")
 def update_plan_exercise(id: str, data: PlanExerciseUpdate, request: Request):
     supabase, _ = get_user_supabase(request)
-    payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
+    # Explicit null clears a superset; omitted fields remain unchanged.
+    payload = {k: v for k, v in data.model_dump(exclude_unset=True, mode='json').items()
+               if v is not None or k == 'superset_id'}
     if not payload:
         return {"status": "no update"}
     res = supabase.table("plan_exercises").update(payload).eq("id", id).execute()

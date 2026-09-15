@@ -1,202 +1,141 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Alert } from 'react-native';
-import DropdownPicker from '../components/DropdownPicker';
-import { Ionicons } from '@expo/vector-icons';
-import { SPACING } from '../assets/theme';
-import { useTheme } from '../context/ThemeContext';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
+import { LibraryPicker as DropdownPicker, LibraryButton as PanelButton, useLibraryTheme as usePanelTheme } from '../components/WorkoutLibraryUI';
+import { LoadState } from '../components/TrainerPanels';
+import { LibraryInput, UNITS, unitInfo } from '../components/WorkoutLibraryUI';
+import { askConfirmation, showError } from '../services/confirm';
 import * as api from '../services/api';
 
-export default function MuscleExercisesScreen({ navigation }) {
-  const { colors: C, themeColors } = useTheme();
-  const styles = useMemo(() => makeStyles(C.accent, themeColors), [C.accent, themeColors]);
-  
-  const [muscleGroups, setMuscleGroups] = useState([]);
-  const [exercises, setExercises] = useState([]);
-  const [newMG, setNewMG] = useState('');
-  const [newEx, setNewEx] = useState('');
-  const [newExUnit, setNewExUnit] = useState('KG');
-  const [selectedMG, setSelectedMG] = useState('');
-
-  useEffect(() => { loadAll(); }, []);
-
-  async function loadAll() {
+export default function MuscleExercisesScreen({ navigation, embedded = false, header, initialGroup, registerGuard, onCreated, onDeleted }) {
+  const { s, C, T } = usePanelTheme();
+  const [groups, setGroups] = useState([]), [exercises, setExercises] = useState([]);
+  const [tab, setTab] = useState(initialGroup?.create ? 'groups' : 'exercises'), [query, setQuery] = useState(''), [filter, setFilter] = useState(initialGroup?.name || '');
+  const [form, setForm] = useState(false), [name, setName] = useState(''), [group, setGroup] = useState(initialGroup?.id || ''), [unit, setUnit] = useState('KG');
+  const [groupName, setGroupName] = useState('');
+  const [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const lock = useRef(false), sequence = useRef(0);
+  useEffect(() => {
+    registerGuard?.(async () => !lock.current && (!(name.trim() || groupName.trim()) || await askConfirmation('Niezapisany formularz', 'Odrzucić wpisane dane i zmienić wybór?', 'Odrzuć zmiany')));
+    return () => registerGuard?.(null);
+  }, [registerGuard, name, groupName]);
+  const load = useCallback(async () => {
+    const seq = ++sequence.current; setLoading(true); setError('');
     try {
-      const [mg, ex] = await Promise.all([
-        api.getMuscleGroups().catch(() => []),
-        api.getExercisesGrouped().catch(() => ({})),
-      ]);
-      setMuscleGroups(mg || []);
-      const flat = [];
-      Object.entries(ex || {}).forEach(([part, exs]) => {
-        exs.forEach(e => flat.push({ ...e, part }));
-      });
-      setExercises(flat);
-    } catch (e) {
-      console.log(e);
-    }
+      const [gs, grouped] = await Promise.all([api.getMuscleGroups(), api.getExercisesGrouped()]);
+      if (seq !== sequence.current) return;
+      setGroups(gs); setExercises(Object.entries(grouped).flatMap(([part, rows]) => rows.map(e => ({ ...e, part }))));
+    } catch (e) { if (seq === sequence.current) setError(e.message); }
+    finally { if (seq === sequence.current) setLoading(false); }
+  }, []);
+  useFocusEffect(useCallback(() => { load(); return () => { sequence.current++; }; }, [load]));
+  async function run(action) {
+    if (lock.current) return;
+    const trigger = typeof document !== 'undefined' ? document.activeElement : null;
+    lock.current = true; setBusy(true); setMessage('');
+    try { await action(); } catch (e) { await showError(e.message); }
+    finally { lock.current = false; setBusy(false); requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus(); }); }
   }
-
-  async function addMuscleGroup() {
-    if (!newMG.trim()) return;
-    try { await api.createMuscleGroup(newMG.trim()); setNewMG(''); loadAll(); } catch (e) { Alert.alert('Błąd', e.message); }
-  }
-  async function deleteMuscleGroup(id) {
-    try { await api.deleteMuscleGroup(id); loadAll(); } catch (e) { Alert.alert('Błąd', e.message); }
-  }
-
-  async function addExercise() {
-    if (!newEx.trim() || !selectedMG) return;
-    try {
-      await api.createExercise({ muscle_group_id: selectedMG, name: newEx.trim(), unit: newExUnit });
-      setNewEx('');
-      setNewExUnit('KG');
-      loadAll();
-    } catch (e) { Alert.alert('Blad', e.message); }
-  }
-  async function deleteExercise(id) {
-    try { await api.deleteExercise(id); loadAll(); } catch (e) { Alert.alert('Błąd', e.message); }
-  }
-
-  const groupedExercises = {};
-  exercises.forEach(e => {
-    (groupedExercises[e.part] = groupedExercises[e.part] || []).push(e);
+  const addExercise = () => run(async () => {
+    if (!name.trim() || !group) return;
+    await api.createExercise({ name: name.trim(), muscle_group_id: group, unit });
+    setName(''); setForm(false); setMessage('Ćwiczenie dodane do biblioteki.'); await load();
   });
-
-  async function moveExercise(part, index, direction) {
-    const exs = groupedExercises[part];
-    if ((direction === -1 && index === 0) || (direction === 1 && index === exs.length - 1)) return;
-    
-    const newExs = [...exs];
-    const temp = newExs[index];
-    newExs[index] = newExs[index + direction];
-    newExs[index + direction] = temp;
-    
-    // Optymistyczna aktualizacja, żeby nie czekać na reload
-    const newFlat = exercises.map(e => {
-       if (e.part === part) {
-          const newIdx = newExs.findIndex(nx => nx.id === e.id);
-          return { ...e, sort_order: newIdx };
-       }
-       return e;
-    }).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-    setExercises(newFlat);
-
-    try {
-      await Promise.all(
-        newExs.map((ex, idx) => api.updateExercise(ex.id, { sort_order: idx }))
-      );
-      loadAll();
-    } catch (e) {
-      Alert.alert('Błąd', e.message);
-    }
-  }
-
-  return (
-    <AppLayout navigation={navigation} title="Partie Mięśniowe" showBack>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        
-        <Text style={styles.sectionTitle}>Partie mięśniowe</Text>
-        <View style={styles.row}>
-          <TextInput style={[styles.input, { flex: 1 }]} value={newMG} onChangeText={setNewMG} placeholder="Nowa partia..." placeholderTextColor={themeColors.textMuted} />
-          <TouchableOpacity style={[styles.addBtn, { backgroundColor: C.accent }]} onPress={addMuscleGroup}>
-            <Text style={styles.addBtnText}>Dodaj</Text>
-          </TouchableOpacity>
+  const addGroup = () => run(async () => {
+    if (!groupName.trim()) return;
+    const created = await api.createMuscleGroup(groupName.trim());
+    setGroupName(''); setGroup(created.id); setMessage('Partia mięśniowa dodana.'); await load(); onCreated?.(created);
+  });
+  const remove = (item, isGroup) => run(async () => {
+    const details = isGroup
+      ? 'Usunięcie partii usuwa też jej ćwiczenia, ich wpisy w planach i zapisane wyniki treningów. Tej operacji nie można cofnąć.'
+      : 'Usunięcie ćwiczenia usuwa też jego wpisy we wszystkich planach i zapisane wyniki treningów. Tej operacji nie można cofnąć.';
+    if (!await askConfirmation(`Usunąć „${item.name}”?`, details, 'Usuń trwale')) return;
+    await (isGroup ? api.deleteMuscleGroup(item.id) : api.deleteExercise(item.id));
+    if (isGroup && group === item.id) setGroup('');
+    if (isGroup && filter === item.name) setFilter('');
+    setMessage('Usunięto.'); await load(); if (isGroup) onDeleted?.();
+  });
+  const move = (ex, direction) => run(async () => {
+    const rows = exercises.filter(e => e.part === ex.part), index = rows.findIndex(e => e.id === ex.id), target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    [rows[index], rows[target]] = [rows[target], rows[index]];
+    const results = await Promise.allSettled(rows.map((e, i) => api.updateExercise(e.id, { sort_order: i })));
+    await load();
+    if (results.some(r => r.status === 'rejected')) throw new Error('Nie udało się zapisać całej kolejności. Odświeżono listę; sprawdź położenie ćwiczeń przed kolejną zmianą.');
+  });
+  const visible = exercises.filter(e => (!filter || e.part === filter) && `${e.name} ${e.part}`.toLocaleLowerCase('pl').includes(query.trim().toLocaleLowerCase('pl')));
+  const Layout = embedded ? React.Fragment : AppLayout;
+  return <Layout {...(embedded ? {} : { navigation, title: 'Ćwiczenia i partie', showBack: true })}>
+    <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+      {header}
+      {!embedded && <>
+      <Text style={s.heading}>Biblioteka ćwiczeń</Text>
+      <Text style={s.muted}>Twórz ćwiczenia, przypisuj je do partii mięśniowych i wybieraj sposób mierzenia wyniku.</Text>
+      <View style={s.row}>
+        <PanelButton selected={tab === 'exercises'} disabled={busy} onPress={() => setTab('exercises')}>Ćwiczenia</PanelButton>
+        <PanelButton selected={tab === 'groups'} disabled={busy} onPress={() => setTab('groups')}>Partie mięśniowe</PanelButton>
+        <PanelButton disabled={busy} onPress={() => navigation.navigate('PlanManager')}>Przejdź do planów</PanelButton>
+      </View>
+      </>}
+      <LoadState loading={loading} error={error} retry={load} />
+      {!!message && <Text style={s.text} accessibilityLiveRegion="polite">{message}</Text>}
+      {!loading && !error && (tab === 'groups' ? <>
+        <View style={s.card}>
+          <Text style={s.title}>Nowa partia mięśniowa</Text>
+          <LibraryInput label="Nazwa partii" placeholder="Np. Plecy" value={groupName} onChangeText={setGroupName} editable={!busy} maxLength={120} />
+          <PanelButton disabled={busy || !groupName.trim()} primary onPress={addGroup}>Dodaj partię</PanelButton>
         </View>
-        {muscleGroups.map(mg => (
-          <View key={mg.id} style={styles.itemRow}>
-            <Text style={styles.itemText}>{mg.name}</Text>
-            <TouchableOpacity onPress={() => deleteMuscleGroup(mg.id)}>
-              <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
-            </TouchableOpacity>
+        {!groups.length && <Text style={s.muted}>Dodaj pierwszą partię, aby przypisać do niej ćwiczenia.</Text>}
+        {!embedded && groups.map(g => <View key={g.id} style={s.card}>
+          <Text style={s.title}>{g.name}</Text><Text style={s.muted}>Ćwiczenia: {exercises.filter(e => e.part === g.name).length}</Text>
+          <View style={s.row}>
+            <PanelButton disabled={busy} onPress={() => { setFilter(g.name); setQuery(''); setTab('exercises'); }}>Pokaż ćwiczenia</PanelButton>
+            <PanelButton disabled={busy} label={`Usuń partię ${g.name}`} quiet onPress={() => remove(g, true)}>Usuń partię</PanelButton>
           </View>
-        ))}
-
-        <Text style={styles.sectionTitle}>Ćwiczenia</Text>
-        <DropdownPicker
-          placeholder="— Wybierz partię —"
-          selectedValue={selectedMG}
-          onValueChange={setSelectedMG}
-          style={styles.pickerWrap}
-          dropdownIconColor={themeColors.textSecondary}
-          items={[
-            { label: "— Wybierz partię —", value: "", color: themeColors.textMuted },
-            ...muscleGroups.map(mg => ({ label: mg.name, value: mg.id, color: themeColors.text }))
-          ]}
-        />
-        {selectedMG !== '' && (
-          <View style={styles.row}>
-            <TextInput style={[styles.input, { flex: 1 }]} value={newEx} onChangeText={setNewEx} placeholder="Nowe cwiczenie..." placeholderTextColor={themeColors.textMuted} />
-            <DropdownPicker
-              selectedValue={newExUnit}
-              onValueChange={setNewExUnit}
-              style={[styles.pickerWrap, { width: 95, marginLeft: 8, marginBottom: 0 }]}
-              dropdownIconColor={themeColors.textSecondary}
-              items={[
-                { label: "KG", value: "KG", color: themeColors.text },
-                { label: "KM", value: "KM", color: themeColors.text },
-                { label: "POW", value: "POW", color: themeColors.text },
-                { label: "MIN", value: "MIN", color: themeColors.text },
-                { label: "SEK", value: "SEK", color: themeColors.text }
-              ]}
-            />
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: C.accent }]} onPress={addExercise}>
-              <Text style={styles.addBtnText}>Dodaj</Text>
-            </TouchableOpacity>
+        </View>)}
+      </> : <>
+        <View style={s.card}>
+          <View style={[s.row, { justifyContent: 'space-between' }]}>
+            <Text style={s.title}>{embedded ? `${initialGroup.name} · ${visible.length} ćwiczeń` : `Ćwiczenia · ${exercises.length}`}</Text>
+            <PanelButton disabled={busy} selected={form} onPress={() => { setForm(v => !v); if (!group && groups.length) setGroup(groups[0].id); }}>Nowe ćwiczenie</PanelButton>
           </View>
-        )}
-
-        {Object.entries(groupedExercises).map(([part, exs]) => (
-          <View key={part} style={styles.exGroup}>
-            <Text style={styles.exGroupTitle}>{part}</Text>
-            {exs.map((ex, idx) => (
-              <View key={ex.id} style={styles.itemRow}>
-                <Text style={[styles.itemText, { flex: 1 }]}>{ex.name}</Text>
-                <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
-                  <TouchableOpacity onPress={() => moveExercise(part, idx, -1)} disabled={idx === 0}>
-                    <Ionicons name="arrow-up" size={18} color={idx === 0 ? themeColors.textMuted + '40' : themeColors.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => moveExercise(part, idx, 1)} disabled={idx === exs.length - 1}>
-                    <Ionicons name="arrow-down" size={18} color={idx === exs.length - 1 ? themeColors.textMuted + '40' : themeColors.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteExercise(ex.id)} style={{marginLeft: 4}}>
-                    <Ionicons name="trash-outline" size={18} color={themeColors.danger} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+          <LibraryInput label="Szukaj ćwiczenia" placeholder="Nazwa ćwiczenia lub partii" value={query} onChangeText={setQuery} />
+          {!embedded && <DropdownPicker placeholder="Filtr partii" selectedValue={filter} onValueChange={setFilter}
+            items={[{ label: 'Wszystkie partie', value: '' }, ...groups.map(g => ({ label: g.name, value: g.name }))]} />}
+          {embedded && <PanelButton disabled={busy} quiet onPress={() => remove({ id: initialGroup.id, name: initialGroup.name }, true)}>Usuń partię</PanelButton>}
+        </View>
+        {form && <View style={[s.card, { borderColor: C.accent }]}>
+          <Text style={s.title}>Nowe ćwiczenie</Text>
+          <LibraryInput label="Nazwa ćwiczenia" placeholder="Np. Wiosłowanie hantlem" value={name} onChangeText={setName} editable={!busy} maxLength={200} />
+          {groups.length ? <>
+            <Text style={s.muted}>Partia mięśniowa</Text>
+            {embedded ? <Text style={s.text}>{initialGroup.name}</Text> : <DropdownPicker placeholder="Partia ćwiczenia" selectedValue={group} onValueChange={v => !busy && setGroup(v)} items={groups.map(g => ({ label: g.name, value: g.id }))} />}
+          </> : <PanelButton onPress={() => setTab('groups')}>Najpierw dodaj partię mięśniową</PanelButton>}
+          <Text style={s.muted}>Jednostka wyniku</Text>
+          <DropdownPicker placeholder="Jednostka wyniku" selectedValue={unit} onValueChange={v => !busy && setUnit(v)} items={UNITS} />
+          <Text style={s.muted}>Ta jednostka będzie widoczna w planie i podczas zapisywania treningu.</Text>
+          <View style={s.row}>
+            <PanelButton disabled={busy || !name.trim() || !group} primary onPress={addExercise}>Dodaj ćwiczenie</PanelButton>
+            <PanelButton disabled={busy} onPress={() => setForm(false)}>Anuluj</PanelButton>
           </View>
-        ))}
-
-      </ScrollView>
-    </AppLayout>
-  );
-}
-
-function makeStyles(accent, TC) {
-  return StyleSheet.create({
-    scroll: { paddingHorizontal: SPACING.lg, paddingBottom: 100, paddingTop: 16 },
-    sectionTitle: {
-      color: accent, fontSize: 14, fontWeight: '700', marginTop: 24, marginBottom: 10,
-      textTransform: 'uppercase', letterSpacing: 1,
-    },
-    row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-    input: {
-      backgroundColor: TC.surface, borderRadius: 10, padding: 12, fontSize: 14,
-      color: TC.text, borderWidth: 1, borderColor: TC.border,
-    },
-    addBtn: { borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12, justifyContent: 'center' },
-    addBtnText: { color: TC.background, fontWeight: '700', fontSize: 13 },
-    itemRow: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingVertical: 10, paddingHorizontal: 12,
-      backgroundColor: TC.surface, borderRadius: 10,
-      marginBottom: 4, borderWidth: 1, borderColor: TC.border,
-    },
-    itemText: { color: TC.text, fontSize: 14 },
-    pickerWrap: { backgroundColor: TC.surface, borderRadius: 10, borderWidth: 1, borderColor: TC.border, overflow: 'hidden', marginBottom: 8 },
-    picker: { color: TC.text, height: 50, backgroundColor: TC.surface },
-    exGroup: { marginTop: 8 },
-    exGroupTitle: { color: accent, fontSize: 12, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  });
+        </View>}
+        <Text style={s.muted}>Wyniki wyszukiwania: {visible.length}</Text>
+        {!visible.length && <Text style={s.text}>{exercises.length ? 'Brak ćwiczeń pasujących do filtrów.' : 'Biblioteka jest pusta. Dodaj pierwsze ćwiczenie.'}</Text>}
+        {visible.map(ex => {
+          const siblings = exercises.filter(e => e.part === ex.part), index = siblings.findIndex(e => e.id === ex.id);
+          return <View key={ex.id} style={s.card}>
+            <Text style={s.title}>{ex.name}</Text>
+            <View style={s.row}><Text style={s.muted}>{ex.part}</Text><Text style={[s.text, { backgroundColor: T.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }]}>{unitInfo(ex.unit).short}</Text></View>
+            <View style={s.row}>
+              <PanelButton label={`Przenieś ${ex.name} wyżej`} disabled={busy || !!query || index === 0} onPress={() => move(ex, -1)}>↑ Wyżej</PanelButton>
+              <PanelButton label={`Przenieś ${ex.name} niżej`} disabled={busy || !!query || index === siblings.length - 1} onPress={() => move(ex, 1)}>↓ Niżej</PanelButton>
+              <PanelButton label={`Usuń ćwiczenie ${ex.name}`} disabled={busy} quiet onPress={() => remove(ex, false)}>Usuń</PanelButton>
+            </View>
+          </View>;
+        })}
+      </>)}
+    </ScrollView>
+  </Layout>;
 }

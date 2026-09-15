@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List
 from datetime import date, datetime, timedelta
 from models import ClientCreate, ClientUpdate, ClientResponse, ClientPackageCreate, ClientPackageUpdate, ClientPackageResponse, StartBillingRequest, EndBillingRequest
-from database import get_supabase, get_user_supabase, supabase_retry, utcnow_iso
+from database import get_supabase, get_user_supabase, supabase_retry, utcnow_iso, atomic_rpc
 from pydantic import BaseModel
+from billing import slot_done as _slot_done, project_package
+from billing_data import read_all, load_package_boundaries
 
 class AdjustPackageRequest(BaseModel):
     new_count: int
@@ -28,24 +30,6 @@ class PackageEndAtRequest(BaseModel):
     event_id: str
 
 router = APIRouter(prefix="/clients", tags=["clients"])
-
-
-def _slot_done(event_date: str, event_hour: int) -> bool:
-    """2.0: slot odbyty = minela pelna godzina slotu w Europe/Warsaw.
-    Planowany (przyszly) trening NIE nabija licznika."""
-    try:
-        from zoneinfo import ZoneInfo
-        from datetime import datetime as _dt
-        WARSAW = ZoneInfo("Europe/Warsaw")
-        now = _dt.now(WARSAW)
-        y, m, d = (int(x) for x in str(event_date).split("-"))
-        h = int(event_hour)
-        if h + 1 >= 24:
-            return now.date().isoformat() > str(event_date)
-        slot_end = _dt(y, m, d, h + 1, 0, 0, tzinfo=WARSAW)
-        return now > slot_end
-    except Exception:
-        return False
 
 
 def get_monday(dt=None):
@@ -148,12 +132,13 @@ def assign_client_packages_status(clients, supabase):
     client_ids_pkg = [c["id"] for c in clients if c.get("billing_type") == "package"]
     client_ids_single = [c["id"] for c in clients if c.get("billing_type") == "single" and c.get("package_purchase_date")]
 
-    pkgs_res = supabase.table("client_packages").select("*").in_("client_id", [c["id"] for c in clients]).execute() if clients else None
-    packages = pkgs_res.data if pkgs_res else []
+    packages = read_all(lambda: supabase.table('client_packages').select('*').in_('client_id', [c['id'] for c in clients])) if clients else []
 
     active_packages = {}
     for p in packages:
         if p.get("end_training_id") is None:
+            if p['client_id'] in active_packages:
+                raise HTTPException(409, 'Klient ma kilka otwartych pakietów. Sprawdź pakiety przed rozliczeniem.')
             active_packages[p["client_id"]] = p
     # T6: własny pakiet ma pierwszeństwo — członek z własnym pakietem nie należy
     # do cudzej puli (ani mapowanie, ani unia, ani nadpisanie wyniku).
@@ -217,6 +202,7 @@ def assign_client_packages_status(clients, supabase):
             .order("event_hour") \
             .execute()
 
+    package_boundaries = load_package_boundaries(supabase, active_packages.values(), all_events_res.data)
     client_events = {}
     for e in all_events_res.data:
         cid = e["client_id"]
@@ -226,14 +212,11 @@ def assign_client_packages_status(clients, supabase):
 
     # Absencje: odwołane BEZ rozliczenia = absencja bez rozliczonego treningu w tym slocie.
     abs_by_client = {}
-    try:
-        abs_res = supabase.table("absences").select("client_id,absence_date,absence_hour").in_("client_id", fetch_ids).execute()
-        for a in (abs_res.data or []):
-            abs_by_client.setdefault(a["client_id"], []).append(a)
-    except Exception:
-        pass
+    for a in read_all(lambda: supabase.table('absences').select('id,client_id,absence_date,absence_hour').in_('client_id', fetch_ids)):
+        abs_by_client.setdefault(a['client_id'], []).append(a)
 
     def count_free_absences(cid, start_date, evs):
+        evs = [e for e in evs if str(e.get('client_id')) == str(cid)]
         settled_keys = {(e["event_date"], e["event_hour"]) for e in evs if e.get("is_settled")}
         settled_days = {e["event_date"] for e in evs if e.get("is_settled")}
         # FIX 2026-09-07 (Ania): slot ponownie zajety AKTYWNYM treningiem tego
@@ -285,48 +268,23 @@ def assign_client_packages_status(clients, supabase):
                                           and str(p.get("id")) != str(pkg.get("id"))
                                           for p in packages))]
                 union = union_events(members)
-                start_id = pkg["start_training_id"]
-                # Prod: offset/size bywają NULL — None nie może wejść do licznika.
-                offset = pkg.get("offset") or 0
-
-                start_idx = next((i for i, e in enumerate(union) if str(e["id"]) == str(start_id)), None)
-
-                if start_idx is not None:
-                    # 2.0: licznik = TYLKO odbyte + odwolane-oplacone.
-                    # Planowane (przyszle sloty) NIE nabijaja licznika.
-                    # tile_number na kafelku zostaje pozycyjny (kalendarz),
-                    # package_current_count rosnie dopiero po odbyciu.
-                    current_count = offset
-                    cancelled_settled = 0
-                    start_date = union[start_idx]["event_date"]
-                    for idx in range(start_idx, len(union)):
-                        if union[idx].get("status") == "deleted":
-                            continue
-                        if union[idx].get("status") == "cancelled":
-                            if union[idx].get("is_settled"):
-                                current_count += 1
-                                cancelled_settled += 1
-                            continue
-                        if _slot_done(union[idx]["event_date"], union[idx]["event_hour"]):
-                            current_count += 1
-                    for m in members:
-                        mc = clients_by_id[m]
-                        mc["package_current_count"] = current_count
-                        mc["package_size"] = pkg.get("size") or 10
-                        mc["package_purchase_date"] = start_date
-                        mc["active_package_id"] = pkg["id"]
-                        mc["cancelled_settled_count"] = cancelled_settled
-                        mc["cancelled_free_count"] = count_free_absences(m, start_date, union)
-                        mc["shared_with"] = [x for x in members if x != m]
-                        assigned.add(m)
-                else:
-                    for m in members:
-                        mc = clients_by_id[m]
-                        mc["package_current_count"] = 0
-                        mc["package_purchase_date"] = None
-                        mc["cancelled_settled_count"] = 0
-                        mc["shared_with"] = [x for x in members if x != m]
-                        assigned.add(m)
+                try:
+                    projection = project_package(pkg, union, done=_slot_done, boundary_events=package_boundaries)
+                except ValueError as exc:
+                    raise HTTPException(409, str(exc))
+                effective = projection['effective_start']
+                for m in members:
+                    mc = clients_by_id[m]
+                    mc['package_current_count'] = projection['count']
+                    mc['package_size'] = pkg.get('size') or 10
+                    mc['package_purchase_date'] = effective['event_date'] if effective else None
+                    mc['active_package_id'] = pkg['id']
+                    mc['package_pending_start'] = projection['pending']
+                    mc['effective_start_training_id'] = effective['id'] if effective else None
+                    mc['cancelled_settled_count'] = projection['cancelled']
+                    mc['cancelled_free_count'] = sum(count_free_absences(member, projection['boundary_date'], union) for member in members)
+                    mc['shared_with'] = [x for x in members if x != m]
+                    assigned.add(m)
             else:
                 c["package_current_count"] = 0
                 c["package_purchase_date"] = None
@@ -379,8 +337,7 @@ def list_clients(request: Request):
     supabase, _ = get_user_supabase(request)
 
     def _load():
-        res = supabase.table("clients").select("*").order("name").execute()
-        clients = res.data or []
+        clients = read_all(lambda: supabase.table('clients').select('*').order('name'))
         return assign_client_packages_status(clients, supabase)
 
     try:
@@ -409,46 +366,18 @@ def delete_client_package(package_id: str, request: Request):
     supabase.table("client_packages").delete().eq("id", package_id).execute()
     return {"status": "deleted"}
 
+class BillingVersionRequest(BaseModel):
+    expected_updated_at: datetime
+
+
 @router.post("/{client_id}/hard-reset", response_model=ClientResponse)
-def hard_reset_client(client_id: str, request: Request):
+def hard_reset_client(client_id: str, data: BillingVersionRequest, request: Request):
     supabase, _ = get_user_supabase(request)
-    
-    # Usuń wszystkie powiązane pakiety SSOT
-    supabase.table("client_packages").delete().eq("client_id", client_id).execute()
+    return atomic_rpc(supabase, 'billing_cycle_v1', {
+        'p_client_id': client_id, 'p_action': 'reset',
+        'p_expected_updated_at': data.expected_updated_at.isoformat(),
+    })
 
-    # Odklej z cudzych wspólnych pul pakietowych (inaczej licznik wracałby z puli).
-    try:
-        others = supabase.table("client_packages").select("id,shared_client_ids").filter(
-            "shared_client_ids", "ov", "{" + str(client_id) + "}").execute()
-        for p in (others.data or []):
-            rest = [x for x in (p.get("shared_client_ids") or []) if str(x) != str(client_id)]
-            supabase.table("client_packages").update({"shared_client_ids": rest}).eq("id", p["id"]).execute()
-    except Exception:
-        pass
-
-    # Odklej z cudzych linków miesięcznych + wyczyść własne.
-    try:
-        mrows = supabase.table("clients").select("id,shared_monthly_with").filter(
-            "shared_monthly_with", "ov", "{" + str(client_id) + "}").execute()
-        for r in (mrows.data or []):
-            rest = [x for x in (r.get("shared_monthly_with") or []) if str(x) != str(client_id)]
-            supabase.table("clients").update({"shared_monthly_with": rest}).eq("id", r["id"]).execute()
-    except Exception:
-        pass
-
-    # Wyzeruj liczniki w kliencie (active_package_id jest liczone dynamicznie
-    # w assign_client_packages_status — nie ma takiej kolumny w tabeli).
-    res = supabase.table("clients").update({
-        "package_purchase_date": None,
-        "package_current_count": 0,
-        "package_size": 0,
-        "shared_monthly_with": []
-    }).eq("id", client_id).execute()
-    
-    if not res.data:
-        raise HTTPException(404, "Client not found")
-        
-    return assign_client_packages_status([res.data[0]], supabase)[0]
 
 def _pool_peer_ids(supabase, client) -> list:
     """T5: identyfikatory potrzebne do policzenia puli jednego klienta —
@@ -487,20 +416,17 @@ def _pool_peer_ids(supabase, client) -> list:
 @router.get("/{client_id}", response_model=ClientResponse)
 def get_client(client_id: str, request: Request):
     supabase, _ = get_user_supabase(request)
-    res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    if not res.data:
-        raise HTTPException(404, "Client not found")
-    # T5: liczymy na pełnej puli, zwracamy tylko żądanego klienta.
-    try:
-        peers = _pool_peer_ids(supabase, res.data)
-        rows = supabase.table("clients").select("*").in_("id", peers).execute().data or [res.data]
-    except Exception:
-        rows = [res.data]
+    return _computed_client(supabase, client_id)
+
+
+def _computed_client(supabase, client_id):
+    # Same complete trainer-scoped pool as the list, also after a PUT.
+    rows = read_all(lambda: supabase.table('clients').select('*'))
     computed = assign_client_packages_status(rows, supabase)
     for c in computed:
         if str(c["id"]) == str(client_id):
             return c
-    return computed[0]
+    raise HTTPException(404, 'Client not found')
 
 
 @router.post("/", response_model=ClientResponse, status_code=201)
@@ -530,7 +456,7 @@ def update_client(client_id: str, data: ClientUpdate, request: Request):
         if schedule is not None:
             generate_client_events(supabase, user_id, client_id, schedule)
 
-    return assign_client_packages_status([res.data[0]], supabase)[0]
+    return _computed_client(supabase, client_id)
 
 
 @router.delete("/{client_id}")
@@ -642,94 +568,19 @@ def start_package_at(client_id: str, data: PackageStartAtRequest, request: Reque
     return res.data[0]
 
 
-class CloseCycleRequest(BaseModel):
-    end_date: str
+class CloseCycleRequest(BillingVersionRequest):
+    end_date: date
 
 
 @router.post("/{client_id}/close-cycle", response_model=ClientResponse)
 def close_client_cycle(client_id: str, data: CloseCycleRequest, request: Request):
-    """T9: domknięcie cyklu miesięcznego na wskazaną datę. Backend liczy
-    wykorzystanie od startu DO wskazanego końca (odbyte + odwołane-opłacone),
-    zamiast kopiować bieżący licznik. Pakiety zamyka przepływ end-at."""
-    from datetime import datetime as _dt
+    """Count and close in one database transaction; never substitute failed reads."""
     supabase, _ = get_user_supabase(request)
-    res = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    if not res.data:
-        raise HTTPException(404, "Client not found")
-    client = res.data
-    if (client.get("billing_type") or "single") == "package":
-        raise HTTPException(400, "Pakiet zamyka przepływ end-at, nie close-cycle")
-    start = client.get("package_purchase_date")
-    if not start:
-        raise HTTPException(400, "Brak otwartego cyklu")
-    end = data.end_date
-    try:
-        _dt.fromisoformat(str(end))
-        _dt.fromisoformat(str(start))
-    except ValueError:
-        raise HTTPException(400, "Zła data")
-    if str(end) < str(start):
-        raise HTTPException(400, "Koniec nie może być przed startem cyklu")
-
-    peers = _pool_peer_ids(supabase, client)
-    try:
-        rows = supabase.table("clients").select("*").in_("id", peers).execute().data or [client]
-    except Exception:
-        rows = [client]
-    by_id = {str(r["id"]): r for r in rows}
-    members = sorted({str(m) for m in monthly_share_group(str(client_id), by_id) if str(m) in by_id})
-
-    try:
-        ev_res = supabase.table("calendar_events") \
-            .select("id,client_id,event_date,event_hour,status,is_settled") \
-            .in_("client_id", members).execute()
-        events = ev_res.data or []
-    except Exception:
-        events = []
-    try:
-        abs_res = supabase.table("absences").select(
-            "client_id,absence_date,absence_hour").in_("client_id", members).execute()
-        abs_set = {(a.get("client_id"), a.get("absence_date"), a.get("absence_hour"))
-                   for a in (abs_res.data or [])}
-        abs_days = {(a.get("client_id"), a.get("absence_date"))
-                    for a in (abs_res.data or []) if a.get("absence_hour") is None}
-    except Exception:
-        abs_set, abs_days = set(), set()
-
-    def _timely(cid, d, h):
-        return (cid, d, h) in abs_set or (cid, d) in abs_days
-
-    completed = 0
-    for e in events:
-        d = e.get("event_date")
-        if d is None or not (str(start) <= str(d) <= str(end)):
-            continue
-        if e.get("status") == "deleted":
-            continue
-        if e.get("status") == "cancelled":
-            if e.get("is_settled"):
-                completed += 1
-            continue
-        if _timely(e.get("client_id"), d, e.get("event_hour")):
-            continue
-        if _slot_done(d, e.get("event_hour")):
-            completed += 1
-
-    history = list(client.get("payment_history") or [])
-    history.append({
-        "action": "end",
-        "end_date": str(end),
-        "purchase_date": str(start),
-        "archived_at": _dt.now().isoformat(),
-        "package_size": 0,
-        "completed_count": completed,
+    return atomic_rpc(supabase, 'billing_cycle_v1', {
+        'p_client_id': client_id, 'p_action': 'close',
+        'p_expected_updated_at': data.expected_updated_at.isoformat(),
+        'p_end_date': data.end_date.isoformat(),
     })
-    upd = supabase.table("clients").update(
-        {"payment_history": history, "package_purchase_date": None,
-         "updated_at": utcnow_iso()}).eq("id", client_id).execute()
-    if not upd.data:
-        raise HTTPException(404, "Client not found")
-    return assign_client_packages_status([upd.data[0]], supabase)[0]
 
 
 @router.post("/{client_id}/packages/end-at")

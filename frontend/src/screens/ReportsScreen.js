@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, Alert, Linking, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions, Linking, Platform, Image } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import DropdownPicker from '../components/DropdownPicker';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '../assets/theme';
@@ -103,25 +104,22 @@ export default function ReportsScreen({ navigation }) {
     if (!selectedClient) return;
     setLoading(true);
     try {
-      const [history, meas] = await Promise.all([
-        api.getClientHistory(selectedClient),
-        api.getMeasurements(selectedClient),
-      ]);
       const cutoff = new Date();
       cutoff.setMonth(cutoff.getMonth() - months);
       const cutoffStr = cutoff.toISOString().slice(0, 10);
       const todayStr = new Date().toISOString().slice(0, 10);
+      const [history, meas, evs] = await Promise.all([
+        api.getClientHistory(selectedClient),
+        api.getMeasurements(selectedClient),
+        api.getCalendarEvents(cutoffStr, todayStr, selectedClient, false),
+      ]);
 
       const filtered = (history || []).filter(
         w => w.session_date >= cutoffStr
       );
 
       // Dni z eventami kalendarza tego klienta = treningi z trenerem.
-      let tDates = new Set();
-      try {
-        const evs = await api.getCalendarEvents(cutoffStr, todayStr, selectedClient).catch(() => []);
-        tDates = new Set((evs || []).filter(e => e.status !== 'deleted').map(e => e.event_date));
-      } catch {}
+      const tDates = new Set((evs || []).filter(e => e.status !== 'deleted').map(e => e.event_date));
       setTrainerDates(tDates);
 
       const filteredMeas = (meas || []).filter(
@@ -133,6 +131,7 @@ export default function ReportsScreen({ navigation }) {
       setMeasurements(filteredMeas);
     } catch (e) {
       console.error(e);
+      Alert.alert('Błąd raportu', 'Nie udało się pobrać kompletnych danych. Spróbuj ponownie.');
     } finally {
       setLoading(false);
     }
@@ -625,7 +624,7 @@ export default function ReportsScreen({ navigation }) {
         )}
 
         {stats && (
-          <View style={styles.emailSection}>
+          <View style={styles.shareSection}>
             <TouchableOpacity
               style={[styles.sendBtn, sending && { opacity: 0.5 }, { backgroundColor: '#25D366', flexDirection: 'row', justifyContent: 'center', gap: 8 }]}
               onPress={handleSendWhatsApp}
@@ -762,11 +761,10 @@ function makeStyles(C, TC) { return StyleSheet.create({
   tableBodyText: { color: TC.text, fontSize: 8, textAlign: 'center' },
 
   chart: { marginVertical: 8, borderRadius: 16 },
-  emailSection: {
+  shareSection: {
     backgroundColor: TC.surface, borderRadius: 16, padding: 18,
     marginTop: 24, borderWidth: 1, borderColor: TC.border,
   },
-  emailLabel: { color: C.accent, fontSize: 14, fontWeight: '700', marginBottom: 8 },
   sendBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: 'center' },
   sendBtnText: { color: TC.background, fontWeight: '700', fontSize: 14 },
 }); }

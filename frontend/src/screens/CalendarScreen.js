@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, useWindowDimensions, Platform, Image, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Platform, Image, ActivityIndicator, TextInput } from 'react-native';
+import { AppAlert as Alert } from '../services/confirm';
 import { Svg, Path, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../assets/theme';
@@ -175,7 +176,7 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
     // Tryb pakietu: tap na kafelek przenosi do rozliczen tego klienta.
     if (packageMode) {
       if (ev && ev.client_id) {
-        navigation.navigate('Payments', { clientId: ev.client_id });
+        navigation.push('ClientPayments', { clientId: ev.client_id });
       }
       return;
     }
@@ -329,6 +330,8 @@ function CalendarScreen({ navigation, route }) {
   const [monday, setMonday] = useState(getMonday(today));
   const [events, setEvents] = useState([]);
   const [absences, setAbsences] = useState([]);
+  const [weekClients, setWeekClients] = useState({});
+  const [weekLoading, setWeekLoading] = useState(true);
   const [packageMode, setPackageMode] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [viewMode, setViewMode] = useState('week');
@@ -338,8 +341,18 @@ function CalendarScreen({ navigation, route }) {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showHistoryPopup, setShowHistoryPopup] = useState(false);
+  const [focusTarget, setFocusTarget] = useState(null);
 
   useEffect(() => {
+    if (route?.params?.focusDate) {
+      const target = new Date(route.params.focusDate + 'T12:00:00');
+      if (!Number.isNaN(target.getTime())) setMonday(getMonday(target));
+      setFocusTarget({date:route.params.focusDate,hour:route.params.focusHour});
+      setViewMode('week');
+      setPackageMode(false);
+      setHistoryMode(false);
+      navigation.setParams({focusDate:undefined,focusHour:undefined});
+    }
     if (route?.params?.activateHistory) {
       setHistoryMode(true);
       setPackageMode(false);
@@ -350,7 +363,7 @@ function CalendarScreen({ navigation, route }) {
       setHistoryMode(false);
       navigation.setParams({ activatePackage: undefined });
     }
-  }, [route?.params?.activateHistory, route?.params?.activatePackage]);
+  }, [route?.params?.activateHistory, route?.params?.activatePackage, route?.params?.focusDate]);
 
   const handleShowHistory = useCallback(async (clientId, clientName) => {
     setHistoryClientId(clientId || '');
@@ -385,25 +398,36 @@ function CalendarScreen({ navigation, route }) {
 
   // Diagnoza pustej apki: cichy catch zamieniamy na jednorazowy widoczny komunikat.
   const loadErrShown = useRef(false);
+  const weekRequest = useRef(0);
   const loadWeek = useCallback(async () => {
+    const current = ++weekRequest.current;
+    setWeekLoading(true);
+    const saturday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 5);
     try {
-      const [evData, absData] = await Promise.all([
+      const [evData, absData, clientData] = await Promise.all([
         api.getWeekEvents(formatDateString(monday)),
-        api.getAbsences(formatDateString(monday))
+        api.getAbsences(formatDateString(monday), formatDateString(saturday)),
+        api.getClients(true)
       ]);
+      if (current !== weekRequest.current) return;
+      setWeekClients(Object.fromEntries((clientData || []).map(c => [c.id, c])));
       setEvents((evData || []).filter(e => e.status !== 'deleted'));
       setAbsences(absData || []);
     } catch (e) {
+      if (current !== weekRequest.current) return;
       if (!loadErrShown.current) {
         loadErrShown.current = true;
         showMessage('Błąd pobierania', 'Kalendarz: ' + e.message);
       }
+    } finally {
+      if (current === weekRequest.current) setWeekLoading(false);
     }
   }, [monday]);
 
   useFocusEffect(
     useCallback(() => {
       loadWeek();
+      return () => { weekRequest.current += 1; };
     }, [loadWeek])
   );
 
@@ -420,17 +444,22 @@ function CalendarScreen({ navigation, route }) {
   const [selSlot, setSelSlot] = useState(null);
   // Jawny wybór przy odwołaniu (jak X w trybie edycji): null | 'ask'
   const [absenceAsk, setAbsenceAsk] = useState(false);
-  // 2.0: pelna karta klienta do przyciskow pakietu w szufladzie (pobierana przy otwarciu).
-  const [drawerClient, setDrawerClient] = useState(null);
-  useEffect(() => {
-    const cid = selSlot?.ev?.client_id;
-    if (!cid) { setDrawerClient(null); return; }
-    let cancelled = false;
-    api.getClient(cid).then(c => { if (!cancelled) setDrawerClient(c || null); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [selSlot]);
+  // Week and billing snapshot are ready together, before the first slot tap.
+  const drawerClient = weekClients[selSlot?.ev?.client_id] || null;
   const vScrollRef = useRef(null);
   const hGridRef = useRef(null);
+
+  useEffect(() => {
+    if (!focusTarget || weekLoading || formatDateString(getMonday(new Date(focusTarget.date+'T12:00:00'))) !== formatDateString(monday)) return;
+    const timer=setTimeout(() => {
+      const idx=(new Date(focusTarget.date+'T12:00:00').getDay()+6)%7;
+      hGridRef.current?.scrollTo({x:idx*dayW,animated:false});
+      headerScrollRef.current?.scrollTo({x:idx*dayW,animated:false});
+      vScrollRef.current?.scrollTo({y:Math.max(0,((focusTarget.hour??6)-6)*CELL_H),animated:false});
+      setFocusTarget(null);
+    },160);
+    return()=>clearTimeout(timer);
+  },[focusTarget,weekLoading,monday,dayW]);
 
   useEffect(() => {
     // Auto-scroll do bieżącego dnia tylko na telefonie (tablet widzi cały tydzień).
@@ -515,8 +544,7 @@ function CalendarScreen({ navigation, route }) {
 
   // 2.0: start/koniec pakietu i cyklu z szuflady (solo; wspoldzielone w Rozliczeniach).
   const confirm2 = (title, msg, okLabel, fn) => {
-    if (Platform.OS === 'web') { if (window.confirm(`${title}\n\n${msg}`)) fn(); }
-    else Alert.alert(title, msg, [{ text: 'Anuluj', style: 'cancel' }, { text: okLabel, onPress: fn }]);
+    Alert.alert(title, msg, [{ text: 'Anuluj', style: 'cancel' }, { text: okLabel, onPress: fn }]);
   };
 
   const endPackageFromDrawer = useCallback(() => {
@@ -562,7 +590,7 @@ function CalendarScreen({ navigation, route }) {
       `Klient: ${c.name || ''}\nKoniec: ${s.ev.event_date}`,
       'Zakończ', async () => {
         try {
-          await api.closeClientCycle(c.id, { end_date: s.ev.event_date });
+          await api.closeClientCycle(c.id, { end_date: s.ev.event_date, expected_updated_at: c.updated_at });
           setSelSlot(null); loadWeek();
         } catch (e) { Alert.alert('Błąd', e.message); }
       });
@@ -584,8 +612,7 @@ function CalendarScreen({ navigation, route }) {
         loadWeek();
       } catch (e) {
         loadWeek();
-        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-        else Alert.alert('Błąd', 'Nie udało się usunąć: ' + e.message);
+        Alert.alert('Błąd', 'Nie udało się usunąć: ' + e.message);
       }
     };
 
@@ -599,8 +626,7 @@ function CalendarScreen({ navigation, route }) {
       try {
         info = await api.deletePackageStart(dateStr, hour, { mode: 'probe' });
       } catch (e) {
-        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-        else Alert.alert('Błąd', e.message);
+        Alert.alert('Błąd', e.message);
         loadWeek();
         return;
       }
@@ -615,8 +641,7 @@ function CalendarScreen({ navigation, route }) {
           loadWeek();
         } catch (e) {
           loadWeek();
-          if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-          else Alert.alert('Błąd', e.message);
+          Alert.alert('Błąd', e.message);
         }
       };
       const doAuto = async () => {
@@ -625,8 +650,7 @@ function CalendarScreen({ navigation, route }) {
           loadWeek();
         } catch (e) {
           loadWeek();
-          if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-          else Alert.alert('Błąd', e.message);
+          Alert.alert('Błąd', e.message);
         }
       };
       const doManual = () => {
@@ -634,53 +658,35 @@ function CalendarScreen({ navigation, route }) {
       };
       if (!info.future_count) {
         const msg = `To początek pakietu${shared}, bez kolejnych treningów.\n\nKlient: ${clientName}\nAnulować pakiet i usunąć trening?`;
-        if (Platform.OS === 'web') {
-          if (window.confirm(msg)) doCancel();
-          else loadWeek();
-        } else {
-          Alert.alert('Początek pakietu', msg, [
+        Alert.alert('Początek pakietu', msg, [
             { text: 'Cofnij', style: 'cancel', onPress: () => loadWeek() },
             { text: 'Anuluj pakiet i usuń', style: 'destructive', onPress: doCancel },
           ]);
-        }
         return;
       }
       const nxt = `${info.next_event.event_date} ${info.next_event.event_hour}:00`;
       const msg = `To początek pakietu${shared} (${info.future_count} kolejne).\n\nKlient: ${clientName}\nAutomatycznie ustawiłby się: ${nxt}.`;
-      if (Platform.OS === 'web') {
-        if (window.confirm(msg + '\n\nOK = ustaw automatycznie\nAnuluj = wskaż sam / cofnij')) doAuto();
-        else if (window.confirm('Wskazać nowy początek samemu (tapnij trening)?\n\nOK = tryb wskazywania\nAnuluj = cofnij')) doManual();
-        else loadWeek();
-      } else {
-        Alert.alert('Początek pakietu', msg, [
+      Alert.alert('Początek pakietu', msg, [
           { text: 'Cofnij', style: 'cancel', onPress: () => loadWeek() },
           { text: 'Wskaż sam', onPress: doManual },
           { text: `Automatycznie (${nxt})`, onPress: doAuto },
         ]);
-      }
     };
 
     // Twarde usunięcie z jednym potwierdzeniem (bez pytania o płatność).
     const confirmMsg = `Czy na pewno chcesz trwale usunąć trening z bazy?\n\nKlient: ${clientName}\nJeżeli trening się odbył, pakiet zostanie pomniejszony o ten trening.`;
     const needProbe = ev?.is_start_of_package && drawerClient?.billing_type === 'package' && drawerClient?.active_package_id;
-    if (Platform.OS === 'web') {
-      if (!window.confirm(confirmMsg)) return;
-      if (needProbe) doStartFlow();
-      else doHardDelete();
-    } else {
-      Alert.alert('Usuń trening', confirmMsg, [
+    Alert.alert('Usuń trening', confirmMsg, [
         { text: 'Cofnij', style: 'cancel' },
         { text: 'Usuń trwale', style: 'destructive', onPress: () => { if (needProbe) doStartFlow(); else doHardDelete(); } },
       ]);
-    }
   }, [loadWeek, drawerClient]);
 
   // Odwołanie z jawnym wyborem płatności (jak X): najpierw oznaczenie, potem nieobecność.
   // T4: błąd settle przerywa całość — brak cichego połykania (płatne musi być pewne).
   const reportAbsence = useCallback(async (dateStr, hour, ev, paid) => {
     try {
-      if (paid) await api.settleWorkout(dateStr, Number(hour));
-      await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour) });
+      await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour), paid });
       setSelSlot(null); setAbsenceAsk(false); loadWeek();
     } catch (e) { Alert.alert('Błąd', e.message); }
   }, [loadWeek]);
@@ -716,8 +722,7 @@ function CalendarScreen({ navigation, route }) {
         loadWeek();
       } catch (e) {
         loadWeek();
-        if (Platform.OS === 'web') window.alert('Błąd: ' + e.message);
-        else Alert.alert('Błąd', e.message);
+        Alert.alert('Błąd', e.message);
       }
     };
     confirm2(`Nowy początek pakietu`,
@@ -725,7 +730,8 @@ function CalendarScreen({ navigation, route }) {
       'Ustaw', finish);
   }, [repoint, loadWeek]);
 
-  return (<View style={styles.container}>
+  return (<View style={styles.container} pointerEvents={weekLoading ? 'none' : 'auto'}
+    accessibilityState={{busy:weekLoading}}>
     {isMovingActive && (
       <View style={styles.moveBanner}>
         <Text style={styles.moveBannerText}>Przenoszenie: {movingSlot.ev?.clients?.name || ''} — kliknij docelowy slot lub anuluj</Text>
@@ -785,7 +791,7 @@ function CalendarScreen({ navigation, route }) {
               }
               return (
                 <Text style={{ fontSize: 11, color: headerIconColor, marginTop: 2, fontWeight: '600' }}>
-                  Treningi: {count}
+                  {weekLoading ? 'Odświeżanie…' : `Treningi: ${count}`}
                 </Text>
               );
             })()}
@@ -902,7 +908,7 @@ function CalendarScreen({ navigation, route }) {
       const selAbs = (absences || []).find(a => a.absence_date === selSlot.date && (a.absence_hour == null || a.absence_hour === Number(selSlot.hour)));
       const selAbsName = selAbs?.clients?.name;
       return (
-      <View style={styles.sheet}>
+      <View testID="calendar-drawer" style={styles.sheet}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={styles.sheetTitle}>
             {selSlot.date} • {selSlot.hour}:00 — {selSlot.ev?.clients?.name || (selAbs ? `✕ nieobecność: ${selAbsName || ''}` : 'wolny slot')}

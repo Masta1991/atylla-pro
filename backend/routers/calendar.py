@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
 from pydantic import BaseModel
-from database import get_user_supabase, supabase_retry, utcnow_iso
+from billing import slot_done as _slot_done, project_package, event_key
+from billing_data import read_all, load_package_boundaries
+from trainer_insights import session_rows, totals as session_totals
+from database import get_user_supabase, supabase_retry, utcnow_iso, atomic_rpc
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
-    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest
+    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest, CalendarWorkoutSave
 )
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -18,22 +21,6 @@ def _str_ids(v):
         except Exception:
             pass
     return out
-
-
-def _slot_done(event_date: str, event_hour: int) -> bool:
-    """2.0: slot odbyty = minela pelna godzina slotu w Europe/Warsaw."""
-    try:
-        from zoneinfo import ZoneInfo
-        from datetime import datetime as _dt
-        WARSAW = ZoneInfo("Europe/Warsaw")
-        now = _dt.now(WARSAW)
-        y, m, d = (int(x) for x in str(event_date).split("-"))
-        h = int(event_hour)
-        if h + 1 >= 24:
-            return now.date().isoformat() > str(event_date)
-        return now > _dt(y, m, d, h + 1, 0, 0, tzinfo=WARSAW)
-    except Exception:
-        return False
 
 
 def _partner_names(supabase, events):
@@ -51,39 +38,20 @@ def _partner_names(supabase, events):
 # ── Absences ─────────────────────────────────────────────────────────────────
 
 @router.get("/absences", response_model=List[AbsenceResponse])
-def get_absences(date_from: Optional[str] = Query(None), request: Request = None):
+def get_absences(date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), request: Request = None):
     supabase, _ = get_user_supabase(request)
     query = supabase.table("absences").select("*, clients(name)").order("absence_date", desc=True)
     if date_from:
         query = query.gte("absence_date", date_from)
+    if date_to:
+        query = query.lte("absence_date", date_to)
     res = query.execute()
     return res.data or []
 
 @router.post("/absences", response_model=AbsenceResponse, status_code=201)
 def create_absence(data: AbsenceCreate, request: Request):
     supabase, user_id = get_user_supabase(request)
-    payload = data.model_dump(mode='json')
-    payload["trainer_id"] = user_id
-    on_conflict = "client_id,absence_date"
-    if data.absence_hour is not None:
-        on_conflict = "client_id,absence_date,absence_hour"
-    res = supabase.table("absences").upsert(
-        payload, on_conflict=on_conflict
-    ).execute()
-
-    # Handle existing events on that day/hour for this client
-    # If the event is settled, we mark it as 'cancelled' so it stays on the calendar and counts for billing.
-    # If unsettled, we mark it as 'deleted' so it disappears (leaving only the absence indicator).
-    query_evs = supabase.table("calendar_events").select("id, is_settled").eq("client_id", data.client_id).eq("event_date", data.absence_date.isoformat())
-    if data.absence_hour is not None:
-        query_evs = query_evs.eq("event_hour", data.absence_hour)
-    
-    existing_evs = query_evs.execute().data
-    for ev in existing_evs:
-        new_status = "cancelled" if ev.get("is_settled") else "deleted"
-        supabase.table("calendar_events").update({"status": new_status, "updated_at": utcnow_iso()}).eq("id", ev["id"]).execute()
-
-    return res.data[0]
+    return atomic_rpc(supabase, 'record_absence_v3', {'p_payload': data.model_dump(mode='json')})
 
 @router.delete("/absences/{absence_id}")
 def delete_absence(absence_id: str, request: Request):
@@ -93,6 +61,11 @@ def delete_absence(absence_id: str, request: Request):
 
 
 # ── Calendar Events ──────────────────────────────────────────────────────────
+
+@router.post('/save-workout')
+def save_calendar_workout(data: CalendarWorkoutSave, request: Request):
+    supabase, _ = get_user_supabase(request)
+    return atomic_rpc(supabase, 'save_calendar_workout_v4', {'p_payload': data.model_dump(mode='json')})
 
 
 def assign_chronological_numbers(events, supabase):
@@ -104,19 +77,19 @@ def assign_chronological_numbers(events, supabase):
     if not client_ids:
         return events
 
-    pkgs_res = supabase.table("client_packages").select("*").in_("client_id", client_ids).limit(5000).execute()
-    packages = pkgs_res.data or []
-    # Pakiety współdzielone, w których członek (nie właściciel) ma eventy w zakresie.
-    try:
-        extra_res = supabase.table("client_packages").select("*").filter(
-            "shared_client_ids", "ov", "{" + ",".join(client_ids) + "}").limit(5000).execute()
-        seen = {p["id"] for p in packages}
-        for p in (extra_res.data or []):
-            if p["id"] not in seen:
-                seen.add(p["id"])
-                packages.append(p)
-    except Exception:
-        pass
+    # RLS scopes this metadata to the authenticated trainer. A complete read
+    # resolves own-wins even when only a shared member has events in this week.
+    all_packages = read_all(lambda: supabase.table('client_packages').select('*'))
+    related = set(client_ids)
+    while True:
+        before = len(related)
+        for p in all_packages:
+            members = {str(p['client_id'])} | set(_str_ids(p.get('shared_client_ids')))
+            if related & members:
+                related.update(members)
+        if len(related) == before:
+            break
+    packages = [p for p in all_packages if str(p['client_id']) in related]
     # Miesięczne współdzielenie: {cid: [member ids]} (puste pre-migracja).
     monthly_shares = {}
     try:
@@ -139,6 +112,7 @@ def assign_chronological_numbers(events, supabase):
     _extra_ids = set()
     for _p in packages:
         _owner = str(_p["client_id"])
+        _extra_ids.add(_owner)
         for _mid in _str_ids(_p.get("shared_client_ids")):
             if _mid != _owner:
                 _extra_ids.add(_mid)
@@ -150,16 +124,6 @@ def assign_chronological_numbers(events, supabase):
     # Nieobecności: trening nierozliczony z absencją = odwołany w porę,
     # wypada z numeracji (jak usunięty). Rozliczony z absencją zostaje.
     # Zakres: klienci z zapytania + członkowie wspólnych pul.
-    abs_set = set()
-    try:
-        abs_res = supabase.table("absences").select("client_id,absence_date,absence_hour").in_("client_id", _fetch_ids).limit(5000).execute()
-        for a in (abs_res.data or []):
-            abs_set.add((a["client_id"], a["absence_date"], a.get("absence_hour")))
-    except Exception:
-        pass
-
-    def has_timely_absence(cid, ev_date, ev_hour):
-        return (cid, ev_date, ev_hour) in abs_set or (cid, ev_date, None) in abs_set
     
     # Retrieve all client calendar events with pagination to avoid 1000-row PostgREST truncation
     all_events_data = []
@@ -180,6 +144,7 @@ def assign_chronological_numbers(events, supabase):
             break
         page += 1
         
+    package_boundaries = load_package_boundaries(supabase, packages, all_events_data)
     all_client_events = {}
     client_info = {}
     for e in all_events_data:
@@ -206,6 +171,7 @@ def assign_chronological_numbers(events, supabase):
     single_last_ids = set()
     # Treningi w DOMKNIĘTYCH zakresach (szuflada chowa na nich przyciski startu).
     closed_ids = set()
+    package_start_ids = set()
 
     # Właściciele aktywnych pakietów + członkowie cudzych pul (own-wins:
     # członek z własnym aktywnym pakietem rozlicza się sam).
@@ -227,91 +193,33 @@ def assign_chronological_numbers(events, supabase):
 
         if b_type == "package":
             pkgs = client_packages.get(cid, [])
-            # Unia eventów właściciel + członkowie wspólnej puli (solo = tylko własne).
-            # Członek z własnym aktywnym pakietem rozlicza się sam (own-wins).
-            _members = [cid]
-            for _p in pkgs:
-                for _mid in _str_ids(_p.get("shared_client_ids")):
-                    if _mid == cid or _mid in _members:
-                        continue
-                    if _mid in _owner_has_active:
-                        continue
-                    _members.append(_mid)
-            evs = []
-            for _m in _members:
-                evs.extend(all_client_events.get(_m, []))
-            evs.sort(key=lambda _e: (_e["event_date"], _e["event_hour"]))
-            ev_id_to_idx = {e["id"]: i for i, e in enumerate(evs)}
-
-            def get_pkg_start_idx(p):
-                return ev_id_to_idx.get(p["start_training_id"], 999999)
-            pkgs.sort(key=get_pkg_start_idx)
-
-            for i, pkg in enumerate(pkgs):
-                start_id = pkg["start_training_id"]
-                end_id = pkg.get("end_training_id")
-                # Prod: offset/size bywają NULL (patrz fix clients.py).
-                offset = pkg.get("offset") or 0
-                pkg_size = pkg.get("size") or 10
-                
-                start_idx = ev_id_to_idx.get(start_id)
-                if start_idx is None:
-                    continue 
-                    
-                end_idx = ev_id_to_idx.get(end_id) if end_id else len(evs)
-                if end_idx is None:
-                    end_idx = len(evs)
-                
-                if i + 1 < len(pkgs):
-                    next_start_idx = ev_id_to_idx.get(pkgs[i+1]["start_training_id"])
-                    if next_start_idx is not None and next_start_idx < end_idx:
-                        end_idx = next_start_idx - 1
-                
-                current_count = offset
-                position = 0
-                for idx in range(start_idx, end_idx + 1):
-                    if idx >= len(evs):
-                        break
-                    e = evs[idx]
-
-                    if e.get("status") == "deleted":
-                        continue
-                    # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
-                    # W unii: absencja liczona per właściciel eventu.
-                    # FIX 2026-09-07 (Ania: usuniety + wpisany ponownie trening):
-                    # AKTYWNY trening w slocie uniewaznia absencje (kazdy przeplyw
-                    # tworzacy absencje przestawia event na deleted/cancelled, wiec
-                    # active + absencja to zawsze zastepstwo/ponowny wpis).
-                    if e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], e["event_date"], e["event_hour"]):
-                        continue
-                    # Bezpłatne odwołanie (także bez absencji) nie dostaje numeru —
-                    # pozycje idą w ślad za licznikiem (kafelek = rozliczenia).
-                    if e.get("status") == "cancelled" and not e.get("is_settled"):
-                        continue
-
-                    e_id = e["id"]
-
-                    # 2.0: liczenie POZYCYJNE — kazdy trening wliczony do cyklu
-                    # (aktywny lub odwolany-oplacony) ma numer i liczy sie do
-                    # stanu. Znak $ nie bierze udzialu w liczeniu; is_settled
-                    # znaczy wylacznie "oplacone" przy odwolanym treningu.
-                    # tile_number (pozycja) zawsze rosnie; licznik rozliczen
-                    # (current_count) tylko za odbyte + odwolane-oplacone.
-                    position += 1
-                    event_positions[e_id] = position
-                    event_positions[f"{e_id}_size"] = pkg_size
-                    if end_id:
-                        closed_ids.add(e_id)
-
-                    if e.get("status") == "cancelled":
-                        if e.get("is_settled"):
-                            current_count += 1
-                            event_counts[e_id] = current_count
-                            event_counts[f"{e_id}_size"] = pkg_size
-                    elif _slot_done(e["event_date"], e["event_hour"]):
-                        current_count += 1
-                        event_counts[e_id] = current_count
-                        event_counts[f"{e_id}_size"] = pkg_size
+            all_by_id = {str(e['id']): e for e in package_boundaries}
+            if sum(p.get('end_training_id') is None for p in pkgs) > 1:
+                raise HTTPException(409, 'Klient ma kilka otwartych pakietów. Sprawdź dane przed rozliczeniem.')
+            try:
+                pkgs.sort(key=lambda p: event_key(all_by_id[str(p['start_training_id'])]))
+                for i, pkg in enumerate(pkgs):
+                    # Membership belongs to this package, not the union of its history.
+                    members = {str(cid)} | {m for m in _str_ids(pkg.get('shared_client_ids'))
+                        if pkg.get('end_training_id') or m not in _owner_has_active}
+                    union = [e for m in members for e in all_client_events.get(m, [])]
+                    next_key = event_key(all_by_id[str(pkgs[i+1]['start_training_id'])]) if i+1 < len(pkgs) else None
+                    projection = project_package(pkg, union, done=_slot_done, stop_before=next_key,
+                                                 boundary_events=package_boundaries)
+                    effective = projection['effective_start']
+                    if effective:
+                        package_start_ids.add(effective['id'])
+                    closed_ids.update(projection['closed_ids'])
+                    size = pkg.get('size') or 10
+                    for row in projection['rows']:
+                        eid = row['event']['id']
+                        event_positions[eid] = row['position']
+                        event_positions[f'{eid}_size'] = size
+                        if row['counted']:
+                            event_counts[eid] = row['count']
+                            event_counts[f'{eid}_size'] = size
+            except (KeyError, ValueError) as exc:
+                raise HTTPException(409, 'Niepełne granice pakietu. Sprawdź dane przed rozliczeniem.') from exc
         else:
             # Członek wspólnej puli pakietowej rozlicza się w unii (wyżej) — tu pomijamy,
             # żeby cykl single nie nadpisał pozycji z puli.
@@ -361,8 +269,6 @@ def assign_chronological_numbers(events, supabase):
                     continue
                 # Odwołany w porę (absencja, brak rozliczenia) wypada z numeracji.
                 # FIX 2026-09-07 jak wyzej: AKTYWNY trening ignoruje absencje.
-                if e.get("status") != "active" and not e.get("is_settled") and has_timely_absence(e["client_id"], ev_date, e["event_hour"]):
-                    continue
                 # Bezpłatne odwołanie (także bez absencji) nie dostaje numeru.
                 if e.get("status") == "cancelled" and not e.get("is_settled"):
                     continue
@@ -374,8 +280,6 @@ def assign_chronological_numbers(events, supabase):
                         pd = h.get("purchase_date") or "0000-00-00"
                         ed = h.get("end_date") or "9999-12-31"
                         if pd <= ev_date <= ed:
-                            if ev_date == ed and not e.get("is_settled"):
-                                continue
                             cycle_key = f"pkg_{pd}"
                             belongs_to_history = True
                             cycle_ed = ed
@@ -428,7 +332,7 @@ def assign_chronological_numbers(events, supabase):
                         if cands:
                             single_last_ids.add(cands[-1])
 
-    _all_start_ids = {p["start_training_id"] for p in packages if p.get("start_training_id")}
+    _all_start_ids = package_start_ids
     _all_end_ids = {p.get("end_training_id") for p in packages if p.get("end_training_id")}
 
     for ev in events:
@@ -509,6 +413,8 @@ def list_events(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     client_id: Optional[str] = Query(None),
+    billing: bool = True,
+    include_deleted: bool = False,
     request: Request = None,
 ):
     supabase, _ = get_user_supabase(request)
@@ -521,9 +427,16 @@ def list_events(
     if client_id:
         query = query.eq("client_id", client_id)
 
-    res = query.neq("status", "deleted").order("event_date,event_hour").execute()
-    events = res.data or []
-    return assign_chronological_numbers(events, supabase)
+    if not include_deleted:
+        query = query.neq('status', 'deleted')
+    events, page = [], 0
+    while True:
+        rows = query.order('event_date').order('event_hour').order('id').range(page*1000, (page+1)*1000-1).execute().data or []
+        events.extend(rows)
+        if len(rows) < 1000:
+            break
+        page += 1
+    return assign_chronological_numbers(events, supabase) if billing else events
 
 
 @router.get("/week/{monday_date}", response_model=List[CalendarEventResponse])
@@ -540,7 +453,7 @@ def get_week_events(monday_date: str, request: Request):
         # Jawna lista kolumn zamiast * (lżejszy transfer niż pełne wiersze).
         res = (
             supabase.table("calendar_events")
-            .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
+            .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,main_group,added_groups,is_replacement,replaced_client_id,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
             .gte("event_date", monday.isoformat())
             .lte("event_date", saturday.isoformat())
             .order("event_date,event_hour")
@@ -604,27 +517,32 @@ def get_week_summary(monday_date: str, request: Request):
         } for d in (dels.data or [])]
     except Exception:
         removed = []
+    names = {str(e['client_id']): (e.get('clients') or {}).get('name', 'Klient') for e in evs.data if e.get('client_id')}
+    names.update({str(a['client_id']): (a.get('clients') or {}).get('name', 'Klient') for a in abss.data})
+    names.update(_partner_names(supabase, evs.data))
+    classified = session_rows(evs.data, abss.data, names)
     return {
+        "session_rows": classified, "session_totals": session_totals(classified),
         "monday": monday.isoformat(), "sunday": sunday.isoformat(),
         "events": (evs.data or []) + removed, "absences": abss.data or [],
     }
 
 
 @router.get("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
-def get_event(event_date: str, event_hour: int, request: Request):
+def get_event(event_date: str, event_hour: int, request: Request, include_deleted: bool = False):
     supabase, _ = get_user_supabase(request)
-    res = (
+    query = (
         supabase.table("calendar_events")
         .select("*, clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
         .eq("event_date", event_date)
         .eq("event_hour", event_hour)
-        .neq("status", "deleted")
-        .single()
-        .execute()
     )
+    if not include_deleted:
+        query = query.neq('status','deleted')
+    res = query.execute()
     if not res.data:
         raise HTTPException(404, "Event not found")
-    events = assign_chronological_numbers([res.data], supabase)
+    events = assign_chronological_numbers([res.data[0]], supabase)
     return events[0]
 
 
@@ -650,7 +568,7 @@ def _clear_slot_absence(supabase, client_id, event_date: str, event_hour: int):
 def create_or_update_event(data: CalendarEventCreate, request: Request):
     """Upsert: create or replace calendar event."""
     supabase, user_id = get_user_supabase(request)
-    payload = data.model_dump(exclude_none=True, mode='json')
+    payload = data.model_dump(mode='json')
     payload["trainer_id"] = user_id
 
     try:
@@ -668,109 +586,32 @@ def create_or_update_event(data: CalendarEventCreate, request: Request):
 
 @router.post("/replace-week")
 def replace_week(data: ReplaceWeekRequest, request: Request):
-    """Hard delete all events for a given week, then insert new ones."""
-    from datetime import timedelta
-    supabase, user_id = get_user_supabase(request)
-    
-    # Target date range
-    monday = data.monday_date
-    saturday = monday + timedelta(days=5)
-
-    try:
-        # 0. Kotwice pakietów wskazujące na kasowany zakres: odepnij najpierw
-        # (inaczej DELETE łamie FK start_training_id).
-        try:
-            doomed = supabase.table("calendar_events").select("id") \
-                .gte("event_date", monday.isoformat()) \
-                .lte("event_date", saturday.isoformat()) \
-                .eq("trainer_id", user_id) \
-                .eq("is_settled", False) \
-                .execute()
-            from database import get_supabase as _svc2
-            _doomed_ids = [r["id"] for r in (doomed.data or []) if r.get("id")]
-            _cancel_active_packages_at(supabase, _doomed_ids)
-            _detach_anchors(supabase, _svc2(), user_id, _doomed_ids)
-        except Exception:
-            pass
-        # 1. Hard delete all calendar_events between monday and saturday for this trainer
-        supabase.table("calendar_events") \
-            .delete() \
-            .gte("event_date", monday.isoformat()) \
-            .lte("event_date", saturday.isoformat()) \
-            .eq("trainer_id", user_id) \
-            .eq("is_settled", False) \
-            .execute()
-        
-        # 2. Insert new events
-        if data.events:
-            payloads = []
-            for ev in data.events:
-                p = ev.model_dump(exclude_none=True, mode='json')
-                p["trainer_id"] = user_id
-                payloads.append(p)
-                
-            res = supabase.table("calendar_events").upsert(
-                payloads, on_conflict="event_date,event_hour,trainer_id"
-            ).execute()
-            
-            # Raise exception if Supabase returns an error
-            if hasattr(res, 'error') and res.error:
-                raise Exception(f"Supabase upsert error: {res.error}")
-
-            for p in payloads:
-                _clear_slot_absence(supabase, p.get("client_id"),
-                                    p.get("event_date"), p.get("event_hour"))
-            
-        return {"status": "replaced"}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(500, detail=repr(e))
-
+    """Replace a week in one transaction, preserving settled slots and closed anchors."""
+    supabase, _ = get_user_supabase(request)
+    return atomic_rpc(supabase, "calendar_mutation_v2", {
+        "p_action": "replace_week", "p_data": data.model_dump(mode="json"),
+    })
 
 @router.delete("/clear-week/{monday_date}")
 def clear_week(monday_date: str, request: Request):
-    """Hard delete all events for a given week."""
-    from datetime import timedelta, date
-    supabase, user_id = get_user_supabase(request)
-    
-    # Parse monday_date string to date object
-    monday = date.fromisoformat(monday_date)
-    # week = Mon to Sun (6 days later) to be safe and delete entire week
-    sunday = monday + timedelta(days=6)
-
+    supabase, _ = get_user_supabase(request)
+    from datetime import date
     try:
-        try:
-            doomed = supabase.table("calendar_events").select("id") \
-                .gte("event_date", monday.isoformat()) \
-                .lte("event_date", sunday.isoformat()) \
-                .eq("trainer_id", user_id) \
-                .eq("is_settled", False) \
-                .execute()
-            from database import get_supabase as _svc3
-            _doomed_ids = [r["id"] for r in (doomed.data or []) if r.get("id")]
-            _cancel_active_packages_at(supabase, _doomed_ids)
-            _detach_anchors(supabase, _svc3(), user_id, _doomed_ids)
-        except Exception:
-            pass
-        supabase.table("calendar_events") \
-            .delete() \
-            .gte("event_date", monday.isoformat()) \
-            .lte("event_date", sunday.isoformat()) \
-            .eq("trainer_id", user_id) \
-            .eq("is_settled", False) \
-            .execute()
-        return {"status": "cleared"}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(500, detail=repr(e))
-
+        monday = date.fromisoformat(monday_date)
+        if monday.weekday() != 0:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(422, "Wskaż poniedziałek w formacie RRRR-MM-DD")
+    return atomic_rpc(supabase, "calendar_mutation_v2", {
+        "p_action": "clear_week", "p_data": {"monday_date": monday.isoformat()},
+    })
 
 @router.put("/{event_date}/{event_hour}", response_model=CalendarEventResponse)
 def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate, request: Request):
     supabase, _ = get_user_supabase(request)
-    payload = {k: v for k, v in data.model_dump(exclude_none=True, mode='json').items() if v is not None}
+    payload = data.model_dump(exclude_unset=True, mode='json')
+    if any(payload.get(k) is None for k in ("status", "is_settled", "is_replacement") if k in payload):
+        raise HTTPException(422, "Status i pola logiczne nie mogą być puste")
     payload["updated_at"] = utcnow_iso()
 
     res = (
@@ -787,85 +628,11 @@ def update_event(event_date: str, event_hour: int, data: CalendarEventUpdate, re
 
 @router.post("/swap")
 def swap_events(data: CalendarSwapRequest, request: Request):
-    """Swap two calendar events (drag-and-drop) or move one event.
-
-    FIX 2026-09-07 (przeniesienie startu pakietu 1/10):
-    wczesniej robil UPSERT (nowy UUID) + DELETE starego wiersza, kopiujac
-    tylko client_id/workout_type_id/status/is_settled. To gubilo plan_id
-    (nowy trening "bez planu") i sierocilo client_packages.start_training_id
-    (stary id znikal, rozliczenia nie przesuwaly daty startu).
-    Teraz przenosimy przez UPDATE po id: id wiersza zostaje, wiec pakiet
-    i rozliczenia podazaja automatycznie (SSOT = chronologia eventow).
-    """
-    supabase, user_id = get_user_supabase(request)
-
-    # Fetch both events (scoped do trenera, zeby nie mieszac kont)
-    res1 = supabase.table("calendar_events").select("*").eq("event_date", data.date1.isoformat()).eq("event_hour", data.hour1).eq("trainer_id", user_id).execute()
-    res2 = supabase.table("calendar_events").select("*").eq("event_date", data.date2.isoformat()).eq("event_hour", data.hour2).eq("trainer_id", user_id).execute()
-
-    ev1_data = res1.data[0] if res1.data else None
-    ev2_data = res2.data[0] if res2.data else None
-
-    if not ev1_data and not ev2_data:
-        raise HTTPException(404, "No events to swap")
-
-    def _move_logs(client_id, old_date: str, new_date: str):
-        if not client_id or old_date == new_date:
-            return
-        try:
-            supabase.table("workout_logs").update({"session_date": new_date}).eq("client_id", client_id).eq("session_date", old_date).execute()
-        except Exception:
-            pass
-
-    # Przypadek 1: oba sloty zajete = zamiana dat/godzin (id zostaja)
-    if ev1_data and ev2_data:
-        _TMP_DATE = "1970-01-01"
-        _TMP_HOUR = 6
-        # Krok przez slot tymczasowy, zeby nie zlamac unique(event_date,event_hour,trainer_id)
-        supabase.table("calendar_events").update(
-            {"event_date": _TMP_DATE, "event_hour": _TMP_HOUR, "updated_at": utcnow_iso()}
-        ).eq("id", ev1_data["id"]).execute()
-        supabase.table("calendar_events").update(
-            {"event_date": data.date1.isoformat(), "event_hour": data.hour1, "updated_at": utcnow_iso()}
-        ).eq("id", ev2_data["id"]).execute()
-        supabase.table("calendar_events").update(
-            {"event_date": data.date2.isoformat(), "event_hour": data.hour2, "updated_at": utcnow_iso()}
-        ).eq("id", ev1_data["id"]).execute()
-        # Logi ida za treningiem (bez godzin, tylko data)
-        d1, d2 = data.date1.isoformat(), data.date2.isoformat()
-        if d1 != d2:
-            c1, c2 = ev1_data.get("client_id"), ev2_data.get("client_id")
-            if c1 and c1 == c2:
-                # Ten sam klient po obu stronach: zamiana dat przez bufor
-                try:
-                    supabase.table("workout_logs").update({"session_date": _TMP_DATE}).eq("client_id", c1).eq("session_date", d1).execute()
-                    supabase.table("workout_logs").update({"session_date": d1}).eq("client_id", c1).eq("session_date", d2).execute()
-                    supabase.table("workout_logs").update({"session_date": d2}).eq("client_id", c1).eq("session_date", _TMP_DATE).execute()
-                except Exception:
-                    pass
-            else:
-                _move_logs(c1, d1, d2)
-                _move_logs(c2, d2, d1)
-        _clear_slot_absence(supabase, ev1_data.get("client_id"),
-                            data.date2.isoformat(), data.hour2)
-        _clear_slot_absence(supabase, ev2_data.get("client_id"),
-                            data.date1.isoformat(), data.hour1)
-        return {"status": "swapped"}
-
-    # Przypadek 2: ruch w jedna strone = UPDATE daty/godziny (id zostaje,
-    # plan/partner/notatka/is_settled nienaruszone)
-    moving = ev1_data or ev2_data
-    src_date = data.date1.isoformat() if ev1_data else data.date2.isoformat()
-    dst_date = data.date2.isoformat() if ev1_data else data.date1.isoformat()
-    dst_hour = data.hour2 if ev1_data else data.hour1
-    supabase.table("calendar_events").update(
-        {"event_date": dst_date, "event_hour": dst_hour, "updated_at": utcnow_iso()}
-    ).eq("id", moving["id"]).execute()
-    _move_logs(moving.get("client_id"), src_date, dst_date)
-    _clear_slot_absence(supabase, moving.get("client_id"), dst_date, dst_hour)
-
-    return {"status": "swapped"}
-
+    """Move or swap calendar rows and logs in one database transaction."""
+    supabase, _ = get_user_supabase(request)
+    return atomic_rpc(supabase, "calendar_mutation_v2", {
+        "p_action": "swap", "p_data": data.model_dump(mode="json"),
+    })
 
 @router.get("/stats")
 def get_calendar_stats(months: int = Query(1), request: Request = None):
@@ -1008,98 +775,21 @@ def _any_active_anchor(supabase, event):
     """Czy KTOKOLWIEK aktywny pakiet startuje w tym evencie (bez patrzenia
     na członków puli)? Siatka bezpieczeństwa przed cichym FK-500."""
     try:
-        res = supabase.table("client_packages").select("id").execute()
+        res = supabase.table("client_packages").select("id,start_training_id,end_training_id").execute()
         for p in (res.data or []):
             if p.get("end_training_id") is None and str(p.get("start_training_id")) == str(event.get("id")):
                 return True
     except Exception:
-        pass
+        raise HTTPException(503, "Nie udało się sprawdzić powiązań pakietu. Spróbuj ponownie.")
     return False
 
 
 def _hard_delete(supabase, user_id, event, event_date, event_hour):
-    """Twarde usunięcie treningu: wpis audytowy, czyszczenie logów i absencji
-    slotu, odpięcie kotwicy końca pakietu, DELETE wiersza. Bez śladu w kalendarzu."""
-    supabase.table("deleted_workouts").insert({
-        "event_date": event_date,
-        "event_hour": event_hour,
-        "client_name": event.get("clients", {}).get("name") if isinstance(event.get("clients"), dict) else None,
-        "workout_type": event.get("workout_types", {}).get("name") if isinstance(event.get("workout_types"), dict) else None,
-        "trainer_id": user_id,
-    }).execute()
-
-    client_id = event.get("client_id")
-    if client_id:
-        supabase.table("workout_logs").delete().eq("client_id", client_id).eq("session_date", event_date).execute()
-        try:
-            supabase.table("absences").delete() \
-                .eq("client_id", client_id) \
-                .eq("absence_date", event_date).eq("absence_hour", event_hour).execute()
-        except Exception:
-            pass
-    # Kotwice pakietów (start KONIECZNIE — FK RESTRICT, koniec dla porządku):
-    # odepnij, żeby twarde kasowanie nie łamało klucza obcego.
-    from database import get_supabase as _svc
-    _detach_anchors(supabase, _svc(), user_id, [event["id"]])
-    try:
-        supabase.table("calendar_events").delete().eq("id", event["id"]).execute()
-    except Exception as e:
-        if "foreign key" in str(e).lower():
-            raise HTTPException(400, "Trening jest powiązany z pakietem spoza Twojego konta — napisz, odepnę ręcznie.")
-        raise
+    """The transaction checks anchors BEFORE changing any dependent data."""
+    atomic_rpc(supabase, "calendar_mutation_v2", {
+        "p_action": "delete", "p_data": {"event_date": event_date, "event_hour": event_hour},
+    })
     return "deleted"
-
-
-def _cancel_active_packages_at(supabase, event_ids):
-    """Anuluj AKTYWNE pakiety zakotwiczone w kasowanych treningach (bulk wipe).
-    Ciche odpięcie zostawiałoby zombie 0/10 „Brak danych” — jawne anulowanie
-    (wiersz znika) jest uczciwsze. Zwraca liczbę anulowanych."""
-    ids = {str(i) for i in (event_ids or []) if i}
-    if not ids:
-        return 0
-    n = 0
-    try:
-        rows = supabase.table("client_packages").select("id,start_training_id,end_training_id").execute()
-        for p in (rows.data or []):
-            if p.get("end_training_id") is not None:
-                continue
-            if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
-                supabase.table("client_packages").delete().eq("id", p["id"]).execute()
-                n += 1
-    except Exception:
-        pass
-    return n
-
-
-def _detach_anchors(supabase, svc, user_id, event_ids):
-    """Odepnij kotwice ZAMKNIĘTYCH/starych pakietów wskazujące na kasowane treningi.
-    Bez tego DELETE łamie FK client_packages_start_training_id_fkey (RESTRICT).
-    Aktywnych NIE ruszamy (anuluje je _cancel_active_packages_at albo przepływ
-    delete-start) — inaczej powstałby zombie-pakiet 0/10 bez startu.
-    Skan przez service-role (widzi też wiersze schowane przez RLS), zapis tylko
-    własnych/NULLOWYCH trenerów — cudzych nie ruszamy."""
-    ids = [str(i) for i in (event_ids or []) if i]
-    if not ids:
-        return
-    try:
-        rows = svc.table("client_packages").select("id,trainer_id,start_training_id,end_training_id").execute()
-        for p in (rows.data or []):
-            if p.get("end_training_id") is None:
-                continue  # aktywne obsługuje cancel/repoint, nie ciche odpięcie
-            patch = {}
-            if p.get("start_training_id") and str(p.get("start_training_id")) in ids:
-                patch["start_training_id"] = None
-            if p.get("end_training_id") and str(p.get("end_training_id")) in ids:
-                patch["end_training_id"] = None
-            if not patch:
-                continue
-            owner = p.get("trainer_id")
-            if owner is not None and str(owner) != str(user_id):
-                continue
-            patch["updated_at"] = utcnow_iso()
-            svc.table("client_packages").update(patch).eq("id", p["id"]).execute()
-    except Exception:
-        pass
 
 
 class DeleteStartRequest(BaseModel):
@@ -1155,68 +845,33 @@ def _package_future_trainings(supabase, pkg, event):
 
 @router.post("/{event_date}/{event_hour}/delete-start")
 def delete_package_start(event_date: str, event_hour: int, data: DeleteStartRequest, request: Request):
-    """Usunięcie treningu rozpoczynającego pakiet.
-    - probe: czy to kotwica aktywnego pakietu + ile kolejnych treningów (bez usuwania).
-    - cancel: anuluj pakiet (usuń wiersz) i usuń trening atomowo.
-    - repoint: wskaż nowy początek (z przyszłych treningów pakietu) i usuń stary.
-    Bez kotwicy (stary znacznik, cykl miesięczny): zwykłe atomowe usunięcie."""
     supabase, user_id = get_user_supabase(request)
-    ev = supabase.table("calendar_events").select("*,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count),workout_types(name),training_plans(name)").eq("event_date", event_date).eq("event_hour", event_hour).execute()
-    if not (ev.data and len(ev.data) > 0):
+    if data.mode not in {"probe", "cancel", "repoint"}:
+        raise HTTPException(422, "Nieznany tryb")
+    if data.mode != "probe":
+        return atomic_rpc(supabase, "calendar_mutation_v2", {
+            "p_action": "delete_start",
+            "p_data": {"event_date": event_date, "event_hour": event_hour,
+                       "mode": data.mode, "new_event_id": data.new_event_id},
+        })
+    res = supabase.table("calendar_events").select("*").eq(
+        "event_date", event_date).eq("event_hour", event_hour).eq("trainer_id", user_id).execute()
+    if not res.data:
         raise HTTPException(404, "Workout not found in calendar")
-    event = ev.data[0]
+    event = res.data[0]
     pkg = _active_pool_package_at(supabase, event)
-
     if pkg is None:
-        if data.mode == "probe":
-            return {"is_package_start": False}
-        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
-        return {"status": new_status, "package": "none"}
-
+        return {"is_package_start": False}
     future = _package_future_trainings(supabase, pkg, event)
     nxt = future[0] if future else None
-    if data.mode == "probe":
-        return {
-            "is_package_start": True,
-            "package_id": pkg["id"],
-            "package_size": pkg.get("size") or 10,
-            "shared_with": [x for x in (pkg.get("shared_client_ids") or [])],
-            "future_count": len(future),
-            "next_event": {"id": nxt["id"], "event_date": nxt["event_date"],
-                           "event_hour": nxt["event_hour"]} if nxt else None,
-        }
-    if data.mode == "cancel":
-        supabase.table("client_packages").delete().eq("id", pkg["id"]).execute()
-        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
-        return {"status": new_status, "package": "cancelled"}
-    if data.mode == "repoint":
-        if not data.new_event_id:
-            raise HTTPException(400, "Wskaż nowy początek pakietu")
-        cand = next((e for e in future if str(e.get("id")) == str(data.new_event_id)), None)
-        if cand is None:
-            raise HTTPException(400, "Nowy początek musi być kolejnym treningiem tego pakietu")
-        if pkg.get("end_training_id"):
-            try:
-                endres = supabase.table("calendar_events").select("event_date,event_hour").eq("id", pkg["end_training_id"]).execute()
-                if endres.data:
-                    ed, eh = endres.data[0]["event_date"], int(endres.data[0]["event_hour"] or 0)
-                    if (str(cand["event_date"]), int(cand["event_hour"] or 0)) > (str(ed), eh):
-                        raise HTTPException(400, "Nowy początek wypada za końcem pakietu")
-            except HTTPException:
-                raise
-            except Exception:
-                pass
-        supabase.table("client_packages").update(
-            {"start_training_id": cand["id"], "updated_at": utcnow_iso()}).eq("id", pkg["id"]).execute()
-        new_status = _hard_delete(supabase, user_id, event, event_date, event_hour)
-        return {"status": new_status, "package": "repointed",
-                "new_start_event_id": cand["id"]}
-    raise HTTPException(400, "Nieznany tryb") 
+    return {
+        "is_package_start": True, "package_id": pkg["id"], "package_size": pkg.get("size") or 10,
+        "shared_with": pkg.get("shared_client_ids") or [], "future_count": len(future),
+        "next_event": {k: nxt[k] for k in ("id", "event_date", "event_hour")} if nxt else None,
+    }
 
 
 @router.delete("/events/{event_date}/{event_hour}/hard")
 def hard_delete_event(event_date: str, event_hour: int, request: Request):
-    """Hard delete (remove row entirely)."""
-    supabase, _ = get_user_supabase(request)
-    supabase.table("calendar_events").delete().eq("event_date", event_date).eq("event_hour", event_hour).execute()
-    return {"status": "deleted"}
+    """Legacy alias uses the same checks and transaction as the regular delete."""
+    return delete_event(event_date, event_hour, request)

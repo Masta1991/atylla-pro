@@ -3,24 +3,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from routers import clients, calendar, workouts, measurements, config_router, auth, email_router
+from routers import clients, calendar, workouts, measurements, config_router, auth, trainer
 
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.0.17",
+    version="2.1.11",
 )
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 import traceback
+from postgrest.exceptions import APIError
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    exc_str = str(exc)
-    
     # Check if the exception is a Supabase/PostgREST JWT error
-    if "JWT" in exc_str or "PGRST30" in exc_str:
+    if isinstance(exc, APIError) and str(exc.code) in {'PGRST301', 'PGRST303'}:
         return JSONResponse(
             status_code=401,
             content={"detail": "Session expired (JWT expired or invalid)"},
@@ -59,10 +58,10 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(calendar.router)
+app.include_router(trainer.router)
 app.include_router(workouts.router)
 app.include_router(measurements.router)
 app.include_router(config_router.router)
-app.include_router(email_router.router)
 # dayclose usuniety w 2.0 (decyzja 2026-09-07) — tabela day_approvals zostaje w bazie nietknieta.
 
 
@@ -107,7 +106,7 @@ if os.path.isdir(STATIC_DIR):
     # API prefixes that should NOT be intercepted by SPA fallback
     API_PREFIXES = (
         "clients", "calendar", "workouts", "measurements",
-        "config", "auth", "email", "health", "version",
+        "config", "auth", "email", "health", "version",  # retired email paths must return 404, not SPA
     )
 
     @app.get("/{full_path:path}")

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -9,31 +9,63 @@ export default function DropdownPicker({
   items = [], // Array of { label: string, value: any, color?: string }
   style,
   placeholder = "Wybierz opcję",
-  dropdownIconColor
+  dropdownIconColor,
+  placeholderTextColor
 }) {
-  const { colors: C, themeColors } = useTheme();
+  const { colors: C, themeColors, mode } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
+  const triggerRef = useRef(null);
+  const modalRef = useRef(null);
+  const closeRef = useRef(null);
+  const [focused, setFocused] = useState(null);
+  const close = () => setModalVisible(false);
+  const focusStyle = key => Platform.OS === 'web' && focused === key
+    ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: C.accent, outlineOffset: -2 } : null;
+  useEffect(() => {
+    if (!modalVisible || Platform.OS !== 'web' || !modalRef.current) return;
+    // RN Web traps Tab but does not isolate its portal's siblings.
+    const background = Array.from(document.body.children)
+      .filter(node => !node.contains(modalRef.current));
+    const previous = background.map(node => [node, node.inert]);
+    previous.forEach(([node]) => { node.inert = true; });
+    closeRef.current?.focus();
+    return () => {
+      previous.forEach(([node, inert]) => { node.inert = inert; });
+      triggerRef.current?.focus();
+    };
+  }, [modalVisible]);
 
   const selectedItem = items.find(i => String(i.value) === String(selectedValue));
 
   return (
     <>
       <TouchableOpacity 
-        style={[styles.container, { backgroundColor: 'transparent', borderColor: themeColors.border }, style]} 
+        ref={triggerRef}
+        accessibilityRole="button"
+        accessibilityLabel={placeholder}
+        accessibilityState={{ expanded: modalVisible }}
+        {...(Platform.OS === 'web' ? { 'aria-expanded': modalVisible, 'aria-haspopup': 'dialog' } : {})}
+        onFocus={() => setFocused('trigger')} onBlur={() => setFocused(null)}
+        style={[styles.container, { backgroundColor: 'transparent', borderColor: themeColors.border }, style, focusStyle('trigger')]}
         onPress={() => setModalVisible(true)}
       >
-        <Text style={[styles.text, { color: selectedItem ? themeColors.text : themeColors.textMuted }]} numberOfLines={1}>
+        <Text style={[styles.text, { color: selectedItem ? themeColors.text : (placeholderTextColor || themeColors.textMuted) }]} numberOfLines={1}>
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
         <Ionicons name="chevron-down" size={20} color={dropdownIconColor || themeColors.textSecondary} />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
+      {modalVisible && <Modal ref={modalRef} visible transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={close}
+        accessibilityLabel={placeholder}>
+        <View style={styles.modalOverlay}>
+          <View style={StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={close}
+            {...(Platform.OS === 'web' ? { onClick: close } : {})} />
           <View style={[styles.modalContent, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
             <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
               <Text style={[styles.modalTitle, { color: themeColors.text }]}>{placeholder}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+              <TouchableOpacity ref={closeRef} accessibilityRole="button" accessibilityLabel="Zamknij wybór"
+                onFocus={() => setFocused('close')} onBlur={() => setFocused(null)}
+                onPress={close} style={[styles.closeBtn, focusStyle('close')]}>
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
@@ -42,10 +74,14 @@ export default function DropdownPicker({
               keyExtractor={(item, index) => String(item.value) + index}
               renderItem={({ item }) => (
                 <TouchableOpacity 
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  onFocus={() => setFocused('item-' + item.value)} onBlur={() => setFocused(null)}
                   style={[
                     styles.itemBtn, 
                     String(item.value) === String(selectedValue) && { backgroundColor: C.accent + '20' },
                     { borderBottomColor: themeColors.border }
+                    , focusStyle('item-' + item.value)
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -55,7 +91,7 @@ export default function DropdownPicker({
                   <Text style={[
                     styles.itemText, 
                     { color: item.color || themeColors.text },
-                    String(item.value) === String(selectedValue) && { color: C.accent, fontWeight: '700' }
+                    String(item.value) === String(selectedValue) && { color: mode === 'light' ? themeColors.text : C.accent, fontWeight: '700' }
                   ]}>
                     {item.label}
                   </Text>
@@ -68,8 +104,8 @@ export default function DropdownPicker({
               style={{ maxHeight: Platform.OS === 'web' ? '60vh' : '70%' }}
             />
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </View>
+      </Modal>}
     </>
   );
 }
