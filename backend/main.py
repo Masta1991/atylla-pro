@@ -1,14 +1,24 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from routers import clients, calendar, workouts, measurements, config_router, auth, trainer
+import config as runtime_settings
+from runtime_config import ConfigurationError, validate_config
+
+
+@asynccontextmanager
+async def lifespan(app):
+    validate_config(runtime_settings)
+    yield
 
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.1.11",
+    version="2.1.12",
+    lifespan=lifespan,
 )
 
 from fastapi import Request
@@ -70,6 +80,10 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 @app.get("/health")
 def health_check():
+    try:
+        validate_config(runtime_settings)
+    except ConfigurationError:
+        return JSONResponse(status_code=503, content={"status": "not_ready"})
     return {"status": "healthy"}
 
 
@@ -87,17 +101,24 @@ if os.path.isdir(STATIC_DIR):
     if os.path.isdir(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
+    def _static_file_or_404(filename: str, media_type: str):
+        # Brak pliku (np. sw.js w buildzie bez PWA) ma dać 404, nie 500.
+        path = os.path.join(STATIC_DIR, filename)
+        if not os.path.isfile(path):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        return FileResponse(path, media_type=media_type)
+
     @app.get("/favicon.ico")
     async def favicon():
-        return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
+        return _static_file_or_404("favicon.ico", "image/x-icon")
 
     @app.get("/sw.js")
     async def service_worker():
-        return FileResponse(os.path.join(STATIC_DIR, "sw.js"), media_type="application/javascript")
+        return _static_file_or_404("sw.js", "application/javascript")
 
     @app.get("/manifest.json")
     async def manifest():
-        return FileResponse(os.path.join(STATIC_DIR, "manifest.json"), media_type="application/json")
+        return _static_file_or_404("manifest.json", "application/json")
 
     @app.get("/")
     async def index():

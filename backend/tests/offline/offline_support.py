@@ -24,6 +24,7 @@ for key, value in {
     "SUPABASE_URL": "https://offline.invalid",
     "SUPABASE_KEY": "audit-placeholder",
     "SUPABASE_ANON_KEY": "audit-placeholder",
+    "AUTH_SESSION_SECRET": "synthetic-offline-session-secret-32-characters",
 }.items():
     setattr(config, key, value)
 sys.modules["config"] = config

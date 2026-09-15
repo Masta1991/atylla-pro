@@ -1,149 +1,57 @@
 {
-  "timestamp": "2026-08-23T12:19:42.623544",
-  "total_cycles": 3,
+  "timestamp": "2026-09-15T12:47:12.026068+00:00",
   "overall_status": "PASS",
-  "total_duration_s": 6.03,
+  "scope": "offline Python/API, frontend module and PGlite PostgreSQL/RLS/rollback; synthetic data",
+  "not_verified": [
+    "multi-connection concurrency",
+    "Supabase/PostgREST integration",
+    "browser/device E2E",
+    "deployed production"
+  ],
   "cycles": [
     {
       "cycle": 1,
-      "results": [
-        {
-          "test": "01_Backend_Imports",
-          "status": "PASS",
-          "duration_ms": 2942.63
-        },
-        {
-          "test": "02_Database_Connection",
-          "status": "PASS",
-          "duration_ms": 491.68
-        },
-        {
-          "test": "03_SSOT_Package_Calculation",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "metrics": {
-            "initial": 10,
-            "used": 5,
-            "remaining": 5
-          }
-        },
-        {
-          "test": "04_Calendar_Conflict_Detector",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "05_Physical_PWA_Interaction",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "06_Measurements_Math_Engine",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "bmi": 25.9
-        },
-        {
-          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
-          "status": "PASS",
-          "duration_ms": 1774.62,
-          "verified_tiles": 39
-        }
-      ]
+      "tests": 79,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "frontend": [
+    {
+      "script": "backend/tests/offline/frontend_api.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"API module, synthetic fetch and storage\",\"tests\":[{\"name\":\"refresh_token_only_in_body_and_retry_uses_new_token\",\"status\":\"PASS\"},{\"name\":\"temporary_refresh_failure_keeps_session\",\"status\":\"PASS\"},{\"name\":\"forbidden_resource_does_not_log_user_out\",\"status\":\"PASS\"},{\"name\":\"logout_during_refresh_cannot_restore_tokens\",\"status\":\"PASS\"},{\"name\":\"concurrent_401_requests_share_one_refresh\",\"status\":\"PASS\"},{\"name\":\"concurrent_reads_of_same_dictionary_issue_one_request\",\"status\":\"PASS\"},{\"name\":\"logout_clears_cache_and_discards_late_client_response\",\"status\":\"PASS\"},{\"name\":\"mutation_invalidates_old_counts_and_late_reads\",\"status\":\"PASS\"},{\"name\":\"absence_and_workout_use_single_requests_and_no_mail_exports\",\"status\":\"PASS\"},{\"name\":\"billing_sends_reviewed_version_and_never_retries_unknown_commit\",\"status\":\"PASS\"},{\"name\":\"atomic_pair_survives_restart_and_refresh_does_not_extend_idle\",\"status\":\"PASS\"},{\"name\":\"only_explicit_activity_extends_deadline\",\"status\":\"PASS\"},{\"name\":\"expired_idle_does_not_attempt_refresh_and_clears_storage\",\"status\":\"PASS\"},{\"name\":\"network_failure_during_activity_preserves_durable_session\",\"status\":\"PASS\"},{\"name\":\"two_tabs_rotate_shared_refresh_token_once\",\"status\":\"PASS\"},{\"name\":\"activity_commit_does_not_overwrite_another_tabs_rotated_pair\",\"status\":\"PASS\"},{\"name\":\"legacy_storage_requires_login_and_logout_removes_all_auth_keys\",\"status\":\"PASS\"},{\"name\":\"same_day_sessions_have_separate_read_cache_keys\",\"status\":\"PASS\"},{\"name\":\"duplicate_confirmation_code_and_explicit_flag_survive_api\",\"status\":\"PASS\"}]}",
+      "error": ""
     },
     {
-      "cycle": 2,
-      "results": [
-        {
-          "test": "01_Backend_Imports",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "02_Database_Connection",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "03_SSOT_Package_Calculation",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "metrics": {
-            "initial": 10,
-            "used": 5,
-            "remaining": 5
-          }
-        },
-        {
-          "test": "04_Calendar_Conflict_Detector",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "05_Physical_PWA_Interaction",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "06_Measurements_Math_Engine",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "bmi": 25.9
-        },
-        {
-          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
-          "status": "PASS",
-          "duration_ms": 399.91,
-          "verified_tiles": 39
-        }
-      ]
+      "script": "backend/tests/offline/frontend_billing.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"actual frontend billing history function; synthetic data\",\"tests\":[{\"name\":\"same_day_hour_boundaries_exclude_neighbors\",\"status\":\"PASS\"},{\"name\":\"deleted_and_cancelled_paid_free_and_whole_day_marker_are_not_double_counted\",\"status\":\"PASS\"},{\"name\":\"historical_package_does_not_include_future_shared_members\",\"status\":\"PASS\"},{\"name\":\"missing_history_anchor_is_incomplete_not_all_time_history\",\"status\":\"PASS\"},{\"name\":\"history_uses_warsaw_timezone_at_exact_slot_end\",\"status\":\"PASS\"}]}",
+      "error": ""
     },
     {
-      "cycle": 3,
-      "results": [
-        {
-          "test": "01_Backend_Imports",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "02_Database_Connection",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "03_SSOT_Package_Calculation",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "metrics": {
-            "initial": 10,
-            "used": 5,
-            "remaining": 5
-          }
-        },
-        {
-          "test": "04_Calendar_Conflict_Detector",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "05_Physical_PWA_Interaction",
-          "status": "PASS",
-          "duration_ms": 0.0
-        },
-        {
-          "test": "06_Measurements_Math_Engine",
-          "status": "PASS",
-          "duration_ms": 0.0,
-          "bmi": 25.9
-        },
-        {
-          "test": "07_Calendar_Tile_SSOT_DOM_Renderer",
-          "status": "PASS",
-          "duration_ms": 420.73,
-          "verified_tiles": 39
-        }
-      ]
+      "script": "scripts/check-frontend.cjs",
+      "exit_code": 0,
+      "output": "{\"status\":\"PASS\",\"parsed_modules\":39}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_billing.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite PostgreSQL\",\"scope\":\"real SQL, RLS, FK, rollback; synthetic local data\",\"tests\":[{\"name\":\"paid_free_paid_and_repeated_request_are_atomic_and_idempotent\",\"status\":\"PASS\"},{\"name\":\"whole_day_null_hour_request_does_not_duplicate\",\"status\":\"PASS\"},{\"name\":\"free_anchor_can_be_rebooked_explicitly_with_version_check\",\"status\":\"PASS\"},{\"name\":\"bulk_week_cannot_silently_cancel_open_package\",\"status\":\"PASS\"},{\"name\":\"foreign_trainer_cannot_change_absence_or_calendar\",\"status\":\"PASS\"},{\"name\":\"anon_cannot_execute_any_write_rpc\",\"status\":\"PASS\"},{\"name\":\"workout_batch_failure_rolls_back_deleted_logs\",\"status\":\"PASS\"},{\"name\":\"swap_preserves_event_id_package_anchor_and_moves_logs\",\"status\":\"PASS\"},{\"name\":\"closed_package_absence_delete_and_move_roll_back\",\"status\":\"PASS\"},{\"name\":\"closed_interior_billing_fact_is_protected\",\"status\":\"PASS\"},{\"name\":\"cannot_insert_backdated_session_into_closed_package\",\"status\":\"PASS\"},{\"name\":\"combined_calendar_workout_save_rollback_version_and_empty_logs\",\"status\":\"PASS\"},{\"name\":\"monthly_read_failure_leaves_cycle_and_history_unchanged\",\"status\":\"PASS\"},{\"name\":\"monthly_count_all_pages_shared_paid_free_and_repeat\",\"status\":\"PASS\"},{\"name\":\"invalid_date_missing_version_and_foreign_user_do_not_write\",\"status\":\"PASS\"},{\"name\":\"reset_failure_after_deletion_rolls_back_packages_and_membership\",\"status\":\"PASS\"},{\"name\":\"reset_cleans_both_directions_preserves_history_and_rejects_stale_retry\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_sessions.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"PGlite real SQL, local synthetic data\",\"tests\":[{\"name\":\"migration_links_only_unambiguous_history_and_is_repeatable\",\"status\":\"PASS\"},{\"name\":\"second_session_requires_confirmation_without_partial_writes\",\"status\":\"PASS\"},{\"name\":\"confirmed_sessions_have_independent_exercises_and_empty_new_session\",\"status\":\"PASS\"},{\"name\":\"edit_clear_and_stale_save_do_not_change_other_session\",\"status\":\"PASS\"},{\"name\":\"invalid_log_rolls_back_both_calendar_metadata_and_log_replacement\",\"status\":\"PASS\"},{\"name\":\"legacy_day_writer_cannot_overwrite_multiple_sessions\",\"status\":\"PASS\"},{\"name\":\"same_day_swap_and_cross_day_move_follow_event_identity\",\"status\":\"PASS\"},{\"name\":\"delete_one_session_preserves_other_and_ambiguous_legacy_history\",\"status\":\"PASS\"},{\"name\":\"foreign_actor_and_anon_cannot_write_event_logs\",\"status\":\"PASS\"},{\"name\":\"direct_mismatched_event_link_rejected\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_week_copy.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"PGlite SQL; synthetic data; migration installed twice\",\"tests\":[{\"name\":\"preview_is_read_only_and_pair_copy_has_no_results_or_settlement\",\"status\":\"PASS\"},{\"name\":\"occupied_slot_is_preserved_unless_explicitly_selected_for_replacement\",\"status\":\"PASS\"},{\"name\":\"absence_is_hour_scoped_and_checks_both_participants\",\"status\":\"PASS\"},{\"name\":\"whole_day_absence_blocks_every_hour\",\"status\":\"PASS\"},{\"name\":\"stale_target_rolls_back_other_inserts_in_the_same_batch\",\"status\":\"PASS\"},{\"name\":\"new_absence_after_preview_rejects_every_change\",\"status\":\"PASS\"},{\"name\":\"double_source_slot_is_not_silently_overwritten\",\"status\":\"PASS\"},{\"name\":\"paid_session_log_and_package_anchor_are_protected\",\"status\":\"PASS\"},{\"name\":\"foreign_client_plan_anon_and_past_cannot_write\",\"status\":\"PASS\"}]}",
+      "error": ""
     }
   ]
 }
