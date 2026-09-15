@@ -1,7 +1,7 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
-    "preDeployCommand": ["python backend/runtime_config.py"],
+    "preDeployCommand": ["python runtime_config.py"],
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120
   }

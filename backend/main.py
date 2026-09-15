@@ -17,7 +17,7 @@ async def lifespan(app):
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.1.12",
+    version="2.1.13",
     lifespan=lifespan,
 )
 
