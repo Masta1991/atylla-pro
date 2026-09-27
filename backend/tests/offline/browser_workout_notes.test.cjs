@@ -109,6 +109,9 @@ let browser,debugPage,debugCalls;
   assert((await page.getByTestId('calendar-note-preview').innerText()).includes('sprawdź bark'));
   assert.equal(await page.getByTestId('calendar-note-preview-icon').count(),1);
   assert.equal(await page.getByTestId('calendar-note-mark-read').count(),1);
+  const compactReadButton=await page.getByTestId('calendar-note-mark-read').boundingBox();
+  assert.equal(compactReadButton.width,44);assert.equal(compactReadButton.height,44);
+  assert(!(await page.getByTestId('calendar-note-mark-read').innerText()).includes('Oznacz'));
   const drawerFocus=[];
   await page.getByTestId('calendar-note-preview').focus();
   for(const key of ['Tab','Shift+Tab']){
