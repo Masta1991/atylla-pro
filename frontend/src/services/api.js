@@ -610,6 +610,11 @@ export async function saveCalendarWorkout(data) {
   return request('/calendar/save-workout', {method: 'POST', body: calendarPayload});
 }
 
+export function acknowledgeWorkoutNote(eventId, expectedNote) {
+  return request(`/calendar/notes/${encodeURIComponent(eventId)}/read`,
+    { method: 'POST', body: { expected_note: expectedNote } });
+}
+
 // ── Measurements ────────────────────────────────────────────────────────────
 
 export function getMeasurements(clientId) {

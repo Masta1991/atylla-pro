@@ -4,10 +4,11 @@ from pydantic import BaseModel
 from billing import slot_done as _slot_done, project_package, event_key
 from billing_data import read_all, load_package_boundaries
 from trainer_insights import session_rows, totals as session_totals
+from workout_notes import attach_note_reminders
 from database import get_user_supabase, supabase_retry, utcnow_iso, atomic_rpc
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
-    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest, CalendarWorkoutSave
+    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest, CalendarWorkoutSave, WorkoutNoteRead
 )
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -66,6 +67,18 @@ def delete_absence(absence_id: str, request: Request):
 def save_calendar_workout(data: CalendarWorkoutSave, request: Request):
     supabase, _ = get_user_supabase(request)
     return atomic_rpc(supabase, 'save_calendar_workout_v4', {'p_payload': data.model_dump(mode='json')})
+
+
+@router.post('/notes/{event_id}/read')
+def read_workout_note(event_id: str, data: WorkoutNoteRead, request: Request):
+    from uuid import UUID
+    try:
+        source_id = str(UUID(event_id))
+    except ValueError:
+        raise HTTPException(422, 'Nieprawidłowy identyfikator notatki.')
+    supabase, _ = get_user_supabase(request)
+    return atomic_rpc(supabase, 'acknowledge_workout_note_v1',
+                      {'p_event_id': source_id, 'p_expected_note': data.expected_note})
 
 
 def assign_chronological_numbers(events, supabase):
@@ -453,7 +466,7 @@ def get_week_events(monday_date: str, request: Request):
         # Jawna lista kolumn zamiast * (lżejszy transfer niż pełne wiersze).
         res = (
             supabase.table("calendar_events")
-            .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,main_group,added_groups,is_replacement,replaced_client_id,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
+            .select("id,client_id,event_date,event_hour,status,is_settled,partner_client_id,note,note_acknowledged_at,main_group,added_groups,is_replacement,replaced_client_id,workout_type_id,plan_id,created_at,updated_at,clients!calendar_events_client_id_fkey(name, billing_type, package_size, package_current_count), workout_types(name), training_plans(name)")
             .gte("event_date", monday.isoformat())
             .lte("event_date", saturday.isoformat())
             .order("event_date,event_hour")
@@ -461,12 +474,16 @@ def get_week_events(monday_date: str, request: Request):
         )
         events = res.data or []
         out = assign_chronological_numbers(events, supabase)
-        return out
+        return attach_note_reminders(out, supabase)
 
     try:
         return supabase_retry(_load)
     except _httpx.TransportError:
         raise HTTPException(502, "Baza chwilowo nie odpowiada (Supabase). Spróbuj ponownie.")
+    except Exception as error:
+        if str(getattr(error, 'code', '')) in {'42703', 'PGRST204'}:
+            raise HTTPException(503, 'Przypomnienia notatek wymagają aktualizacji bazy. Odśwież po zakończeniu aktualizacji.')
+        raise
 
 
 @router.get("/week-summary/{monday_date}")

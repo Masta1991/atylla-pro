@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
 import { LibraryPicker as DropdownPicker, LibraryButton as PanelButton, useLibraryTheme as usePanelTheme } from '../components/WorkoutLibraryUI';
 import { LoadState } from '../components/TrainerPanels';
-import { planSetText, workoutCatalog, workoutShareText } from '../services/workoutCatalog';
+import { planSetText, supersetLabels, workoutCatalog, workoutShareText } from '../services/workoutCatalog';
 import { showError } from '../services/confirm';
 import * as api from '../services/api';
 
@@ -91,6 +91,7 @@ export default function PlansScreen({ navigation }) {
             <PanelButton dataSet={{ shareControl: true }} onPress={() => { remove(block.key); add(block.key); }}>Pobierz ponownie</PanelButton>
           </View> : !block.exercises ? <Text style={s.muted}>Pobieranie ćwiczeń…</Text> : block.exercises.length === 0 ? <Text style={s.muted}>Brak ćwiczeń w tym zestawie.</Text> : block.exercises.map((row, i) => <View key={row.id || row.exercise_id || i} style={s.line}>
             <Text style={s.title}>{i + 1}. {row.exercises?.name || row.exercise_id}</Text>
+            {!!supersetLabels(block.exercises)[i] && <Text style={s.text}>{supersetLabels(block.exercises)[i]} · ćwiczenia wykonuj razem</Text>}
             {(row.sets_data || []).map((set, index) => <Text key={index} style={s.text}>Seria {index + 1}: {planSetText(set, row.exercises?.unit)}</Text>)}
           </View>)}
         </View>)}

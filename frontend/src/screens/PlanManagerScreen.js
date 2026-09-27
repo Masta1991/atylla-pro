@@ -24,6 +24,7 @@ export default function PlanManagerScreen({ navigation, embedded = false, header
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('');
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const lock = useRef(false), sequence = useRef(0), librarySequence = useRef(0), leaving = useRef(false), confirming = useRef(false);
+  const hasDraft = dirty || !!name.trim() || !!exerciseName.trim();
   useEffect(() => {
     registerGuard?.(async () => !lock.current && (!(dirty || name.trim() || exerciseName.trim()) || await askConfirmation('Niezapisane zmiany', 'Odrzucić niezapisane dane i zmienić partię lub plan?', 'Odrzuć zmiany')));
     return () => registerGuard?.(null);
@@ -48,14 +49,14 @@ export default function PlanManagerScreen({ navigation, embedded = false, header
   }, []);
   useEffect(() => { loadPlan(planId); return () => { sequence.current++; }; }, [planId, loadPlan]);
   useEffect(() => navigation.addListener('beforeRemove', async e => {
-    if (leaving.current || (!dirty && !lock.current)) return;
+    if (leaving.current || (!hasDraft && !lock.current)) return;
     e.preventDefault();
     if (lock.current || confirming.current) return;
     confirming.current = true;
-    const discard = await askConfirmation('Niezapisane zmiany', 'Opuścić edytor i odrzucić zmiany serii, kolejności i superserii?', 'Odrzuć zmiany');
+    const discard = await askConfirmation('Niezapisane zmiany', 'Opuścić edytor i odrzucić niezapisane dane formularzy oraz zmiany planu?', 'Odrzuć zmiany');
     confirming.current = false;
     if (discard) { leaving.current = true; navigation.dispatch(e.data.action); }
-  }), [navigation, dirty]);
+  }), [navigation, hasDraft]);
   async function canSwitch() {
     return !dirty || await askConfirmation('Niezapisane zmiany', 'Zmienić plan i odrzucić zmiany serii, kolejności i superserii?', 'Odrzuć zmiany');
   }

@@ -124,6 +124,19 @@ class CalendarSwapRequest(BaseModel):
     date2: date
     hour2: int = Field(ge=6, le=21)
 
+class WorkoutNoteReminder(BaseModel):
+    id: UUID
+    client_id: UUID
+    partner_client_id: Optional[UUID] = None
+    event_date: date
+    event_hour: int
+    note: str
+
+
+class WorkoutNoteRead(BaseModel):
+    expected_note: str
+
+
 class CalendarEventResponse(CalendarEventBase):
     id: UUID
     created_at: datetime
@@ -138,6 +151,8 @@ class CalendarEventResponse(CalendarEventBase):
     tile_number: Optional[int] = None  # pozycja w pakiecie/cyklu (od razu, bez rozliczenia)
     partner_name: Optional[str] = None  # imię współćwiczącego (liczone, nie kolumna)
     in_closed_cycle: bool = False
+    note_acknowledged_at: Optional[datetime] = None
+    pending_notes: List[WorkoutNoteReminder] = Field(default_factory=list)
     model_config = {"from_attributes": True}
 
 

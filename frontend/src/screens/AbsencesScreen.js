@@ -21,6 +21,13 @@ export default function AbsencesScreen({ navigation }) {
   const [selectedDates, setSelectedDates] = useState([]);
   const [adding, setAdding] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Compare calendar dates so DST and UTC parsing cannot shift the 30-day cutoff.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 30);
+  const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const visibleAbsences = absences.filter(abs => abs.absence_date >= localDate(cutoff));
 
   function toggleDate(value) {
     setSelectedDates(prev => {
@@ -221,24 +228,18 @@ export default function AbsencesScreen({ navigation }) {
         ) : loadError ? (
           <View><Text accessibilityRole="alert" style={styles.empty}>{loadError}</Text>
           <TouchableOpacity accessibilityRole="button" onPress={loadData} style={styles.btn}><Text style={styles.absDate}>Spróbuj ponownie</Text></TouchableOpacity></View>
-        ) : absences.length === 0 ? (
-          <Text style={styles.empty}>Brak zgłoszonych absencji.</Text>
+        ) : visibleAbsences.length === 0 ? (
+          <Text style={styles.empty}>Brak zgłoszonych absencji w wyświetlanym okresie.</Text>
         ) : (
-          absences.map(abs => {
-            const absDate = new Date(abs.absence_date);
-            const today = new Date(new Date().setHours(0,0,0,0));
-            const diffTime = today - absDate;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (diffDays > 30) return null; // hide absences older than 30 days
-            const isPast = diffDays > 0;
+          visibleAbsences.map(abs => {
+            const isPast = abs.absence_date < localDate(today);
 
             return (
               <View key={abs.id} style={[styles.absRow, isPast && { opacity: 0.6 }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.absClient}>{abs.clients?.name}</Text>
                   <Text style={styles.absDate}>
-                    {new Date(abs.absence_date).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {new Date(abs.absence_date + 'T12:00:00').toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {abs.absence_hour != null ? ` - ${abs.absence_hour}:00` : ''}
                   </Text>
                 </View>

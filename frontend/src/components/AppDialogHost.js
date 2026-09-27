@@ -45,7 +45,9 @@ export default function AppDialogHost() {
             size={28} color={tone||C.accent}/>
         </View>
         <Text accessibilityRole="header" style={[styles.title,{color:T.text}]}>{dialog.title}</Text>
-        <ScrollView style={styles.body}>
+        <ScrollView {...(Platform.OS==='web'?{tabIndex:0,role:'region','aria-label':'Treść komunikatu'}:{})}
+          onFocus={()=>setFocused('body')} onBlur={()=>setFocused(null)}
+          style={[styles.body,Platform.OS==='web'&&focused==='body'?{outlineStyle:'solid',outlineWidth:2,outlineColor:T.text,outlineOffset:-2}:null]}>
           <Text style={[styles.message,{color:T.textSecondary}]}>{dialog.message}</Text>
         </ScrollView>
         <View style={styles.actions}>

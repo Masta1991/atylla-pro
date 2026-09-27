@@ -32,11 +32,12 @@ def main():
         results.append({"cycle": cycle, "tests": result.testsRun,
                         "failures": len(result.failures), "errors": len(result.errors)})
     frontend = []
-    scripts = ['backend/tests/offline/frontend_api.test.cjs', 'backend/tests/offline/frontend_billing.test.cjs', 'scripts/check-frontend.cjs']
+    scripts = ['backend/tests/offline/frontend_api.test.cjs', 'backend/tests/offline/frontend_billing.test.cjs', 'backend/tests/offline/frontend_workout_catalog.test.cjs', 'backend/tests/offline/frontend_workout_save_queue.test.cjs', 'backend/tests/offline/frontend_workout_notes.test.cjs', 'scripts/check-frontend.cjs']
     if args.postgres:
         scripts.append('backend/tests/offline/postgres_billing.test.cjs')
         scripts.append('backend/tests/offline/postgres_sessions.test.cjs')
         scripts.append('backend/tests/offline/postgres_week_copy.test.cjs')
+        scripts.append('backend/tests/offline/postgres_workout_notes.test.cjs')
     for script in scripts:
         try:
             run = subprocess.run(["node", str(ROOT / script)], cwd=ROOT,

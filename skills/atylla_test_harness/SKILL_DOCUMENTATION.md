@@ -1,5 +1,77 @@
 # Zakres testów Atylla Pro
 
+## Aktualizacja 2026-09-26 — 2.1.16
+
+Runner `harness.py --postgres` obejmuje 177 przypadków/kontroli: 88 Python/API,
+19 JS API, 5 historii, 6 katalogu, 9 kolejki, 5 notatek oraz 45 SQL/PGlite
+(17 rozliczeń, 10 sesji, 9 kopiowania tygodnia, 9 notatek). Parsuje 42 moduły JS.
+
+`test_workout_notes.py` sprawdza przenoszenie przypomnień między dniami,
+obu uczestników, paginację ponad 1000 rekordów, izolację, błędy odczytu i API.
+`frontend_workout_notes.test.cjs` obejmuje zachowanie notatki źródłowej,
+pomijanie metadanych oraz ochronę nowej treści przed spóźnionym potwierdzeniem.
+`postgres_workout_notes.test.cjs` uruchamia migrację 012 dwukrotnie, testuje
+trwały odczyt, zmianę tekstu, konflikt, RLS, anon, zamknięty pakiet oraz brak
+konfliktu z równoczesną edycją treningu na tej samej wersji `updated_at`.
+Testy PGlite są sekwencyjne; nie dowodzą zachowania wielu połączeń.
+
+Osobny odbiór renderowanego buildu, syntetyczne API i blokada ruchu zewnętrznego:
+
+```powershell
+node backend/tests/offline/browser_workout_notes.test.cjs .tmp/local-build-WERSJA-ID
+node backend/tests/offline/browser_training_slow_initial_read.test.cjs .tmp/local-build-WERSJA-ID
+node backend/tests/offline/browser_training_failed_plan_read.test.cjs .tmp/local-build-WERSJA-ID
+node backend/tests/offline/browser_training_remove_group.test.cjs .tmp/local-build-WERSJA-ID
+```
+
+Notatki: sześć szerokości 320–1440 px, jedna ikona kartki bez licznika,
+krótki podgląd, bezpośredni odczyt w szufladzie, długi tekst przewijany
+klawiaturą, 503, konflikt 409 i ponowne otwarcie aktualnej treści
+bez przeładowania strony, zachowanie po przeładowaniu, ponowne przypomnienie
+po edycji. `ATYLLA_QA_ZOOM=2` włącza osobny przebieg 720×500 CSS px / skala 2
+(reflow odpowiadający 200%, nie natywny zoom). `ATYLLA_QA_WIDTH` ogranicza
+przebieg diagnostyczny do wskazanej szerokości; usuń te zmienne po teście.
+Trzy regresje treningu sprawdzają na 390/1440 px odpowiednio pełną inicjalizację
+przed edycją, brak zapisu błędnie wczytanego planu i pojedyncze usunięcie partii.
+Dowody: `.tmp/notes-20260926/`; wersja 2.1.16 wymaga migracji 012 przed
+uruchomieniem nowego backendu. Lokalny test nie stosuje migracji w Supabase.
+Odbiór: `docs/audits/NOTES_AND_REAUDIT_FIXES_2.1.16_2026-09-26.md`.
+
+## Aktualizacja 2026-09-26 — 2.1.15
+
+Runner `harness.py --postgres` obejmuje 154 przypadki/kontrole: 79 Python/API,
+19 JS API, 5 JS historii, 6 katalogu ćwiczeń, 9 kolejki zapisów oraz 36
+SQL/PGlite (17 rozliczeń, 10 sesji, 9 kopiowania tygodnia). Dodatkowo parsuje
+40 modułów frontendowych. Są to testy lokalne na danych syntetycznych.
+
+`frontend_workout_save_queue.test.cjs` sprawdza nowszą edycję podczas wolnego
+zapisu, zatrzymanie automatycznych ponowień po awarii, niepewny commit,
+powrót do bazowej wartości, szybką pierwszą edycję, anulowane potwierdzenie,
+niezmienność snapshotu, ochronę zmiany sesji i zatrzymanie kolejki po wyjściu.
+`frontend_workout_catalog.test.cjs` sprawdza także superserie w udostępnianiu,
+członków nieprzylegających do siebie i osierocone identyfikatory superserii.
+
+Osobne testy renderowanego lokalnego buildu (uruchamiać z katalogu projektu):
+
+```powershell
+node backend/tests/offline/browser_audit_autosave.test.cjs .tmp/local-build-WERSJA-ID
+node backend/tests/offline/browser_audit_forms.test.cjs .tmp/local-build-WERSJA-ID
+node backend/tests/offline/browser_audit_absences.test.cjs .tmp/local-build-WERSJA-ID
+```
+
+Wymagają lokalnego Chrome i zależności Playwright/axe w `.tmp/billing-qa`
+(instalacja opisana niżej). API jest syntetyczne, serwer tylko 127.0.0.1,
+zewnętrzne żądania są blokowane, udostępnienie przechwytywane lokalnie.
+Autozapis testowany na 390/1440 px, pozostałe scenariusze na sześciu
+szerokościach 320–1440 px. Raporty: `.tmp/audit-fixes-20260926/`.
+Opcjonalne `ATYLLA_QA_ZOOM=2` dla formularzy i Absencji używa viewport
+720×500 CSS px ze skalą 2, czyli reflow odpowiadającego 200% w 1440×1000;
+nie wykonuje natywnego zoom przeglądarki. Raporty mają osobne katalogi `-zoom`.
+Po takim uruchomieniu usunąć zmienną z sesji terminala.
+
+Wyniki i ograniczenia odbioru: `docs/audits/AUDIT_FIXES_2.1.15_2026-09-26.md`.
+Starsze liczebności poniżej są historyczne.
+
 ## Aktualizacja 2026-09-15 — 2.1.6
 
 Runner obejmuje także `test_trainer_insights.py` (9 przypadków liczników i API)

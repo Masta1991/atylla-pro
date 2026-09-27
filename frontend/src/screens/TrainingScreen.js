@@ -11,6 +11,7 @@ import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import * as api from '../services/api';
 import { showMessage, showError, askConfirmation } from '../services/confirm';
+import { createWorkoutSaveQueue } from '../services/workoutSaveQueue';
 
 export default function TrainingScreen({ navigation, route }) {
   const { colors: C, themeColors } = useTheme();
@@ -31,6 +32,16 @@ export default function TrainingScreen({ navigation, route }) {
   const [muscleGroups, setMuscleGroups] = useState([]);
   const [exercisesByGroup, setExercisesByGroup] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const clientPickerContainerRef = useRef(null);
+  const restoreClientFocusRef = useRef(false);
+  useEffect(() => {
+    if (loading || !restoreClientFocusRef.current) return;
+    restoreClientFocusRef.current = false;
+    // Session loading remounts the form; restore the web trigger after cancellation.
+    const frame = requestAnimationFrame(() => clientPickerContainerRef.current?.querySelector?.('[role="button"]')?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [loading]);
 
   const [selectedClient, setSelectedClient] = useState('');
   const [partnerClient, setPartnerClient] = useState('');
@@ -72,8 +83,32 @@ export default function TrainingScreen({ navigation, route }) {
     }
     return null;
   };
-  // T7: mutex zapisów — autosave nie wchodzi w trakcie ręcznego zapisu i odwrotnie.
-  const isSavingRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState('saved');
+  const writerRef = useRef(null), queueRef = useRef(null);
+  const leavingRef = useRef(false), confirmingLeaveRef = useRef(false), manualSavingRef = useRef(false);
+  if (!queueRef.current) queueRef.current = createWorkoutSaveQueue(payload => writerRef.current(payload), setSaveStatus);
+  const saveQueue = queueRef.current;
+  useEffect(() => { saveQueue.activate(); return () => saveQueue.dispose(); }, [saveQueue]);
+  useEffect(() => navigation.addListener('beforeRemove', async e => {
+    if (leavingRef.current || (!saveQueue.pending() && !saveQueue.busy())) return;
+    e.preventDefault();
+    if (confirmingLeaveRef.current) return;
+    confirmingLeaveRef.current = true;
+    try {
+      if (saveQueue.busy()) {
+        await showMessage('Trwa zapisywanie', 'Poczekaj na potwierdzenie zapisu treningu.');
+      } else if (await askConfirmation('Niezapisane zmiany', 'Opuścić trening i odrzucić zmiany bez potwierdzonego zapisu?', 'Odrzuć zmiany')) {
+        if (saveQueue.busy()) return;
+        leavingRef.current = true; navigation.dispatch(e.data.action);
+      }
+    } finally { confirmingLeaveRef.current = false; }
+  }), [navigation, saveQueue]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onClose = e => { if (saveQueue.pending() || saveQueue.busy()) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', onClose);
+    return () => window.removeEventListener('beforeunload', onClose);
+  }, [saveQueue]);
   const [supersetMode, setSupersetMode] = useState({});
   const [supersetSelection, setSupersetSelection] = useState({});
 
@@ -143,10 +178,21 @@ export default function TrainingScreen({ navigation, route }) {
     }
   }
 
-  const selectSession = async (clientId, dateStr, hourStr) => {
+  async function canChangeSession() {
+    if (saveQueue.busy()) { await showMessage('Trwa zapisywanie', 'Poczekaj na potwierdzenie zapisu przed zmianą treningu.'); return false; }
+    if (!saveQueue.pending()) return true;
+    if (confirmingLeaveRef.current) return false;
+    confirmingLeaveRef.current = true;
+    try {
+      return await askConfirmation('Niezapisane zmiany', 'Zmienić klienta lub termin i odrzucić niezapisane zmiany?', 'Odrzuć zmiany') && !saveQueue.busy();
+    } finally { confirmingLeaveRef.current = false; }
+  }
+  const selectSession = async (clientId, dateStr, hourStr, checked = false) => {
+    if (!checked && !await canChangeSession()) return;
     const generation = ++selectionRequestRef.current;
     ++logsRequestRef.current;
     setIsReadyToSave(false);
+    setLoading(true); setLoadError('');
     try {
       const event = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) && Number(hourStr)>=6 && Number(hourStr)<=21
         ? await api.getCalendarEvent(dateStr, Number(hourStr), true, true).catch(error => {
@@ -160,7 +206,10 @@ export default function TrainingScreen({ navigation, route }) {
       const duplicate = dayEvents.some(e=>e.id!==event?.id && e.status!=='deleted');
       if(duplicate && !await askConfirmation('Kolejny trening tego dnia',
           'Trening dla tego klienta jest już zarejestrowany tego dnia. Kliknij OK, aby dodać kolejny, lub Anuluj, aby wrócić.')) {
-        if(generation===selectionRequestRef.current)setIsReadyToSave(true);
+        if(generation===selectionRequestRef.current) {
+          restoreClientFocusRef.current = true;
+          setIsReadyToSave(true);
+        }
         return;
       }
       if(generation!==selectionRequestRef.current)return;
@@ -184,28 +233,35 @@ export default function TrainingScreen({ navigation, route }) {
         setIsReadyToSave(true);
       }
     } catch(error) {
-      if(generation===selectionRequestRef.current)showError(error.message);
+      if(generation===selectionRequestRef.current) { setLoadError(error.message); showError(error.message); }
+    } finally {
+      if(generation===selectionRequestRef.current)setLoading(false);
     }
   };
   const handleClientChange = val => selectSession(val,selectedDate,selectedHour);
-  const handleDateChange = val => {
+  const handleDateChange = async val => {
+    if (!await canChangeSession()) return;
     setSelectedDate(val);
     setIsReadyToSave(false);
-    if(/^\d{4}-\d{2}-\d{2}$/.test(val))selectSession(selectedClient,val,selectedHour);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(val))selectSession(selectedClient,val,selectedHour,true);
   };
-  const handleHourChange = val => {
+  const handleHourChange = async val => {
+    if (!await canChangeSession()) return;
     setSelectedHour(val);
     setIsReadyToSave(false);
-    if(Number(val)>=6 && Number(val)<=21)selectSession(selectedClient,selectedDate,val);
+    if(Number(val)>=6 && Number(val)<=21)selectSession(selectedClient,selectedDate,val,true);
   };
 
   const handlePlanChange = async (val) => {
+    if (!isReadyToSave || val === selectedPlan) return;
     setIsReadyToSave(false);
-    setSelectedPlan(val);
-    if (val) {
-      await loadPlanExercises(val);
+    setLoading(true);
+    try {
+      if (!val || await loadPlanExercises(val)) setSelectedPlan(val);
+    } finally {
+      setIsReadyToSave(true);
+      setLoading(false);
     }
-    setIsReadyToSave(true);
   };
 
   const handleMainGroupChange = (val) => {
@@ -285,9 +341,6 @@ export default function TrainingScreen({ navigation, route }) {
         }
       }
 
-      // Render natychmiast z tego co mamy (słowniki + event), resztę w tle.
-      if (!cancelled) setLoading(false);
-
       // Plan i logi rownolegle (wczesniej wodospad: plan -> logi = 2x RTT po sobie).
       const planObj = activePlan ? (wt || []).find(p => p.id === activePlan) : null;
       const [planExList, logsRaw] = await Promise.all([
@@ -320,11 +373,14 @@ export default function TrainingScreen({ navigation, route }) {
         skipNextAutosaveRef.current = true;
         setIsReadyToSave(true);
       }
+      // The baseline must be complete before the user can edit the form.
+      if (!cancelled) setLoading(false);
     }
     init().catch(error => {
       if (!cancelled) {
         setLoading(false);
         setIsReadyToSave(false);
+        setLoadError(error.message);
         Alert.alert('Błąd pobierania treningu', error.message);
       }
     });
@@ -334,9 +390,8 @@ export default function TrainingScreen({ navigation, route }) {
   const removePart = (partName) => {
     if (partName === selectedMainGroup) {
       setSelectedMainGroup('');
-    } else {
-      setAddedParts(prev => prev.filter(p => p !== partName));
     }
+    setAddedParts(prev => prev.filter(p => p !== partName));
     setExerciseWeights(prev => {
       const copy = { ...prev };
       Object.keys(copy).forEach(key => {
@@ -352,7 +407,7 @@ export default function TrainingScreen({ navigation, route }) {
   const loadPlanExercises = async (planId) => {
     try {
       const plan = plans.find(p => p.id === planId);
-      if (!plan) return;
+      if (!plan) throw new Error('Wybrany plan nie jest dostępny.');
       const exList = await api.getPlanExercises(planId);
       const planPartName = `Plan: ${plan.name}`;
       
@@ -371,8 +426,10 @@ export default function TrainingScreen({ navigation, route }) {
       if (!addedParts.includes(planPartName)) {
         setAddedParts(prev => [...prev, planPartName]);
       }
+      return true;
     } catch (e) {
       Alert.alert('Błąd', 'Nie udało się wczytać ćwiczeń dla planu.');
+      return false;
     }
   };
 
@@ -567,6 +624,7 @@ export default function TrainingScreen({ navigation, route }) {
   }
 
   async function handleSave() {
+    if (manualSavingRef.current) return;
     if (!isReadyToSave) {
       Alert.alert('Zapis niedostępny', 'Poczekaj na pełne wczytanie treningu. Po błędzie otwórz go ponownie.');
       return;
@@ -615,109 +673,73 @@ export default function TrainingScreen({ navigation, route }) {
     // Pusta lista usuwa ćwiczenia tylko z tego konkretnego treningu.
     payload.exercises = built.exercises;
 
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
+    saveQueue.stage(payload);
+    manualSavingRef.current = true;
     try {
-      const saved = await persistWorkout(payload);
-      if (!saved) return;
-      savedEventRef.current = saved.event;
+      if (!await saveQueue.flush(true)) return;
       await showMessage('Sukces', 'Trening został zapisany.');
+      leavingRef.current = true;
       navigation.goBack();
     } catch (e) {
       showError(e.message);
     } finally {
-      isSavingRef.current = false;
+      manualSavingRef.current = false;
     }
   }
 
-  // Real-time autosave
+  writerRef.current = async payload => {
+    const saved = await persistWorkout(payload);
+    if (!saved) return false;
+    savedEventRef.current = saved.event;
+    autosaveErrorShownRef.current = false;
+    return true;
+  };
+
+  // Stage every edit immediately; debounce only the start of a write.
+  // The queue drains the newest staged draft after the preceding write succeeds.
   useEffect(() => {
-    if (!isReadyToSave || !selectedClient || !savedEventRef.current?.id
-        || savedEventRef.current.client_id!==selectedClient || savedEventRef.current.status!=='active') return;
-
-
-    const performAutoSave = async () => {
-      const payload = {
-        client_id: selectedClient,
-        partner_client_id: partnerClient || null,
-        workout_type_id: selectedType || null,
-        plan_id: selectedPlan || null,
-        event_date: selectedDate,
-        event_hour: parseInt(selectedHour) || 12,
-        note: note,
-        // 2.0: paid zachowane z treningu, nowe zawsze false.
-        is_settled: !!loadedEvent?.is_settled,
-        main_group: selectedMainGroup,
-        added_groups: addedParts,
-        exercises: [],
-        is_replacement: !!replaceClientId,
-        replaced_client_id: replaceClientId || null,
-      };
-
-
-      // T8: autosave nigdy nie wysyła pustego/niekompletnego batcha (nie czyści logów).
-      const built = buildExercisesFromState();
-      if (built.unknown > 0) {
-        if (__DEV__) console.error('Autosave skipped: unknown exercises.');
-        return;
-      }
-      if (Object.keys(exerciseWeights).length > 0 && built.exercises.length === 0) {
-        if (__DEV__) console.error('Autosave skipped: empty exercise payload.');
-        return;
-      }
-      payload.exercises = built.exercises;
-
-      // Start pakietu: autosave nie rusza daty (jak handleSave — tylko Przenies).
-      const startMoved = originalDate && originalHour
-        && (originalDate !== selectedDate || originalHour !== String(selectedHour));
-      if (isSavingRef.current) return;
-      isSavingRef.current = true;
-      try {
-        if (!startMoved) {
-          const saved = await api.saveCalendarWorkout({...payload,
-            reactivate: savedEventRef.current?.status === 'deleted',
-            expected_event_id: savedEventRef.current?.id,
-            expected_updated_at: savedEventRef.current?.updated_at});
-          savedEventRef.current = saved.event;
-          autosaveErrorShownRef.current = false;
-        }
-        if (__DEV__) console.log('Real-time workout autosave successful.');
-      } catch (err) {
-        if (__DEV__) console.error('Real-time workout autosave error:', err.message);
+    if (!isReadyToSave || !selectedClient) return;
+    const built = buildExercisesFromState();
+    if (built.unknown > 0) return;
+    const payload = {
+      client_id: selectedClient, partner_client_id: partnerClient || null,
+      workout_type_id: selectedType || null, plan_id: selectedPlan || null,
+      event_date: selectedDate, event_hour: parseInt(selectedHour) || 12,
+      note, is_settled: !!loadedEvent?.is_settled,
+      main_group: selectedMainGroup, added_groups: addedParts,
+      exercises: built.exercises, is_replacement: !!replaceClientId,
+      replaced_client_id: replaceClientId || null,
+    };
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      saveQueue.reset(payload, savedEventRef.current?.client_id === selectedClient && savedEventRef.current?.status !== 'deleted');
+    } else {
+      saveQueue.stage(payload);
+    }
+    const startMoved = originalDate && originalHour
+      && (originalDate !== selectedDate || originalHour !== String(selectedHour));
+    if (startMoved || !savedEventRef.current?.id || savedEventRef.current.client_id !== selectedClient
+        || savedEventRef.current.status !== 'active') return;
+    const timer = setTimeout(() => {
+      saveQueue.flush().catch(err => {
         if (!autosaveErrorShownRef.current) {
           autosaveErrorShownRef.current = true;
-          Alert.alert('Brak potwierdzenia automatycznego zapisu', err.message + '\nNie zamykaj formularza bez sprawdzenia zapisu.');
+          Alert.alert('Brak potwierdzenia automatycznego zapisu', err.message + '\nZmiany pozostają w formularzu. Sprawdź zapis przed wyjściem.');
         }
-      } finally {
-        isSavingRef.current = false;
-      }
-    };
-
-    const timer = setTimeout(() => {
-      if (skipNextAutosaveRef.current) {
-        skipNextAutosaveRef.current = false;
-        return;
-      }
-      performAutoSave();
+      });
     }, 1200);
-
     return () => clearTimeout(timer);
-  }, [
-    selectedClient,
-    selectedDate,
-    selectedHour,
-    selectedType,
-    selectedPlan,
-    selectedMainGroup,
-    addedParts,
-    exerciseWeights,
-    note,
-    isReadyToSave,
-    exercisesByGroup
-  ]);
+  }, [selectedClient, partnerClient, selectedDate, selectedHour, selectedType, selectedPlan,
+    selectedMainGroup, addedParts, exerciseWeights, note, isReadyToSave, exercisesByGroup, loadedEvent, saveQueue]);
 
   if (loading) {
     return <AppLayout navigation={navigation} title="Rejestracja treningu" showBack><View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={C.accent} /></View></AppLayout>;
+  }
+  if (loadError) {
+    return <AppLayout navigation={navigation} title="Rejestracja treningu" showBack>
+      <View style={{ padding: 24 }}><Text accessibilityRole="alert" style={{ color: themeColors.danger }}>{loadError}</Text>
+        <Text style={{ color: themeColors.text, marginTop: 12 }}>Wróć do kalendarza i otwórz trening ponownie, aby pobrać pełne dane.</Text></View>
+    </AppLayout>;
   }
 
   const allParts = [...new Set([selectedMainGroup, ...addedParts].filter(Boolean))];
@@ -725,9 +747,12 @@ export default function TrainingScreen({ navigation, route }) {
   return (
     <AppLayout navigation={navigation} title="Rejestracja treningu" showBack>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {!!selectedClient && <Text accessibilityLiveRegion="polite" style={{ color: saveStatus === 'error' ? themeColors.danger : themeColors.textSecondary, marginBottom: 12 }}>
+          {saveStatus === 'saving' ? 'Zapisywanie zmian…' : saveStatus === 'error' ? 'Brak potwierdzenia zapisu. Zmiany pozostają w formularzu.' : saveStatus === 'pending' ? 'Masz niezapisane zmiany' : 'Zmiany zapisane'}
+        </Text>}
         {/* Client & Date & Hour in one row */}
         <View style={{ flexDirection: 'row', gap: SPACING.sm, alignItems: 'flex-start' }}>
-          <View style={{ flex: 2 }}>
+          <View ref={clientPickerContainerRef} style={{ flex: 2 }}>
             <Text style={styles.label}>Podopieczny</Text>
             <DropdownPicker
               placeholder="Wybierz"

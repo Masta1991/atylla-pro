@@ -15,7 +15,17 @@ export default function MuscleExercisesScreen({ navigation, embedded = false, he
   const [form, setForm] = useState(false), [name, setName] = useState(''), [group, setGroup] = useState(initialGroup?.id || ''), [unit, setUnit] = useState('KG');
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
-  const lock = useRef(false), sequence = useRef(0);
+  const lock = useRef(false), sequence = useRef(0), leaving = useRef(false), confirming = useRef(false);
+  const hasDraft = !!name.trim() || !!groupName.trim();
+  useEffect(() => navigation.addListener('beforeRemove', async e => {
+    if (leaving.current || (!hasDraft && !lock.current)) return;
+    e.preventDefault();
+    if (lock.current || confirming.current) return;
+    confirming.current = true;
+    const discard = await askConfirmation('Niezapisany formularz', 'Opuścić edytor i odrzucić wpisane dane?', 'Odrzuć zmiany');
+    confirming.current = false;
+    if (discard) { leaving.current = true; navigation.dispatch(e.data.action); }
+  }), [navigation, hasDraft]);
   useEffect(() => {
     registerGuard?.(async () => !lock.current && (!(name.trim() || groupName.trim()) || await askConfirmation('Niezapisany formularz', 'Odrzucić wpisane dane i zmienić wybór?', 'Odrzuć zmiany')));
     return () => registerGuard?.(null);

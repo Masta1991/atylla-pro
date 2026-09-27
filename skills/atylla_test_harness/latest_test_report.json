@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-15T12:47:12.026068+00:00",
+  "timestamp": "2026-09-27T07:35:50.783720+00:00",
   "overall_status": "PASS",
   "scope": "offline Python/API, frontend module and PGlite PostgreSQL/RLS/rollback; synthetic data",
   "not_verified": [
@@ -11,7 +11,7 @@
   "cycles": [
     {
       "cycle": 1,
-      "tests": 79,
+      "tests": 88,
       "failures": 0,
       "errors": 0
     }
@@ -30,9 +30,27 @@
       "error": ""
     },
     {
+      "script": "backend/tests/offline/frontend_workout_catalog.test.cjs",
+      "exit_code": 0,
+      "output": "{\"status\":\"PASS\",\"checks\":[\"namespaced_catalog\",\"group_exercises\",\"mixed_share_order_and_units\",\"zero_and_missing_values\",\"nonadjacent_superset_membership_and_singletons\",\"superset_labels_in_shared_text\"],\"network\":false}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/frontend_workout_save_queue.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"actual workout queue; synthetic writes, no network\",\"tests\":[{\"name\":\"edit_during_slow_write_is_saved_next_with_latest_revision\",\"status\":\"PASS\"},{\"name\":\"failed_write_stops_automatic_retries_even_after_more_edits\",\"status\":\"PASS\"},{\"name\":\"reverting_to_baseline_while_write_runs_is_not_lost\",\"status\":\"PASS\"},{\"name\":\"baseline_is_not_written_but_immediate_first_edit_is\",\"status\":\"PASS\"},{\"name\":\"new_session_remains_pending_until_confirmed_and_cancel_keeps_draft\",\"status\":\"PASS\"},{\"name\":\"snapshot_cannot_be_changed_by_mutating_form_objects\",\"status\":\"PASS\"},{\"name\":\"uncertain_commit_cannot_mark_a_reverted_draft_as_saved\",\"status\":\"PASS\"},{\"name\":\"session_reset_is_rejected_until_inflight_request_finishes\",\"status\":\"PASS\"},{\"name\":\"unmount_does_not_start_another_queued_write\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/frontend_workout_notes.test.cjs",
+      "exit_code": 0,
+      "output": "{\"tests\":[{\"name\":\"billing_metadata_is_not_a_user_note\",\"status\":\"PASS\"},{\"name\":\"unread_prior_note_is_shown_before_current_note\",\"status\":\"PASS\"},{\"name\":\"read_removes_reminders_but_preserves_original_note_icon\",\"status\":\"PASS\"},{\"name\":\"late_ack_does_not_hide_newer_text\",\"status\":\"PASS\"},{\"name\":\"empty_and_duplicate_self_reminders_are_ignored\",\"status\":\"PASS\"}],\"scope\":\"actual note helpers; no network\"}",
+      "error": ""
+    },
+    {
       "script": "scripts/check-frontend.cjs",
       "exit_code": 0,
-      "output": "{\"status\":\"PASS\",\"parsed_modules\":39}",
+      "output": "{\"status\":\"PASS\",\"parsed_modules\":42}",
       "error": ""
     },
     {
@@ -51,6 +69,12 @@
       "script": "backend/tests/offline/postgres_week_copy.test.cjs",
       "exit_code": 0,
       "output": "{\"scope\":\"PGlite SQL; synthetic data; migration installed twice\",\"tests\":[{\"name\":\"preview_is_read_only_and_pair_copy_has_no_results_or_settlement\",\"status\":\"PASS\"},{\"name\":\"occupied_slot_is_preserved_unless_explicitly_selected_for_replacement\",\"status\":\"PASS\"},{\"name\":\"absence_is_hour_scoped_and_checks_both_participants\",\"status\":\"PASS\"},{\"name\":\"whole_day_absence_blocks_every_hour\",\"status\":\"PASS\"},{\"name\":\"stale_target_rolls_back_other_inserts_in_the_same_batch\",\"status\":\"PASS\"},{\"name\":\"new_absence_after_preview_rejects_every_change\",\"status\":\"PASS\"},{\"name\":\"double_source_slot_is_not_silently_overwritten\",\"status\":\"PASS\"},{\"name\":\"paid_session_log_and_package_anchor_are_protected\",\"status\":\"PASS\"},{\"name\":\"foreign_client_plan_anon_and_past_cannot_write\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_workout_notes.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"migration_is_repeatable_and_preserves_text\",\"status\":\"PASS\"},{\"name\":\"read_is_persistent_idempotent_and_does_not_modify_workout_version_or_logs\",\"status\":\"PASS\"},{\"name\":\"changed_note_reopens_reminder_and_stale_ack_cannot_hide_it\",\"status\":\"PASS\"},{\"name\":\"billing_marker_only_change_keeps_read_state\",\"status\":\"PASS\"},{\"name\":\"ack_does_not_conflict_with_concurrent_workout_save_version\",\"status\":\"PASS\"},{\"name\":\"foreign_trainer_cannot_read_or_ack_another_note\",\"status\":\"PASS\"},{\"name\":\"anonymous_cannot_ack\",\"status\":\"PASS\"},{\"name\":\"clearing_note_resets_read_state_and_blocks_ack\",\"status\":\"PASS\"},{\"name\":\"closed_package_allows_ack_without_changing_financial_facts\",\"status\":\"PASS\"}]}",
       "error": ""
     }
   ]
