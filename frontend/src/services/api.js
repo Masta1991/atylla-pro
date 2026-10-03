@@ -799,3 +799,13 @@ export async function commitWeekCopy(data) {
   try { return await request('/trainer/copy', {method:'POST',body:data}); }
   finally { invalidateCache('calendar'); invalidateCache('clients'); invalidateCache('workouts'); }
 }
+
+export function getSeasonality(startYear, endYear) {
+  return request(`/trainer/seasonality?start_year=${startYear}&end_year=${endYear}`);
+}
+export function saveHistoricalMonth(year, month, data) {
+  return request(`/trainer/history/${year}/${month}`, {method:'PUT', body:data});
+}
+export function deleteHistoricalMonth(year, month, expectedUpdatedAt) {
+  return request(`/trainer/history/${year}/${month}`, {method:'DELETE', body:{expected_updated_at:expectedUpdatedAt}});
+}

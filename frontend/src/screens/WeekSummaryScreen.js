@@ -30,6 +30,7 @@ function evState(ev) {
   if (ev.status === 'deleted') return 'free';
   return slotPassed(ev.event_date, ev.event_hour) ? 'done' : 'planned';
 }
+const LIGHT_STATE_COLORS = { done: '#087a54', planned: '#825400', paid: '#a04400' };
 const STATE_META = {
   done: { label: 'odbyty', color: '#1dd1a1' },
   planned: { label: 'planowany', color: '#f1c40f' },
@@ -41,8 +42,8 @@ const STATE_META = {
 };
 
 export default function WeekSummaryScreen({ navigation, route }) {
-  const { colors: C, themeColors } = useTheme();
-  const styles = useMemo(() => makeStyles(C.accent, themeColors), [C, themeColors]);
+  const { colors: C, themeColors, mode } = useTheme();
+  const styles = useMemo(() => makeStyles(C.accent, themeColors, mode), [C, themeColors, mode]);
   const [monday, setMonday] = useState(() => mondayOf(new Date()));
   const [events, setEvents] = useState([]);
   const [absences, setAbsences] = useState([]);
@@ -109,6 +110,7 @@ export default function WeekSummaryScreen({ navigation, route }) {
           state: 'free',
         });
       });
+      devs = devs.filter(r => ['done', 'planned', 'paid'].includes(r.state));
       devs.sort((a, b) => (a.hour ?? 99) - (b.hour ?? 99));
       out.push({ key, label: DOW[i], num: d.getDate(), rows: devs });
     }
@@ -143,7 +145,7 @@ export default function WeekSummaryScreen({ navigation, route }) {
         {!loading && !error && <View style={styles.totals}>
           <Text style={styles.totalMain}>{totals.all} treningów</Text>
           <Text style={styles.totalSub}>
-            odbyte: {totals.done} • opłacone odwołania: {totals.paid} • planowane: {totals.planned} • bez płatności: {totals.free + totals.cancel}
+            odbyte: {totals.done} • opłacone odwołania: {totals.paid} • planowane: {totals.planned}
           </Text>
         </View>}
 
@@ -162,7 +164,7 @@ export default function WeekSummaryScreen({ navigation, route }) {
                   <Text style={styles.hour}>{r.hour != null ? `${r.hour}:00` : '—'}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowName} numberOfLines={1}>{r.name}{r.num ? ` [${r.num}]` : ''}{r.what ? ` • ${r.what}` : ''}</Text>
-                    <Text style={{ color: meta.color, fontSize: 12, fontWeight: '700' }}>{meta.label}</Text>
+                    <Text style={{ color: mode === 'light' ? (LIGHT_STATE_COLORS[r.state] || themeColors.text) : meta.color, fontSize: 12, fontWeight: '700' }}>{meta.label}</Text>
                   </View>
                 </View>
               );
@@ -174,21 +176,21 @@ export default function WeekSummaryScreen({ navigation, route }) {
   );
 }
 
-function makeStyles(accent, TC) { return StyleSheet.create({
+function makeStyles(accent, TC, mode) { return StyleSheet.create({
   scroll: { paddingHorizontal: 16, paddingBottom: 120 },
   weekNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   navBtn: { padding: 10 },
   weekLabel: { color: TC.text, fontSize: 14, fontWeight: '800' },
   todayBtn: { alignItems: 'center', marginVertical: 8 },
-  todayText: { color: accent, fontSize: 13, fontWeight: '700' },
+  todayText: { color: mode === 'light' ? TC.text : accent, fontSize: 13, fontWeight: '700' },
   totals: { backgroundColor: TC.surface, borderRadius: 14, borderWidth: 1, borderColor: TC.border, padding: 14, marginBottom: 10 },
   totalMain: { color: TC.text, fontSize: 18, fontWeight: '800' },
   totalSub: { color: TC.textSecondary, fontSize: 12, marginTop: 4 },
   dayCard: { backgroundColor: TC.surface, borderRadius: 14, borderWidth: 1, borderColor: TC.border, padding: 12, marginBottom: 10 },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   dayLabel: { color: TC.text, fontSize: 15, fontWeight: '800' },
-  dayDate: { color: TC.textMuted, fontSize: 12 },
-  empty: { color: TC.textMuted, fontSize: 13, fontStyle: 'italic' },
+  dayDate: { color: TC.textSecondary, fontSize: 12 },
+  empty: { color: TC.textSecondary, fontSize: 13, fontStyle: 'italic' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: TC.border + '40' },
   hour: { color: TC.text, fontSize: 13, fontWeight: '800', width: 44 },
   rowName: { color: TC.text, fontSize: 13, fontWeight: '600' },

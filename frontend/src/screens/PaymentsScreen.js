@@ -14,9 +14,16 @@ import AppLayout from '../components/AppLayout';
 import DropdownPicker from '../components/DropdownPicker';
 import { useTheme } from '../context/ThemeContext';
 
+const solidButtonText = hex => {
+  const rgb = hex.replace('#', '').match(/../g).map(v => parseInt(v, 16) / 255);
+  const linear = rgb.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const luminance = linear.reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  return (luminance + 0.05) / 0.055 > 1.05 / (luminance + 0.05) ? '#0d1117' : '#ffffff';
+};
+
 export default function PaymentsScreen({ navigation, route }) {
-  const { colors: C, themeColors } = useTheme();
-  const styles = React.useMemo(() => makeStyles(C, themeColors), [C, themeColors]);
+  const { colors: C, themeColors, mode } = useTheme();
+  const styles = React.useMemo(() => makeStyles(C, themeColors, mode), [C, themeColors, mode]);
   
   const [clients, setClients] = useState(global.cachedClients || []);
   const [loading, setLoading] = useState(!global.cachedClients);
@@ -28,6 +35,9 @@ export default function PaymentsScreen({ navigation, route }) {
   
   // History modal states
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const historyContext = useRef(null);
+  const closeHistory = () => { historyContext.current = null; setHistoryModalVisible(false); };
+  const closeEdit = () => { setEditModalVisible(false); if (historyContext.current) setHistoryModalVisible(true); };
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientEvents, setClientEvents] = useState([]);
   const [clientPackages, setClientPackages] = useState([]);
@@ -80,8 +90,14 @@ export default function PaymentsScreen({ navigation, route }) {
       const fetched = data || [];
       setClients(fetched);
       global.cachedClients = fetched;
+      if (historyContext.current) {
+        const currentClient = fetched.find(c => c.id === historyContext.current);
+        if (currentClient) await openHistory(currentClient, fetched, false);
+        else { historyContext.current = null; setHistoryModalVisible(false); }
+      }
     } catch (e) {
-      console.log('Load payments data error', e);
+      if (historyContext.current) setHistoryModalVisible(true);
+      Alert.alert('Błąd odświeżania', 'Nie udało się odświeżyć rozliczeń. Spróbuj ponownie.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -297,7 +313,7 @@ export default function PaymentsScreen({ navigation, route }) {
     return all.filter(p => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   };
 
-  const openHistory = async (client) => {
+  const openHistory = async (client, allClients = clients, resetExpanded = true) => {
     setLoading(true);
     try {
         const [abs, evs, pkgs] = await Promise.all([
@@ -306,7 +322,7 @@ export default function PaymentsScreen({ navigation, route }) {
         ]);
         const pool=new Set([client.id,...(client.shared_with||[])]);
         setClientAbsences((abs || []).filter(a => pool.has(a.client_id)));
-        setExpandedHistoryId(null);
+        if (resetExpanded) setExpandedHistoryId(null);
         if (client.billing_type === 'package') {
             const sorted = (pkgs || []).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
             setClientPackages(sorted);
@@ -317,7 +333,7 @@ export default function PaymentsScreen({ navigation, route }) {
             const othersHist = [];
             for (const mid of (client.shared_with || [])) {
               if (mid === client.id) continue;
-              const mc = clients.find(c => c.id === mid);
+              const mc = allClients.find(c => c.id === mid);
               othersHist.push(...(((mc || {}).payment_history) || []));
             }
             const hist = [...ownHist, ...othersHist];
@@ -333,8 +349,10 @@ export default function PaymentsScreen({ navigation, route }) {
             setClientEvents(evs || []);
         }
         setSelectedClient(client);
+        historyContext.current = client.id;
         setHistoryModalVisible(true);
     } catch(e) {
+        if (historyContext.current) setHistoryModalVisible(true);
         Alert.alert('Błąd', 'Nie można pobrać historii.');
     }
     setLoading(false);
@@ -344,7 +362,8 @@ export default function PaymentsScreen({ navigation, route }) {
   // Zakres wyznacza TYLKO pakiet/cykl (start..koniec) — bez odcięcia "do dziś",
   // żeby zaplanowane przyszłe treningi też się liczyły.
   function packageTrainings(item, isPackage) {
-    return packageTrainingRows(item, isPackage, clientEvents, clientAbsences, isSlotPassed);
+    const result = packageTrainingRows(item, isPackage, clientEvents, clientAbsences, isSlotPassed);
+    return { ...result, rows: result.rows.filter(r => !['cancel', 'cancel-free'].includes(r.state)) };
   }
 
   const handleDeleteHistoryItem = (item) => {
@@ -364,6 +383,7 @@ export default function PaymentsScreen({ navigation, route }) {
           } catch(e) {
               Alert.alert('Błąd', e.message);
               setLoading(false);
+              setHistoryModalVisible(true);
           }
       };
 
@@ -602,14 +622,7 @@ export default function PaymentsScreen({ navigation, route }) {
                   </View>
                 )}
 
-                {client.cancelled_free_count > 0 && (
-                  <View style={[styles.infoRow, { marginTop: 4 }]}>
-                    <Ionicons name="information-circle-outline" size={16} color={themeColors.textSecondary} />
-                    <Text style={styles.infoText}>
-                      Odwołane bez rozliczenia: <Text style={styles.infoValue}>{client.cancelled_free_count}</Text>
-                    </Text>
-                  </View>
-                )}
+
                 
                 {isOverLimit && (
                   <View style={styles.warningMessage}>
@@ -638,7 +651,7 @@ export default function PaymentsScreen({ navigation, route }) {
                     onPress={() => handleOpenEndBilling(client)}
                   >
                     <Ionicons name="stop-circle-outline" size={18} color="#ffffff" />
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                    <Text style={{ color: solidButtonText(themeColors.danger), fontWeight: '600', fontSize: 13 }}>
                       {isPackage ? 'Zakończ Pakiet' : 'Zakończ rozliczanie'}
                     </Text>
                   </TouchableOpacity>
@@ -678,14 +691,15 @@ export default function PaymentsScreen({ navigation, route }) {
       <Modal
         animationType="slide"
         transparent={true}
+        accessibilityLabel="Historia płatności"
         visible={historyModalVisible}
-        onRequestClose={() => setHistoryModalVisible(false)}
+        onRequestClose={closeHistory}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Historia płatności</Text>
-              <TouchableOpacity onPress={() => setHistoryModalVisible(false)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={closeHistory} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
@@ -694,13 +708,13 @@ export default function PaymentsScreen({ navigation, route }) {
               <Text style={[styles.modalSubtitle, { marginBottom: 0, lineHeight: 22 }]}>{selectedClient?.name}</Text>
               {selectedClient?.billing_type === 'package' ? (
                 <View style={{ backgroundColor: C.accent, borderRadius: 11, paddingHorizontal: 10, height: 22, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
+                  <Text style={{ color: solidButtonText(C.accent), fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
                     {selectedClient?.package_current_count ?? 0}/{selectedClient?.package_size || 10}
                   </Text>
                 </View>
               ) : (selectedClient?.package_purchase_date ? (
                 <View style={{ backgroundColor: C.accent, borderRadius: 11, paddingHorizontal: 10, height: 22, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
+                  <Text style={{ color: solidButtonText(C.accent), fontSize: 13, fontWeight: '800', lineHeight: 16 }}>
                     {selectedClient?.package_current_count ?? 0}
                   </Text>
                 </View>
@@ -751,15 +765,15 @@ export default function PaymentsScreen({ navigation, route }) {
                           </Text>
                         </View>
                         <Text style={[styles.historyDate, { marginTop: 6 }]}>
-                          {t.incomplete ? 'Niepełna historia — brak granicy pakietu. Odśwież dane.' : `Treningi: ${t.rows.length} • odbyte: ${t.done} • odwołane rozl.: ${t.cSettled} • odwołane bez: ${t.cFree}`}
+                          {t.incomplete ? 'Niepełna historia — brak granicy pakietu. Odśwież dane.' : `Treningi: ${t.rows.length} • odbyte: ${t.done} • odwołane rozl.: ${t.cSettled}`}
                         </Text>
                         {isPkg && (
-                          <Text style={[styles.historyCountText, { fontSize: 12, color: themeColors.textMuted, marginTop: 2 }]}>
+                          <Text style={[styles.historyCountText, { fontSize: 12, color: mode === 'light' ? themeColors.text : themeColors.textSecondary, marginTop: 2 }]}>
                             Pula: {item.size} • offset: {item.offset} {expanded ? '▲' : '▼'}
                           </Text>
                         )}
                         {!isPkg && (
-                          <Text style={[styles.historyCountText, { fontSize: 12, color: themeColors.textMuted, marginTop: 2 }]}>
+                          <Text style={[styles.historyCountText, { fontSize: 12, color: mode === 'light' ? themeColors.text : themeColors.textMuted, marginTop: 2 }]}>
                             Rozliczono: {item.completed_count} • {item.archived_at ? new Date(item.archived_at).toLocaleDateString() : ''} {expanded ? '▲' : '▼'}
                           </Text>
                         )}
@@ -806,14 +820,15 @@ export default function PaymentsScreen({ navigation, route }) {
       <Modal
         animationType="slide"
         transparent={true}
+        accessibilityLabel="Edytuj Licznik"
         visible={editModalVisible}
-        onRequestClose={() => setEditModalVisible(false)}
+        onRequestClose={closeEdit}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edytuj Licznik</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={closeEdit} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
@@ -859,6 +874,7 @@ export default function PaymentsScreen({ navigation, route }) {
       <Modal
         animationType="fade"
         transparent={true}
+        accessibilityLabel="Rozpocznij rozliczanie"
         visible={startBillingModalVisible}
         onRequestClose={() => setStartBillingModalVisible(false)}
       >
@@ -973,6 +989,7 @@ export default function PaymentsScreen({ navigation, route }) {
       <Modal
         animationType="none"
         transparent={true}
+        accessibilityLabel="Zakończ rozliczanie"
         visible={endBillingModalVisible}
         onRequestClose={() => setEndBillingModalVisible(false)}
       >
@@ -1019,6 +1036,7 @@ export default function PaymentsScreen({ navigation, route }) {
       <Modal
         animationType="slide"
         transparent={true}
+        accessibilityLabel="Zwiększ Pakiet"
         visible={increaseModalVisible}
         onRequestClose={() => setIncreaseModalVisible(false)}
       >
@@ -1079,7 +1097,7 @@ export default function PaymentsScreen({ navigation, route }) {
   );
 }
 
-function makeStyles(C, TC) {
+function makeStyles(C, TC, mode) {
   return StyleSheet.create({
     container: {
       paddingHorizontal: SPACING.md,
@@ -1137,7 +1155,7 @@ function makeStyles(C, TC) {
       alignItems: 'center',
     },
     avatarText: {
-      color: C.accent,
+      color: mode === 'light' ? TC.text : C.accent,
       fontSize: 18,
       fontWeight: '700',
     },
@@ -1167,7 +1185,7 @@ function makeStyles(C, TC) {
     badgeText: {
       fontSize: 10,
       fontWeight: '700',
-      color: C.accent,
+      color: mode === 'light' ? TC.text : C.accent,
     },
     counterSection: {
       alignItems: 'flex-end',
@@ -1175,7 +1193,7 @@ function makeStyles(C, TC) {
     counterText: {
       fontSize: 22,
       fontWeight: '800',
-      color: C.accent,
+      color: mode === 'light' ? TC.text : C.accent,
     },
     counterTextWarning: {
       color: '#FF9800',
@@ -1233,7 +1251,7 @@ function makeStyles(C, TC) {
       backgroundColor: C.accent,
     },
     btnPrimaryText: {
-      color: '#ffffff',
+      color: solidButtonText(C.accent),
       fontWeight: '700',
       fontSize: 13,
     },
@@ -1243,7 +1261,7 @@ function makeStyles(C, TC) {
       borderColor: C.accent,
     },
     btnSecondaryText: {
-      color: C.accent,
+      color: mode === 'light' ? TC.text : C.accent,
       fontWeight: '700',
       fontSize: 13,
     },
@@ -1281,7 +1299,7 @@ function makeStyles(C, TC) {
     },
     modalSubtitle: {
       fontSize: 14,
-      color: C.accent,
+      color: mode === 'light' ? TC.text : C.accent,
       fontWeight: '600',
       marginBottom: SPACING.md,
     },
@@ -1304,7 +1322,7 @@ function makeStyles(C, TC) {
     },
     historyDate: {
       fontSize: 13,
-      color: TC.textSecondary,
+      color: mode === 'light' ? TC.text : TC.textSecondary,
     },
     historyArchived: {
       fontSize: 10,

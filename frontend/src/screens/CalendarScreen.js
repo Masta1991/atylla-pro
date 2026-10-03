@@ -205,7 +205,7 @@ function CalendarSlot({ dateStr, hour, ev, absences, dayW, packageMode, historyM
   }
 
   const showEv = ev && ev.status !== 'cancelled';
-  const ownNote = !!workoutNoteText(ev?.note);
+  const ownNote = !!workoutNoteText(ev?.note) && !ev?.note_acknowledged_at;
   const pendingNotes = (ev?.pending_notes || []).length;
 
   return (
@@ -471,6 +471,7 @@ function CalendarScreen({ navigation, route }) {
     setSelSlot(current => current ? { ...current, ev: applyNoteRead(current.ev, source, result) } : current);
     loadWeek();
   };
+  const drawerCloseRef = useRef(null);
   const vScrollRef = useRef(null);
   const hGridRef = useRef(null);
 
@@ -586,25 +587,34 @@ function CalendarScreen({ navigation, route }) {
   // Panel startu w szufladzie: jeden przycisk, typ i rozmiar na miejscu.
   // Pakiet startuje od treningu szuflady, cykl od jego daty. Typ dopisuje się sam.
   const [startPanel, setStartPanel] = useState(null);
+  const [startingPackage, setStartingPackage] = useState(false);
+  const [drawerFocus, setDrawerFocus] = useState(null);
+  const drawerFocusStyle = key => Platform.OS === 'web' && drawerFocus === key ? { outlineStyle: 'solid', outlineWidth: 2, outlineColor: C.accent, outlineOffset: -2 } : {};
+  const startLock = useRef(false);
   const confirmStartPanel = useCallback(async () => {
     const s = selSlot; const c = drawerClient;
-    if (!s?.ev || !c || !startPanel) return;
+    if (!s?.ev || !c || !startPanel || startLock.current) return;
+    startLock.current = true; setStartingPackage(true);
     try {
       if (startPanel.mode === 'package') {
-        const size = parseInt(startPanel.size, 10) || 10;
-        if (size < 1 || size > 100) {
+        const size = Number(startPanel.size);
+        if (!Number.isInteger(size) || size < 1 || size > 100) {
           Alert.alert('Błąd', 'Rozmiar pakietu 1–100.');
           return;
         }
+        if (startPanel.shared && !startPanel.sharedIds.length) {
+          Alert.alert('Wybierz uczestnika', 'Pakiet łączony wymaga co najmniej jednej dodatkowej osoby.');
+          return;
+        }
         await api.createClientPackage(c.id, {
-          size, start_training_id: s.ev.id, offset: 0, shared_client_ids: [],
+          size, start_training_id: s.ev.id, offset: 0, shared_client_ids: startPanel.shared ? startPanel.sharedIds : [],
         });
-        await api.updateClient(c.id, { billing_type: 'package' });
       } else {
         await api.updateClient(c.id, { billing_type: 'single', package_purchase_date: s.ev.event_date });
       }
       setStartPanel(null); setSelSlot(null); loadWeek();
     } catch (e) { Alert.alert('Błąd', e.message); }
+    finally { startLock.current = false; setStartingPackage(false); }
   }, [selSlot, drawerClient, startPanel, loadWeek]);
 
   // T9: liczy backend (close-cycle), nie kopiujemy bieżącego licznika.
@@ -939,7 +949,7 @@ function CalendarScreen({ navigation, route }) {
           <Text style={styles.sheetTitle}>
             {selSlot.date} • {selSlot.hour}:00 — {selSlot.ev?.clients?.name || (selAbs ? `✕ nieobecność: ${selAbsName || ''}` : 'wolny slot')}
           </Text>
-          <TouchableOpacity onPress={() => { setSelSlot(null); setAbsenceAsk(false); }} style={{ padding: 4 }}>
+          <TouchableOpacity ref={drawerCloseRef} testID="calendar-drawer-close" accessibilityRole="button" accessibilityLabel="Zamknij szufladę" onPress={() => { setSelSlot(null); setAbsenceAsk(false); }} style={{ padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="close" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -966,7 +976,7 @@ function CalendarScreen({ navigation, route }) {
           </Text>
           );
         })()}
-        {!absenceAsk && <CalendarNotesPreview key={selSlot.ev?.id || 'empty'} event={selSlot.ev} onAcknowledged={handleNoteRead} onRefresh={loadWeek} />}
+        {!absenceAsk && <CalendarNotesPreview key={selSlot.ev?.id || 'empty'} event={selSlot.ev} onAcknowledged={handleNoteRead} onRefresh={loadWeek} onEmptyFocus={() => drawerCloseRef.current?.focus()} />}
         <View style={styles.sheetBtns}>
           {!absenceAsk && (
           <TouchableOpacity
@@ -1000,8 +1010,10 @@ function CalendarScreen({ navigation, route }) {
               cykl od daty slotu. Widoczne tylko bez aktywnego rozliczenia. */}
           {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
+              testID="drawer-start-package" accessibilityRole="button" focusable
+              {...(Platform.OS === 'web' ? { tabIndex: 0 } : {})}
               style={[styles.sheetBtn, { backgroundColor: C.accent }]}
-              onPress={() => setStartPanel(startPanel ? null : { mode: 'package', size: '10' })}
+              onPress={() => setStartPanel(startPanel ? null : { mode: 'package', size: '10', shared: false, sharedIds: [] })}
             >
               <Text style={[styles.sheetBtnText, { color: solidButtonText(C.accent) }]}>Rozpocznij pakiet</Text>
             </TouchableOpacity>
@@ -1015,7 +1027,7 @@ function CalendarScreen({ navigation, route }) {
                     style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: startPanel.mode === m ? C.accent : 'transparent', borderWidth: 1, borderColor: startPanel.mode === m ? C.accent : themeColors.border }}
                     onPress={() => setStartPanel({ ...startPanel, mode: m })}
                   >
-                    <Text style={{ color: startPanel.mode === m ? '#fff' : themeColors.text, fontWeight: '700' }}>{m === 'package' ? 'Pakiet' : 'Miesięczny'}</Text>
+                    <Text style={{ color: startPanel.mode === m ? solidButtonText(C.accent) : themeColors.text, fontWeight: '700' }}>{m === 'package' ? 'Pakiet' : 'Miesięczny'}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1029,12 +1041,43 @@ function CalendarScreen({ navigation, route }) {
                   placeholderTextColor={themeColors.textMuted}
                 />
               )}
+              {startPanel.mode === 'package' && <View style={{ gap: 8, marginTop: 8 }}>
+                <TouchableOpacity accessibilityRole="checkbox" accessibilityLabel="Pakiet łączony"
+                  onFocus={() => setDrawerFocus('shared')} onBlur={() => setDrawerFocus(null)}
+                  accessibilityState={{ checked: startPanel.shared, disabled: startingPackage }} disabled={startingPackage}
+                  {...(Platform.OS === 'web' ? { tabIndex: startingPackage ? -1 : 0, 'aria-checked': startPanel.shared,
+                    onKeyDownCapture: e => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!startingPackage && !e.repeat) setStartPanel(p => ({ ...p, shared: !p.shared })); } } } : {})}
+                  onPress={() => setStartPanel(p => ({ ...p, shared: !p.shared }))}
+                  style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, ...drawerFocusStyle('shared') }}>
+                  <Ionicons name={startPanel.shared ? 'checkbox' : 'square-outline'} size={24} color={C.accent} />
+                  <Text style={{ color: themeColors.text, fontWeight: '700' }}>Pakiet łączony</Text>
+                </TouchableOpacity>
+                {startPanel.shared && <>
+                  <Text style={{ color: mode === 'light' ? themeColors.text : themeColors.textSecondary }}>Wybierz osoby do wspólnej puli treningów:</Text>
+                  {Object.values(weekClients).filter(c => c.id !== drawerClient.id && !c.active_package_id && !c.package_purchase_date).map(c => {
+                    const checked = startPanel.sharedIds.includes(c.id);
+                    return <TouchableOpacity key={c.id} accessibilityRole="checkbox" accessibilityLabel={c.name}
+                      onFocus={() => setDrawerFocus(c.id)} onBlur={() => setDrawerFocus(null)}
+                      accessibilityState={{ checked, disabled: startingPackage }} disabled={startingPackage}
+                      {...(Platform.OS === 'web' ? { tabIndex: startingPackage ? -1 : 0, 'aria-checked': checked,
+                        onKeyDownCapture: e => { if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!startingPackage && !e.repeat) setStartPanel(p => ({ ...p, sharedIds: p.sharedIds.includes(c.id) ? p.sharedIds.filter(id => id !== c.id) : [...p.sharedIds, c.id] })); } } } : {})}
+                      onPress={() => setStartPanel(p => ({ ...p, sharedIds: checked ? p.sharedIds.filter(id => id !== c.id) : [...p.sharedIds, c.id] }))}
+                      style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, ...drawerFocusStyle(c.id) }}>
+                      <Ionicons name={checked ? 'checkbox' : 'square-outline'} size={22} color={C.accent} />
+                      <Text style={{ flex: 1, color: themeColors.text }}>{c.name}</Text>
+                    </TouchableOpacity>;
+                  })}
+                  {!Object.values(weekClients).some(c => c.id !== drawerClient.id && !c.active_package_id && !c.package_purchase_date) &&
+                    <Text style={{ color: mode === 'light' ? themeColors.text : themeColors.textSecondary }}>Brak osób bez aktywnego rozliczenia.</Text>}
+                </>}
+              </View>}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                 <TouchableOpacity
                   style={[styles.sheetBtn, { flex: 1, backgroundColor: C.accent }]}
+                  accessibilityRole="button" accessibilityState={{ disabled: startingPackage }} disabled={startingPackage}
                   onPress={confirmStartPanel}
                 >
-                  <Text style={[styles.sheetBtnText, { color: solidButtonText(C.accent) }]}>Rozpocznij</Text>
+                  <Text style={[styles.sheetBtnText, { color: solidButtonText(C.accent) }]}>{startingPackage ? 'Zapisywanie…' : 'Rozpocznij'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.sheetBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.border }]}
@@ -1066,7 +1109,7 @@ function CalendarScreen({ navigation, route }) {
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => setAbsenceAsk(true)}
             >
-              <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Nieobecność</Text>
+              <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Odwołaj trening</Text>
             </TouchableOpacity>
           )}
           {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
@@ -1074,15 +1117,7 @@ function CalendarScreen({ navigation, route }) {
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, true); }}
             >
-              <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Opłacono</Text>
-            </TouchableOpacity>
-          )}
-          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
-            <TouchableOpacity
-              style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
-              onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, false); }}
-            >
-              <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Bez płatności</Text>
+              <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Potwierdź odwołanie</Text>
             </TouchableOpacity>
           )}
           {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
@@ -1113,7 +1148,7 @@ function CalendarScreen({ navigation, route }) {
         </View>
         {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Czy trening opłacono?</Text>
+            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Odwołany trening zostanie opłacony i zaliczony do rozliczenia.</Text>
           </View>
         )}
         </ScrollView>
@@ -1174,11 +1209,11 @@ function makeStyles(accent, barBg, TC, insets) { return StyleSheet.create({
   popupTodayText: { color: accent, fontWeight: '700' },
   popupSelectedText: { color: '#fff', fontWeight: '700' },
   sheet: { position: 'absolute', left: 8, right: 8, bottom: 96, backgroundColor: TC.surface, borderRadius: 16, padding: 12, borderWidth: 1.5, borderColor: accent, zIndex: 150, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
-  sheetTitle: { color: TC.text, fontSize: 14, fontWeight: '800' },
+  sheetTitle: { flex: 1, color: TC.text, fontSize: 14, fontWeight: '800' },
   sheetSub: { color: TC.textSecondary, fontSize: 12, marginTop: 2 },
   sheetBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  sheetBtn: { flex: 1, minWidth: '30%', borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-  sheetBtnText: { fontSize: 12, fontWeight: '800' },
+  sheetBtn: { flexGrow: 1, flexBasis: '30%', minHeight: 44, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  sheetBtnText: { fontSize: 12, lineHeight: 16, fontWeight: '800', textAlign: 'center', flexShrink: 1, maxWidth: '100%' },
   sheetInput: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, fontSize: 14, color: TC.text, backgroundColor: TC.surface, borderWidth: 1, borderColor: TC.border },
 }); }
 

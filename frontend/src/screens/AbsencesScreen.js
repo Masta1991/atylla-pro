@@ -121,7 +121,7 @@ export default function AbsencesScreen({ navigation }) {
           client_id: selectedClient,
           absence_date: d,
           absence_hour: parseInt(h, 10),
-          paid: false
+          paid: true
         });
         setSelectedDates(prev => prev.filter(date => date !== val));
       }
@@ -129,7 +129,7 @@ export default function AbsencesScreen({ navigation }) {
       setSelectedClient('');
       setSelectedDates([]);
       await loadData();
-      Alert.alert('Sukces', `Zgłoszono absencje (${selectedDates.length}). Treningi zostały oznaczone jako odwołane.`);
+      Alert.alert('Sukces', `Zgłoszono absencje (${selectedDates.length}). Treningi zostały oznaczone jako odwołane opłacone.`);
     } catch (e) {
       await loadData();
       Alert.alert('Błąd', e.message);

@@ -18,14 +18,16 @@ class InsightsTests(unittest.TestCase):
                 event(4,hour=13,status='cancelled'),event(5,hour=15,status='deleted'),event(6,hour=16,status='deleted')]
         rows=session_rows(events,[absence(1,hour=15)],{CID:'QA','partner':'Partner'},NOW)
         t=totals(rows)
-        self.assertEqual([t[k] for k in ('done','planned','paid','free','unknown')],[1,1,1,2,0])
+        self.assertEqual([t[k] for k in ('done','planned','paid','free','unknown')],[1,1,1,0,0])
         self.assertEqual(t['clients_done'],2)
-        self.assertEqual(t['total'],5) # The pair is one session, deleted template is excluded.
+        self.assertEqual(t['total'],3)
+        self.assertEqual(t['recorded'],2) # The pair is one session, deleted template is excluded.
 
     def test_same_day_multiple_sessions_and_whole_day_dedup(self):
         events=[event(1,hour=9,status='deleted'),event(2,hour=12,status='deleted')]
         rows=session_rows(events,[absence(1,hour=None),absence(2,hour=9),absence(3,hour=9)],{CID:'QA'},NOW)
-        self.assertEqual(totals(rows)['free'],2)
+        self.assertEqual(totals(rows)['free'],0)
+        self.assertEqual(rows,[])
         self.assertEqual(totals(rows)['unknown'],0)
 
     def test_unmatched_absence_is_unknown_not_a_free_training(self):

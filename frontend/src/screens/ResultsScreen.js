@@ -22,6 +22,7 @@ export default function ResultsScreen({navigation}) {
   return <AppLayout navigation={navigation} title="Strefa Trenera" showBack>
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.heading}>Twój miesiąc pracy</Text>
+      <PanelButton onPress={() => navigation.navigate('Seasonality')}>Raport sezonowości · porównaj lata</PanelButton>
       <MonthPicker {...period} onChange={change} outlined/>
       <LoadState loading={loading} error={error} retry={load}/>
       {!loading&&data&&<>

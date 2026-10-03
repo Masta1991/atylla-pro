@@ -38,6 +38,7 @@ def main():
         scripts.append('backend/tests/offline/postgres_sessions.test.cjs')
         scripts.append('backend/tests/offline/postgres_week_copy.test.cjs')
         scripts.append('backend/tests/offline/postgres_workout_notes.test.cjs')
+        scripts.append('backend/tests/offline/postgres_seasonality.test.cjs')
     for script in scripts:
         try:
             run = subprocess.run(["node", str(ROOT / script)], cwd=ROOT,

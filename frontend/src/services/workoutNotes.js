@@ -2,9 +2,9 @@ export const workoutNoteText = value => String(value || '').replace(/\[BILLING:[
 
 export function calendarNotes(event) {
   if (!event) return [];
-  const own = workoutNoteText(event.note) ? [{ ...event, own: true }] : [];
-  const previous = (event.pending_notes || []).filter(n => n.id !== event.id && workoutNoteText(n.note));
-  // In the drawer, handle unread reminders first; the current training note stays available after them.
+  const own = workoutNoteText(event.note) && !event.note_acknowledged_at ? [{ ...event, own: true }] : [];
+  const previous = (event.pending_notes || []).filter(n => n.id !== event.id && !n.note_acknowledged_at && workoutNoteText(n.note));
+  // Acknowledgement hides the reminder; source text remains in training history.
   return [...previous, ...own];
 }
 

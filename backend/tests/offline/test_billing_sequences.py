@@ -154,17 +154,42 @@ class BillingSequences(unittest.TestCase):
         db = Mock()
         db.rpc.return_value.execute.return_value.data = {'id': EID}
         with patch.object(calendar, 'get_user_supabase', return_value=(db,UID)):
-            calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, paid=False), None)
+            calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, paid=True), None)
         db.table.assert_not_called()
         args = db.rpc.call_args.args
         self.assertEqual(args[0], 'record_absence_v3')
-        self.assertIs(args[1]['p_payload']['paid'], False)
+        self.assertIs(args[1]['p_payload']['paid'], True)
+
+    def test_unpaid_cancellation_is_rejected_without_writes(self):
+        db = Mock()
+        with patch.object(calendar, 'get_user_supabase', return_value=(db, UID)):
+            with self.assertRaises(HTTPException) as failure:
+                calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', paid=False), None)
+        self.assertEqual(failure.exception.status_code, 422)
+        db.rpc.assert_not_called()
+        db.table.assert_not_called()
+
+    def test_omitted_payment_means_paid_cancellation(self):
+        self.assertTrue(AbsenceCreate(client_id=CID, absence_date='2026-09-10').paid)
 
     def test_long_history_is_not_truncated_at_1000(self):
         rows = [event(EID if i==0 else f'row-{i}', '2026-09-01') for i in range(1050)]
         count, tiles = self.project(rows)
         self.assertEqual(count['package_current_count'], 1050)
         self.assertEqual(max(t['tile_number'] for t in tiles), 1050)
+
+    def test_shared_package_projects_single_member_type_and_calendar(self):
+        member='00000000-0000-4000-8000-000000000021'
+        owner={**client(), 'billing_type':'single', 'package_purchase_date':None}
+        other={**client(member), 'billing_type':'single', 'package_purchase_date':None}
+        package=pkg(shared_client_ids=[member])
+        rows=[{**event(), 'clients':owner}, {**event(EID2,'2026-09-02'), 'client_id':member,'clients':other}]
+        db=MemoryDB({'clients':[other,owner],'client_packages':[package],'calendar_events':rows})
+        result=clients.assign_client_packages_status([copy.deepcopy(other),copy.deepcopy(owner)],db)
+        self.assertTrue(all(c['billing_type']=='package' and c['active_package_id']==PID for c in result))
+        tiles=calendar.assign_chronological_numbers([copy.deepcopy(rows[1])],db)
+        self.assertEqual(tiles[0]['clients']['billing_type'],'package')
+        self.assertEqual(tiles[0]['tile_number'],2)
 
     def test_shared_member_only_week_includes_owner_anchor(self):
         member='00000000-0000-4000-8000-000000000021'

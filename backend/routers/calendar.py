@@ -51,6 +51,8 @@ def get_absences(date_from: Optional[str] = Query(None), date_to: Optional[str] 
 
 @router.post("/absences", response_model=AbsenceResponse, status_code=201)
 def create_absence(data: AbsenceCreate, request: Request):
+    if not data.paid:
+        raise HTTPException(422, 'Odwołanie bez płatności jest obecnie wyłączone. Odwołany trening jest opłacony.')
     supabase, user_id = get_user_supabase(request)
     return atomic_rpc(supabase, 'record_absence_v3', {'p_payload': data.model_dump(mode='json')})
 
@@ -204,7 +206,7 @@ def assign_chronological_numbers(events, supabase):
         cinfo = client_info.get(cid, {})
         b_type = cinfo.get("billing_type")
 
-        if b_type == "package":
+        if b_type == "package" or str(cid) in _owner_has_active:
             pkgs = client_packages.get(cid, [])
             all_by_id = {str(e['id']): e for e in package_boundaries}
             if sum(p.get('end_training_id') is None for p in pkgs) > 1:
@@ -353,6 +355,9 @@ def assign_chronological_numbers(events, supabase):
         if cid and ev.get("clients"):
             b_type = ev["clients"].get("billing_type")
             e_id = ev["id"]
+            if f"{e_id}_size" in event_positions:
+                b_type = 'package'
+                ev['clients']['billing_type'] = 'package'
 
             has_active_or_history = False
 

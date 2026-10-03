@@ -1,5 +1,26 @@
 # Zakres testów Atylla Pro
 
+## Aktualizacja 2026-10-02 — lokalna 2.1.18
+
+Runner `harness.py --postgres`: 200 kontroli (100 Python/API, 44 JS, 56 SQL/PGlite)
+oraz parser 43 modułów JS. Nowe `test_seasonality.py` i `postgres_seasonality.test.cjs`
+sprawdzają liczenie sesji, brak/zero, zastąpienie miesiąca, kompletność i powtarzalność,
+izolację trenerów, CAS zapisu/usunięcia, uprawnienia i błędy. SQL 013 jest uruchamiany
+wyłącznie w PGlite. Nie jest stosowany w Supabase przez runner.
+
+Przeglądarkowy odbiór aktualnego lokalnego buildu:
+
+```powershell
+node backend/tests/offline/browser_workout_notes.test.cjs .tmp/LOKALNY-BUILD
+node backend/tests/offline/browser_requested_changes.test.cjs .tmp/LOKALNY-BUILD
+node backend/tests/offline/browser_seasonality.test.cjs .tmp/LOKALNY-BUILD
+```
+
+Dowody z bieżącej sesji: `.tmp/changes-20261002/`. API musi wskazywać
+`http://127.0.0.1:8000`; przechwyty są syntetyczne, ruch zewnętrzny blokowany.
+Build przygotuj z `--clear`, aby cache Metro nie zachował wcześniejszego celu API.
+Szczegóły i ograniczenia odbioru: `docs/audits/CHANGES_2.1.18_2026-10-02.md`.
+
 ## Aktualizacja 2026-09-26 — 2.1.16
 
 Runner `harness.py --postgres` obejmuje 177 przypadków/kontroli: 88 Python/API,

@@ -22,6 +22,7 @@ import WorkoutGeneratorScreen from './src/screens/WorkoutGeneratorScreen';
 import ManagerScreen from './src/screens/ManagerScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
+import SeasonalityScreen from './src/screens/SeasonalityScreen';
 import PaymentsScreen from './src/screens/PaymentsScreen';
 import HistoryFilterScreen from './src/screens/HistoryFilterScreen';
 import MuscleExercisesScreen from './src/screens/MuscleExercisesScreen';
@@ -64,6 +65,7 @@ function AppNavigator() {
           <Stack.Screen name="Measurements" component={MeasurementsScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Results" component={ResultsScreen} />
+          <Stack.Screen name="Seasonality" component={SeasonalityScreen} />
           <Stack.Screen name="Payments" component={PaymentsScreen} />
           <Stack.Screen name="ClientPayments" component={PaymentsScreen} />
           <Stack.Screen name="Plans" component={PlansScreen} />

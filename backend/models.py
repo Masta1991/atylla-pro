@@ -164,7 +164,7 @@ class AbsenceBase(BaseModel):
     absence_hour: Optional[int] = Field(default=None, ge=6, le=21)
 
 class AbsenceCreate(AbsenceBase):
-    paid: bool = False
+    paid: bool = True
 
 class AbsenceResponse(AbsenceBase):
     id: UUID

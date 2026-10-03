@@ -112,3 +112,54 @@ def copy_preview(data: CopyRequest, request: Request):
 @router.post('/copy')
 def copy_week(data: CopyRequest, request: Request):
     return copy_call(request, data, True)
+
+
+class HistoricalMonth(BaseModel):
+    training_count: int = Field(ge=0, le=10000, strict=True)
+    expected_updated_at: Optional[datetime] = None
+
+
+class HistoricalMonthDelete(BaseModel):
+    expected_updated_at: datetime
+
+
+def historical_period(year, month):
+    if not (2000 <= year <= 2100 and 1 <= month <= 12):
+        raise HTTPException(422, 'Nieprawidłowy rok lub miesiąc.')
+    now = datetime.now(WARSAW)
+    if (year, month) >= (now.year, now.month):
+        raise HTTPException(422, 'Dane historyczne można wpisywać tylko za zakończone miesiące.')
+
+
+@router.get('/seasonality')
+def get_seasonality(request: Request, start_year: int = Query(..., ge=2000, le=2100), end_year: int = Query(..., ge=2000, le=2100)):
+    from seasonality import seasonality_report
+    if end_year < start_year or end_year - start_year > 9:
+        raise HTTPException(422, 'Wybierz zakres od jednego do dziesięciu lat.')
+    db, actor = get_user_supabase(request)
+    events = read_all(lambda: db.table('calendar_events').select('id,event_date,event_hour,status,is_settled')
+                      .eq('trainer_id', actor).gte('event_date', f'{start_year}-01-01').lte('event_date', f'{end_year}-12-31'))
+    first_active = db.table('calendar_events').select('event_date').eq('trainer_id', actor).eq('status', 'active').order('event_date').limit(1).execute().data or []
+    first_paid = db.table('calendar_events').select('event_date').eq('trainer_id', actor).eq('status', 'cancelled').eq('is_settled', True).order('event_date').limit(1).execute().data or []
+    first = sorted(first_active + first_paid, key=lambda row: row['event_date'])
+    try:
+        manual = db.table('trainer_monthly_history').select('*').eq('trainer_id', actor).gte('year', start_year).lte('year', end_year).order('year').order('month').limit(120).execute().data or []
+    except Exception as exc:
+        raise HTTPException(503, 'Historia sezonowości jest niedostępna. Sprawdź wdrożenie modułu i spróbuj ponownie.') from exc
+    return seasonality_report(events, manual, start_year, end_year, first[0]['event_date'] if first else None)
+
+
+@router.put('/history/{year}/{month}')
+def save_historical_month(year: int, month: int, data: HistoricalMonth, request: Request):
+    historical_period(year, month)
+    db, actor = get_user_supabase(request)
+    return atomic_rpc(db, 'save_trainer_month_v1', {'p_year': year, 'p_month': month, 'p_count': data.training_count,
+                      'p_expected': data.expected_updated_at.isoformat() if data.expected_updated_at else None})
+
+
+@router.delete('/history/{year}/{month}')
+def delete_historical_month(year: int, month: int, data: HistoricalMonthDelete, request: Request):
+    historical_period(year, month)
+    db, actor = get_user_supabase(request)
+    return atomic_rpc(db, 'delete_trainer_month_v1', {'p_year': year, 'p_month': month,
+                      'p_expected': data.expected_updated_at.isoformat()})

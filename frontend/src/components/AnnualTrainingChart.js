@@ -1,18 +1,20 @@
 import React, { useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { MONTHS, STATES, STATUS_NAMES, PanelButton, usePanelTheme } from './TrainerPanels';
+import { MONTHS, STATUS_NAMES, PanelButton, usePanelTheme } from './TrainerPanels';
 
 const HEIGHT = 280, COLUMN = 82;
+const STATES = ['done', 'paid'];
 export default function AnnualTrainingChart({ year, month, months, onSelect }) {
   const { s, T, C, palette } = usePanelTheme();
   const scroll = useRef(null);
   const [table, setTable] = useState(false);
+  months = months.map(m => ({ ...m, total: (m.done || 0) + (m.paid || 0) }));
   const max = Math.max(4, ...months.map(m => m.total));
   const ceiling = Math.ceil(max / 4) * 4;
   const selected = months.find(m => m.month === month);
   return <View style={s.card} testID="annual-chart">
     <Text style={s.title}>Treningi w roku {year}</Text>
-    <Text style={s.muted}>Wysokość słupka pokazuje liczbę sesji. Wybierz miesiąc, aby odczytać dokładne wartości każdego statusu.</Text>
+    <Text style={s.muted}>Wykres obejmuje treningi odbyte i odwołane opłacone. Wybierz miesiąc, aby zobaczyć szczegóły.</Text>
     <Text style={s.muted}>Łączna liczba treningów w każdym miesiącu</Text>
     <View style={{ flexDirection: 'row' }}>
       <View style={{ width: 38, height: HEIGHT, marginTop: 43 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
@@ -45,7 +47,6 @@ export default function AnnualTrainingChart({ year, month, months, onSelect }) {
           <View style={{ height: 8, width: `${100 * selected[k] / Math.max(1, ...STATES.map(key => selected[key]))}%`, backgroundColor: palette[k] }} />
         </View>
       </View>)}
-      {selected.unknown > 0 && <Text style={s.muted}>Dodatkowo: {selected.unknown} zgłoszeń bez danych o rozliczeniu.</Text>}
     </View>}
     <PanelButton selected={table} onPress={() => setTable(v => !v)}>{table ? 'Ukryj liczby całego roku' : 'Pokaż liczby całego roku'}</PanelButton>
     {table && months.map(m => <View key={m.month} style={s.line}>

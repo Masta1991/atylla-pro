@@ -30,7 +30,7 @@ def session_rows(events, absences, names, now=None):
             state = 'unknown'
         if state in ('paid', 'free'):
             matched.update(str(a['id']) for a in links)
-        if state == 'removed':
+        if state in ('removed', 'free'):
             continue
         rows.append({'id': str(ev['id']), 'event_id': str(ev['id']), 'date': day, 'hour': hour,
                      'client_ids': sorted(members), 'name': ' + '.join(names.get(c, 'Usunięty klient') for c in sorted(members)),
@@ -50,10 +50,11 @@ def session_rows(events, absences, names, now=None):
 
 def totals(rows):
     out = {state: sum(r['state'] == state for r in rows) for state in STATES}
-    out['total'] = sum(out[s] for s in STATES if s != 'unknown')
+    out['total'] = out['done'] + out['planned'] + out['paid']
+    out['recorded'] = out['done'] + out['paid']
     out['clients_done'] = len({c for r in rows if r['state'] == 'done' for c in r['client_ids']})
     out['clients_planned'] = len({c for r in rows if r['state'] == 'planned' for c in r['client_ids']})
-    past = [r for r in rows if r['is_session'] and r['ended'] and r['state'] in ('done', 'paid', 'free')]
+    past = [r for r in rows if r['is_session'] and r['ended'] and r['state'] in ('done', 'paid')]
     out['cancellation_rate'] = round(100 * sum(r['state'] != 'done' for r in past) / len(past), 1) if past else None
     return out
 

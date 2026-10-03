@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { openDialog, showError } from '../services/confirm';
@@ -8,13 +8,29 @@ import { acknowledgeWorkoutNote } from '../services/api';
 
 const sourceDate = note => `${new Date(note.event_date + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}, ${note.event_hour}:00`;
 
-export default function CalendarNotesPreview({ event, onAcknowledged, onRefresh }) {
+export default function CalendarNotesPreview({ event, onAcknowledged, onRefresh, onEmptyFocus }) {
+  const notes = calendarNotes(event);
+  const noteRefs = useRef({}), focusAfterRead = useRef(false);
+  useEffect(() => {
+    if (!focusAfterRead.current) return;
+    focusAfterRead.current = false;
+    const next = notes[0] && noteRefs.current[notes[0].id];
+    if (next) next.focus(); else onEmptyFocus?.();
+  }, [notes, onEmptyFocus]);
+  const acknowledged = (note, result) => {
+    focusAfterRead.current = true;
+    onAcknowledged(note, result);
+  };
+  if (!notes.length) return null;
+  return <ScrollView testID="calendar-note-list" style={{ maxHeight: 210 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+    {notes.map(note => <NotePreview key={note.id} first={note} openRef={node => { noteRefs.current[note.id] = node; }} onAcknowledged={acknowledged} onRefresh={onRefresh} />)}
+  </ScrollView>;
+}
+
+function NotePreview({ first, openRef, onAcknowledged, onRefresh }) {
   const { colors: C, themeColors: T } = useTheme();
   const [busy, setBusy] = useState(false), [focused, setFocused] = useState(null);
   const lock = useRef(false);
-  const notes = calendarNotes(event);
-  if (!notes.length) return null;
-  const first = notes[0];
   const label = first.own ? 'Notatka z tego treningu' : `Notatka z ${sourceDate(first)}`;
 
   async function acknowledge(note) {
@@ -40,18 +56,11 @@ export default function CalendarNotesPreview({ event, onAcknowledged, onRefresh 
   async function openNotes() {
     if (lock.current) return;
     lock.current = true;
-    let index = 0;
     try {
-      while (index < notes.length) {
-        const note = notes[index];
-        const buttons = [{ text: 'Zamknij', style: 'cancel', value: 'close' }];
-        if (notes.length > 1) buttons.push({ text: `Następna (${index + 1}/${notes.length})`, value: 'next' });
-        if (!note.note_acknowledged_at) buttons.push({ text: 'Oznacz jako przeczytaną', value: 'read' });
-        const action = await openDialog(`Notatka · ${sourceDate(note)}`, workoutNoteText(note.note), buttons);
-        if (action === 'next') { index = (index + 1) % notes.length; continue; }
-        if (action === 'read') await acknowledge(note);
-        break;
-      }
+      const buttons = [{ text: 'Zamknij', style: 'cancel', value: 'close' },
+        { text: 'Oznacz jako przeczytaną', value: 'read' }];
+      const action = await openDialog(`Notatka · ${sourceDate(first)}`, workoutNoteText(first.note), buttons);
+      if (action === 'read') await acknowledge(first);
     } finally { lock.current = false; }
   }
 
@@ -60,7 +69,7 @@ export default function CalendarNotesPreview({ event, onAcknowledged, onRefresh 
   return <View style={{ marginTop: 8, padding: 7, borderRadius: 10, borderWidth: 1,
     borderColor: T.border, backgroundColor: T.surfaceLight }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <TouchableOpacity testID="calendar-note-preview" accessibilityRole="button"
+      <TouchableOpacity ref={openRef} testID="calendar-note-preview" accessibilityRole="button"
         accessibilityLabel="Otwórz notatkę" disabled={busy} accessibilityState={{ disabled: busy }}
         onPress={openNotes} onFocus={() => setFocused('open')} onBlur={() => setFocused(null)}
         style={[{ flex: 1, minHeight: 50, justifyContent: 'center', borderRadius: 7, paddingHorizontal: 2 }, focusStyle('open')]}>

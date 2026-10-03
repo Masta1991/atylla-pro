@@ -7,7 +7,7 @@ import * as api from '../services/api';
 
 export const MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 export const STATUS_NAMES = {done:'Odbyte', planned:'Zaplanowane', paid:'Odwołane, opłacone', free:'Odwołane, nieopłacone', unknown:'Brak danych o rozliczeniu'};
-export const STATES = ['done','planned','paid','free'];
+export const STATES = ['done','planned','paid'];
 export const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 export const mondayOf = d => {const n = new Date(d); n.setDate(n.getDate() - (n.getDay()+6)%7); return n;};
 export const addDays = (day, n) => {const d = new Date(day+'T12:00:00'); d.setDate(d.getDate()+n); return iso(d);};

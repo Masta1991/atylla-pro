@@ -255,7 +255,7 @@ def assign_client_packages_status(clients, supabase):
         cid = str(c["id"])
         if cid in assigned:
             continue
-        if c.get("billing_type") == "package":
+        if cid in member_pkg or cid in active_packages or c.get("billing_type") == "package":
             pkg = active_packages.get(c["id"]) or active_packages.get(str(c["id"])) or member_pkg.get(cid)
             if pkg:
                 # T6: z puli wypadają członkowie z WŁASNYM innym pakietem
@@ -275,6 +275,7 @@ def assign_client_packages_status(clients, supabase):
                 effective = projection['effective_start']
                 for m in members:
                     mc = clients_by_id[m]
+                    mc['billing_type'] = 'package'
                     mc['package_current_count'] = projection['count']
                     mc['package_size'] = pkg.get('size') or 10
                     mc['package_purchase_date'] = effective['event_date'] if effective else None
