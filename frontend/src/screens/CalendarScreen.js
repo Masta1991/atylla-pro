@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { APP_VERSION } from '../version';
 import CalendarNotesPreview from '../components/CalendarNotesPreview';
 import { workoutNoteText, applyNoteRead } from '../services/workoutNotes';
+import useMenuTrigger from '../hooks/useMenuTrigger';
 
 const solidButtonText = hex => {
   const rgb = hex.replace('#', '').match(/../g).map(v => parseInt(v, 16) / 255);
@@ -281,6 +282,7 @@ function isSlotPassed(dateStr, hour) {
 }
 
 function CalendarScreen({ navigation, route }) {
+  const menuTrigger = useMenuTrigger(navigation);
   const { colors: C, barStyle, themeColors, mode } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -801,7 +803,7 @@ function CalendarScreen({ navigation, route }) {
         <Text style={{ color: appTitleColor, fontSize: 16, fontWeight: '700', letterSpacing: 1 }}>ATYLLA PRO</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('MenuModal')}>
+        <TouchableOpacity ref={menuTrigger.ref} testID="open-menu" accessibilityRole="button" accessibilityLabel="Otwórz menu" style={styles.headerBtn} onPress={menuTrigger.open}>
           <Ionicons name="menu" size={32} color={headerIconColor} />
         </TouchableOpacity>
         

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import useMenuTrigger from '../hooks/useMenuTrigger';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Image, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ function AppLayout({ navigation, title, children, hideBottom, showBack }) {
   const { colors: C, barStyle, themeColors, mode } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const menuTrigger = useMenuTrigger(navigation);
 
   const barBg = useMemo(() => {
     if (barStyle === 'pianoWhite') return '#FFFFFF';
@@ -132,7 +134,8 @@ function AppLayout({ navigation, title, children, hideBottom, showBack }) {
           {showBack ? (
             <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="chevron-back" size={26} color={headerIconColor} /></TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={() => navigation.navigate('MenuModal')}><Ionicons name="menu" size={32} color={headerIconColor} /></TouchableOpacity>
+            <TouchableOpacity ref={menuTrigger.ref} testID="open-menu" accessibilityRole="button" accessibilityLabel="Otwórz menu"
+              onPress={menuTrigger.open}><Ionicons name="menu" size={32} color={headerIconColor} /></TouchableOpacity>
           )}
           <View style={styles.headerCenter}>{title ? <Text style={[styles.screenTitle, { color: headerTextColor }]}>{title}</Text> : null}</View>
           <View style={{ width: 32 }} />

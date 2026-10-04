@@ -1,5 +1,23 @@
 # Zakres testów Atylla Pro
 
+## Ciekawostki dnia — 2026-10-04, lokalne 2.1.23
+
+Runner obejmuje `test_daily_facts_import.py` i `frontend_daily_facts.test.cjs`:
+zgodność 313 wpisów z Excelem, odrzucanie niepoprawnych danych, dokładne daty,
+niedziele, powtarzanie cykli, lata przestępne, Europe/Warsaw i północ przy DST.
+Dodatkowy test: jednorazowy podgląd 4.10.2026 wygasa o polskiej północy.
+Porównanie z XLSX wymaga źródła lokalnego; w klonie bez niego jest SKIP.
+Aktualny zakres: 131 Python/API, 51 JS i parser 50 modułów; bez PGlite.
+
+`python scripts/import-daily-facts.py --check` porównuje JSON z Excelem bez zmian.
+Uruchomienie bez `--check` aktualizuje lokalny JSON; aplikacja nie czyta XLSX w runtime.
+
+Odbiór UI: `node backend/tests/offline/browser_daily_facts.test.cjs <lokalny-build>`.
+Najpierw zachowaj bazowy odczyt wersji przed zmianą, uruchamiając ten sam test
+z `--baseline` i ścieżką bazowego buildu. Wyniki w `.tmp/daily-facts-2.1.23`.
+Test blokuje zewnętrzne połączenia i przechwytuje API; baza i prawdziwe konta są
+nieużywane. Zakres i ograniczenia: `docs/audits/DAILY_FACTS_2.1.23_2026-10-04.md`.
+
 ## Aktualizacja 2026-10-02 — lokalna 2.1.18
 
 Runner `harness.py --postgres`: 200 kontroli (100 Python/API, 44 JS, 56 SQL/PGlite)

@@ -33,6 +33,7 @@ def main():
                         "failures": len(result.failures), "errors": len(result.errors)})
     frontend = []
     scripts = ['backend/tests/offline/frontend_api.test.cjs', 'backend/tests/offline/frontend_billing.test.cjs', 'backend/tests/offline/frontend_workout_catalog.test.cjs', 'backend/tests/offline/frontend_workout_save_queue.test.cjs', 'backend/tests/offline/frontend_workout_notes.test.cjs', 'scripts/check-frontend.cjs']
+    scripts.append('backend/tests/offline/frontend_daily_facts.test.cjs')
     if args.postgres:
         scripts.append('backend/tests/offline/postgres_billing.test.cjs')
         scripts.append('backend/tests/offline/postgres_sessions.test.cjs')
