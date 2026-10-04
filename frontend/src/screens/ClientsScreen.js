@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, Platform
+  ActivityIndicator, RefreshControl, Platform, TextInput
 } from 'react-native';
 import { AppAlert as Alert } from '../services/confirm';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,6 +22,11 @@ export default function ClientsScreen({ navigation }) {
   const [workoutTypes, setWorkoutTypes] = useState(global.cachedWorkoutTypesMap || {});
   const [loading, setLoading] = useState(!global.cachedClients);
   const [openId, setOpenId] = useState(null); // rozwijana karta klienta (jak 2.0)
+  const [search, setSearch] = useState('');
+  const normalizeName = value => String(value || '').toLocaleLowerCase('pl')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l');
+  const searchWords = normalizeName(search).trim().split(/\s+/).filter(Boolean);
+  const visibleClients = clients.filter(client => searchWords.every(word => normalizeName(client.name).includes(word)));
   const loadErrShown = useRef(false); // diagnoza pustej apki: błąd raz, widocznie
 
   const loadClients = useCallback(async () => {
@@ -77,11 +82,24 @@ export default function ClientsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.searchRow}>
+        <TextInput
+          accessibilityLabel="Szukaj klienta po imieniu lub nazwisku"
+          placeholder="Szukaj klienta"
+          placeholderTextColor={themeColors.textSecondary}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          style={styles.searchInput}
+        />
+      </View>
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadClients} tintColor={C.accent} />}
       >
-        {clients.map(c => {
+        {visibleClients.map(c => {
           const isPkg = c.billing_type === 'package';
           const cur = c.package_current_count || 0;
           const size = c.package_size || 0;
@@ -137,8 +155,8 @@ export default function ClientsScreen({ navigation }) {
           </TouchableOpacity>
           );
         })}
-        {clients.length === 0 && (
-          <Text style={styles.empty}>Brak klientów</Text>
+        {visibleClients.length === 0 && (
+          <Text style={styles.empty}>{clients.length === 0 ? 'Brak klientów' : 'Brak klientów pasujących do wyszukiwania'}</Text>
         )}
       </ScrollView>
     </AppLayout>
@@ -146,6 +164,8 @@ export default function ClientsScreen({ navigation }) {
 }
 
 function makeStyles(C, TC) { return StyleSheet.create({
+  searchRow: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  searchInput: { minHeight: 46, borderWidth: 1, borderColor: TC.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: TC.surface, color: TC.text, fontSize: 16 },
   headerRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
   addBtn: { backgroundColor: C.accent, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
   addBtnText: { color: TC.background, fontWeight: '700', fontSize: 13 },

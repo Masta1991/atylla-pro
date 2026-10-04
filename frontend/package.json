@@ -1,6 +1,6 @@
 {
     "name":  "atylla-pro",
-    "version":  "2.1.18",
+    "version":  "2.1.19",
     "main":  "index.js",
     "dependencies":  {
                          "@expo/ngrok":  "^4.1.3",

@@ -29,6 +29,18 @@ export default function PaymentsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(!global.cachedClients);
   const [refreshing, setRefreshing] = useState(false);
   const isClientView = route?.name === 'ClientPayments';
+  const [expandedClientId, setExpandedClientId] = useState(isClientView ? route?.params?.clientId : null);
+  const [moreClientId, setMoreClientId] = useState(null);
+  const toggleClient = id => {
+    setExpandedClientId(current => current === id ? null : id);
+    setMoreClientId(null);
+  };
+  useEffect(() => {
+    if (isClientView) {
+      setExpandedClientId(route?.params?.clientId || null);
+      setMoreClientId(null);
+    }
+  }, [isClientView, route?.params?.clientId]);
   const visibleClients = isClientView
     ? clients.filter(client => client.id === route?.params?.clientId)
     : clients;
@@ -558,44 +570,50 @@ export default function PaymentsScreen({ navigation, route }) {
           const size = client.package_size || 0;
           const current = client.package_current_count || 0;
           const isOverLimit = isPackage && current > size;
+          const expanded = expandedClientId === client.id;
           
           return (
             <View key={client.id} testID={`payment-card-${client.id}`} style={[styles.card, isOverLimit && styles.cardWarning]}>
-              <View style={styles.cardHeader}>
+              <TouchableOpacity
+                style={styles.cardHeader}
+                accessibilityRole="button"
+                accessibilityLabel={`${expanded ? 'Zwiń' : 'Rozwiń'} rozliczenie: ${client.name}`}
+                accessibilityState={{ expanded }}
+                aria-expanded={expanded}
+                aria-controls={`payment-details-${client.id}`}
+                onPress={() => toggleClient(client.id)}
+              >
                 <View style={styles.clientMeta}>
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>{client.name?.charAt(0)?.toUpperCase() || '?'}</Text>
                   </View>
-                  <View>
+                  <View style={styles.clientIdentity}>
                     <Text style={styles.clientName}>{client.name}</Text>
                     <View style={[styles.badge, isPackage ? styles.badgePackage : styles.badgeSingle]}>
-                      <Text style={[styles.badgeText, isSingle && { color: '#8b949e' }]}>
+                      <Text style={[styles.badgeText, isSingle && { color: mode === 'light' ? themeColors.text : themeColors.textSecondary }]}>
                         {isPackage ? 'PAKIET' : (client.package_purchase_date ? 'MIESIĘCZNY' : 'BEZ PAKIETU')}
                       </Text>
                     </View>
                   </View>
                 </View>
                 
+                <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={C.accent} />
+              </TouchableOpacity>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{isPackage ? 'Wykorzystano treningów' : 'Treningi w rozliczeniu'}</Text>
                 <View style={styles.counterSection}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[styles.counterText, isOverLimit && styles.counterTextWarning]}>
                       {isSingle ? current : `${current}${isPackage ? ` / ${size}` : ''}`}
                     </Text>
-                    {isPackage && (
-                      <>
-                        <TouchableOpacity onPress={() => openEditModal(client)} style={{ marginLeft: 6, padding: 4 }}>
-                          <Ionicons name="pencil" size={16} color={C.accent} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => openIncreaseModal(client)} style={{ marginLeft: 2, padding: 4 }}>
-                          <Ionicons name="add-circle-outline" size={18} color="#1dd1a1" />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                  <Text style={styles.counterLabel}>treningi</Text>
                 </View>
               </View>
+              {isPackage && size > 0 && (
+                <View style={styles.packageTrack} accessibilityElementsHidden aria-hidden>
+                  <View style={[styles.packageFill, { width: `${Math.min(100, Math.max(0, current / size * 100))}%` }, isOverLimit && { backgroundColor: '#FF9800' }]} />
+                </View>
+              )}
 
+              {expanded && <View nativeID={`payment-details-${client.id}`} style={styles.expandedDetails}>
               <View style={styles.cardBody}>
                 <View style={styles.infoRow}>
                   <Ionicons name="calendar-outline" size={16} color={themeColors.textSecondary} />
@@ -633,6 +651,16 @@ export default function PaymentsScreen({ navigation, route }) {
               </View>
 
               <View style={[styles.cardActions, { flexWrap: 'wrap', gap: 8 }]}>
+                {isPackage && <>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edytuj licznik" style={[styles.btn, styles.btnSecondary, styles.detailAction]} onPress={() => openEditModal(client)}>
+                    <Ionicons name="pencil" size={16} color={C.accent} />
+                    <Text style={styles.btnSecondaryText}>Edytuj licznik</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Zwiększ pakiet" style={[styles.btn, styles.btnSecondary, styles.detailAction]} onPress={() => openIncreaseModal(client)}>
+                    <Ionicons name="add-circle-outline" size={18} color={C.accent} />
+                    <Text style={styles.btnSecondaryText}>Zwiększ pakiet</Text>
+                  </TouchableOpacity>
+                </>}
                 {!client.package_purchase_date && !client.active_package_id && (
                   <TouchableOpacity
                     style={[styles.btn, styles.btnPrimary, { flex: 1, minWidth: '48%' }]}
@@ -666,6 +694,19 @@ export default function PaymentsScreen({ navigation, route }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: moreClientId === client.id }}
+                  accessibilityLabel="Więcej"
+                  aria-expanded={moreClientId === client.id}
+                  aria-controls={`payment-more-${client.id}`}
+                  style={[styles.btn, styles.btnSecondary, { minWidth: '100%' }]}
+                  onPress={() => setMoreClientId(current => current === client.id ? null : client.id)}
+                >
+                  <Text style={styles.btnSecondaryText}>Więcej</Text>
+                  <Ionicons name={moreClientId === client.id ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={C.accent} />
+                </TouchableOpacity>
+                {moreClientId === client.id && <TouchableOpacity
+                  nativeID={`payment-more-${client.id}`}
                   style={[styles.btn, { flex: 1, minWidth: '100%', backgroundColor: 'transparent', borderColor: themeColors.danger, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 6, marginTop: 4 }]}
                   onPress={() => handleHardReset(client)}
                 >
@@ -673,8 +714,9 @@ export default function PaymentsScreen({ navigation, route }) {
                   <Text style={{ color: themeColors.danger, fontWeight: '600', fontSize: 13 }}>
                     Twardy Reset (Wyzeruj)
                   </Text>
-                </TouchableOpacity>
+                </TouchableOpacity>}
               </View>
+              </View>}
             </View>
           );
         })}
@@ -1136,17 +1178,26 @@ function makeStyles(C, TC, mode) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottomWidth: 1,
-      borderBottomColor: TC.border,
-      paddingBottom: 12,
+      minHeight: 44,
+      gap: 10,
       marginBottom: 12,
     },
     clientMeta: {
+      flex: 1,
+      minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
     },
+    clientIdentity: { flex: 1, minWidth: 0 },
+    summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+    summaryLabel: { color: TC.textSecondary, fontSize: 13, flexShrink: 1 },
+    packageTrack: { height: 5, backgroundColor: TC.border, borderRadius: 4, overflow: 'hidden', marginTop: 12 },
+    packageFill: { height: 5, backgroundColor: C.accent },
+    expandedDetails: { borderTopWidth: 1, borderTopColor: TC.border, paddingTop: 16, marginTop: 16 },
+    detailAction: { minWidth: '48%', minHeight: 44, paddingHorizontal: 10 },
     avatar: {
+      flexShrink: 0,
       width: 44,
       height: 44,
       borderRadius: 22,
@@ -1196,7 +1247,7 @@ function makeStyles(C, TC, mode) {
       color: mode === 'light' ? TC.text : C.accent,
     },
     counterTextWarning: {
-      color: '#FF9800',
+      color: mode === 'light' ? '#874a00' : '#FF9800',
     },
     counterLabel: {
       fontSize: 10,
@@ -1213,6 +1264,7 @@ function makeStyles(C, TC, mode) {
       gap: 6,
     },
     infoText: {
+      flex: 1,
       fontSize: 13,
       color: TC.textSecondary,
     },
@@ -1230,8 +1282,9 @@ function makeStyles(C, TC, mode) {
       marginTop: 10,
     },
     warningText: {
+      flex: 1,
       fontSize: 12,
-      color: '#FF9800',
+      color: mode === 'light' ? '#874a00' : '#FF9800',
       fontWeight: '600',
     },
     cardActions: {
@@ -1251,6 +1304,8 @@ function makeStyles(C, TC, mode) {
       backgroundColor: C.accent,
     },
     btnPrimaryText: {
+      flexShrink: 1,
+      textAlign: 'center',
       color: solidButtonText(C.accent),
       fontWeight: '700',
       fontSize: 13,
@@ -1261,6 +1316,8 @@ function makeStyles(C, TC, mode) {
       borderColor: C.accent,
     },
     btnSecondaryText: {
+      flexShrink: 1,
+      textAlign: 'center',
       color: mode === 'light' ? TC.text : C.accent,
       fontWeight: '700',
       fontSize: 13,
