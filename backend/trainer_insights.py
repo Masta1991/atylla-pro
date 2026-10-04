@@ -1,5 +1,6 @@
 """Read-only session facts. No package counters, exercise rows or schedule templates."""
 from datetime import date, datetime, timedelta
+from calendar import monthrange
 from billing import WARSAW, slot_done
 
 STATES = ('done', 'planned', 'paid', 'free', 'unknown')
@@ -59,7 +60,7 @@ def totals(rows):
     return out
 
 
-def overview(events, absences, clients, year, month, client_id=None, now=None):
+def overview(events, absences, clients, year, month, client_id=None, now=None, first_record_date=None):
     now = now or datetime.now(WARSAW)
     rows = session_rows(events, absences, {str(c['id']): c['name'] for c in clients}, now)
     if client_id:
@@ -82,8 +83,26 @@ def overview(events, absences, clients, year, month, client_id=None, now=None):
     previous = [r for r in rows if previous_start.isoformat() <= r['date'] <= previous_end.replace(day=previous_cutoff).isoformat()
                 and (int(r['date'][-2:]) < previous_cutoff or cutoff > previous_end.day
                      or (year, month) != (now.year, now.month) or r['hour'] is None or r['hour'] + 1 <= now.hour)]
+    first_record_date = first_record_date or min((r['date'] for r in rows if r['state'] in ('done', 'paid')), default=None)
+    months = []
+    for m in range(1, 13):
+        stamp = f'{year:04}-{m:02}'
+        values = totals([r for r in rows if r['date'].startswith(stamp)])
+        status = ('future' if (year, m) > (now.year, now.month) else
+                  'current' if (year, m) == (now.year, now.month) else
+                  'missing' if not values['recorded'] else
+                  'partial' if first_record_date and stamp == first_record_date[:7] else 'recorded')
+        days = monthrange(year, m)[1]
+        months.append({'month': m, **values, 'coverage': status, 'calendar_days': days,
+                       'weekly_average': round(values['done'] * 7 / days, 1) if status == 'recorded' else None})
+    eligible = [m for m in months if m['weekly_average'] is not None]
+    days = sum(m['calendar_days'] for m in eligible)
+    annual = {'months': len(eligible), 'days': days, 'done': sum(m['done'] for m in eligible),
+              'paid': sum(m['paid'] for m in eligible)}
+    annual['weekly_average'] = round(annual['done'] * 7 / days, 1) if days else None
+    annual['paid_share'] = round(100 * annual['paid'] / (annual['done'] + annual['paid']), 1) if annual['done'] + annual['paid'] else None
     return {'year': year, 'month': month, 'updated_at': now.isoformat(), 'totals': totals(current),
             'previous_done': totals(previous)['done'], 'previous_label': f'{previous_start.isoformat()} – {previous_end.replace(day=previous_cutoff).isoformat()}',
-            'months': [{'month': m, **totals([r for r in rows if r['date'].startswith(f'{year:04}-{m:02}')])} for m in range(1,13)],
+            'months': months, 'annual': annual,
             'weeks': weeks, 'rows': current,
             'clients': [{'id': str(c['id']), 'name': c['name']} for c in clients]}

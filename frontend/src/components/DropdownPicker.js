@@ -11,6 +11,7 @@ export default function DropdownPicker({
   placeholder = "Wybierz opcję",
   dropdownIconColor,
   placeholderTextColor
+  , disabled = false
 }) {
   const { colors: C, themeColors, mode } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,7 +44,8 @@ export default function DropdownPicker({
         ref={triggerRef}
         accessibilityRole="button"
         accessibilityLabel={placeholder}
-        accessibilityState={{ expanded: modalVisible }}
+        accessibilityState={{ expanded: modalVisible, disabled }}
+        disabled={disabled}
         {...(Platform.OS === 'web' ? { 'aria-expanded': modalVisible, 'aria-haspopup': 'dialog' } : {})}
         onFocus={() => setFocused('trigger')} onBlur={() => setFocused(null)}
         style={[styles.container, { backgroundColor: 'transparent', borderColor: themeColors.border }, style, focusStyle('trigger')]}

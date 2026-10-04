@@ -4,7 +4,7 @@ import { MONTHS, STATUS_NAMES, PanelButton, usePanelTheme } from './TrainerPanel
 
 const HEIGHT = 280, COLUMN = 82;
 const STATES = ['done', 'paid'];
-export default function AnnualTrainingChart({ year, month, months, onSelect }) {
+export default function AnnualTrainingChart({ year, month, months, annual, onSelect }) {
   const { s, T, C, palette } = usePanelTheme();
   const scroll = useRef(null);
   const [table, setTable] = useState(false);
@@ -48,10 +48,21 @@ export default function AnnualTrainingChart({ year, month, months, onSelect }) {
         </View>
       </View>)}
     </View>}
-    <PanelButton selected={table} onPress={() => setTable(v => !v)}>{table ? 'Ukryj liczby całego roku' : 'Pokaż liczby całego roku'}</PanelButton>
-    {table && months.map(m => <View key={m.month} style={s.line}>
-      <Text style={s.title}>{MONTHS[m.month - 1]} · {m.total} sesji</Text>
-      <View style={s.row}>{STATES.map(k => <Text key={k} style={s.text}>{STATUS_NAMES[k]}: {m[k]}</Text>)}</View>
-    </View>)}
+    <PanelButton aria-expanded={table} onPress={() => setTable(v => !v)}>{table ? 'Ukryj liczby całego roku' : 'Pokaż liczby całego roku'}</PanelButton>
+    {table && <View style={{gap:12}} testID="annual-numbers">
+      {months.map(m => <View key={m.month} style={s.line}>
+        <Text style={s.title}>{MONTHS[m.month - 1]} · {m.total} zapisanych sesji</Text>
+        <View style={s.row}>{STATES.map(k => <Text key={k} style={s.text}>{STATUS_NAMES[k]}: {m[k]}</Text>)}</View>
+        <Text style={s.text}>Odbyte / tydzień: {m.weekly_average?.toLocaleString('pl-PL') ?? '—'}</Text>
+        {m.coverage!=='recorded'&&<Text style={s.muted}>{{future:'Miesiąc przed Tobą',current:'Miesiąc w toku',missing:'Brak zapisanych odbytych sesji i opłaconych odwołań',partial:'Pierwszy miesiąc historii — możliwe niepełne dane'}[m.coverage]}</Text>}
+      </View>)}
+      {annual&&<View style={[s.line,{gap:8}]}>
+        <Text style={s.title}>Zakończone miesiące z danymi: {annual.months}</Text>
+        <Text style={s.text}>Odbyte: {annual.done} · Opłacone odwołania: {annual.paid}</Text>
+        <Text style={s.title}>Średnio {annual.weekly_average?.toLocaleString('pl-PL') ?? '—'} odbytych / tydzień</Text>
+        <Text style={s.muted}>Udział opłaconych odwołań: {annual.paid_share==null?'—':annual.paid_share+'%'}</Text>
+      </View>}
+      <Text style={s.muted}>Średnia = odbyte ÷ dni kalendarzowe × 7. Suma waży miesiące liczbą dni; uwzględnia także dni bez pracy. Pomijamy pierwszy, bieżący i przyszłe miesiące oraz miesiące bez zapisów. Historia może wymagać uzupełnienia — brak zapisów nie potwierdza zera.</Text>
+    </View>}
   </View>;
 }

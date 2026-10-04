@@ -2,7 +2,7 @@
     "expo":  {
                  "name":  "Atylla Pro",
                  "slug":  "atylla-pro",
-                  "version":  "2.1.20",
+                  "version":  "2.1.21",
                  "orientation":  "portrait",
                  "icon":  "./assets/icon.png",
                  "userInterfaceStyle":  "dark",
@@ -10,7 +10,7 @@
                  "ios":  {
                              "supportsTablet":  true,
                              "bundleIdentifier":  "com.atyllapro.app",
-                             "buildNumber":  "59",
+                             "buildNumber":  "60",
                              "infoPlist":  {
                                                "ITSAppUsesNonExemptEncryption":  false
                                            }
@@ -21,7 +21,7 @@
                                                       "backgroundColor":  "#0d1117"
                                                   },
                                  "package":  "com.atyllapro.app",
-                                 "versionCode":  58
+                                 "versionCode":  59
                              },
                  "web":  {
                              "favicon":  "./assets/favicon.png"

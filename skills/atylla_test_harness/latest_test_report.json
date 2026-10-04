@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-02T16:35:31.640838+00:00",
+  "timestamp": "2026-10-04T11:57:36.967442+00:00",
   "overall_status": "PASS",
   "scope": "offline Python/API, frontend module and PGlite PostgreSQL/RLS/rollback; synthetic data",
   "not_verified": [
@@ -11,7 +11,7 @@
   "cycles": [
     {
       "cycle": 1,
-      "tests": 100,
+      "tests": 128,
       "failures": 0,
       "errors": 0
     }
@@ -50,7 +50,7 @@
     {
       "script": "scripts/check-frontend.cjs",
       "exit_code": 0,
-      "output": "{\"status\":\"PASS\",\"parsed_modules\":43}",
+      "output": "{\"status\":\"PASS\",\"parsed_modules\":46}",
       "error": ""
     },
     {
@@ -81,6 +81,12 @@
       "script": "backend/tests/offline/postgres_seasonality.test.cjs",
       "exit_code": 0,
       "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"explicit_zero_is_persisted_with_owner_and_version\",\"status\":\"PASS\"},{\"name\":\"repeatable_migration_preserves_existing_history\",\"status\":\"PASS\"},{\"name\":\"create_conflict_and_stale_update_leave_value_unchanged\",\"status\":\"PASS\"},{\"name\":\"zero_update_and_version_checked_delete\",\"status\":\"PASS\"},{\"name\":\"same_month_isolated_between_trainers_and_foreign_version_rejected\",\"status\":\"PASS\"},{\"name\":\"authenticated_direct_table_writes_are_denied\",\"status\":\"PASS\"},{\"name\":\"anonymous_cannot_read_or_execute_mutations\",\"status\":\"PASS\"},{\"name\":\"missing_actor_and_nonexistent_user_are_rejected\",\"status\":\"PASS\"},{\"name\":\"invalid_values_and_current_future_months_cannot_mutate_history\",\"status\":\"PASS\"},{\"name\":\"conflict_rolls_back_the_entire_transaction\",\"status\":\"PASS\"},{\"name\":\"user_foreign_key_cascades_only_its_own_history\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_planning.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"new_actor_needs_no_seed_and_first_revision_is_one\",\"status\":\"PASS\"},{\"name\":\"compare_and_swap_rejects_stale_and_updates_current\",\"status\":\"PASS\"},{\"name\":\"profiles_are_isolated_by_rls_and_no_caller_owner_argument\",\"status\":\"PASS\"},{\"name\":\"foreign_locked_client_and_direct_table_writes_are_denied\",\"status\":\"PASS\"},{\"name\":\"analysis_and_preferences_save_atomically\",\"status\":\"PASS\"},{\"name\":\"idempotent_retry_returns_original_even_after_profile_changes\",\"status\":\"PASS\"},{\"name\":\"request_collision_cannot_overwrite_snapshot\",\"status\":\"PASS\"},{\"name\":\"same_request_id_in_another_profile_is_separate_and_invisible\",\"status\":\"PASS\"},{\"name\":\"snapshot_failure_rolls_back_preference_write\",\"status\":\"PASS\"},{\"name\":\"analysis_stale_revision_and_foreign_proposal_clients_are_rejected\",\"status\":\"PASS\"},{\"name\":\"preserve_answers_can_add_durable_windows_but_never_remove_existing\",\"status\":\"PASS\"},{\"name\":\"invalid_sql_preferences_do_not_bypass_python_validation\",\"status\":\"PASS\"},{\"name\":\"anonymous_and_missing_actor_cannot_read_or_execute\",\"status\":\"PASS\"},{\"name\":\"authenticated_cannot_forge_snapshots_or_call_actor_helper\",\"status\":\"PASS\"},{\"name\":\"missing_result_arrays_fail_closed_without_profile_update\",\"status\":\"PASS\"},{\"name\":\"repeatable_migration_preserves_data_and_permissions\",\"status\":\"PASS\"}]}",
       "error": ""
     }
   ]

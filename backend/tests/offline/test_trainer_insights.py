@@ -13,6 +13,24 @@ def absence(i, day='2026-09-15', hour=9, **kw):
     return dict(id=str(i),trainer_id=UID,client_id=CID,absence_date=day,absence_hour=hour,**kw)
 
 class InsightsTests(unittest.TestCase):
+    def test_weekly_averages_use_calendar_days_and_weighted_period(self):
+        events = [event(i, '2024-02-12') for i in range(29)] + [event(100+i, '2024-03-12') for i in range(62)]
+        result = overview(events, [], [], 2024, 2, now=NOW, first_record_date='2023-06-01')
+        self.assertEqual(result['months'][1]['weekly_average'], 7)
+        self.assertEqual(result['months'][2]['weekly_average'], 14)
+        self.assertEqual(result['annual']['days'], 60)
+        self.assertEqual(result['annual']['weekly_average'], 10.6)
+        self.assertEqual(result['months'][0]['coverage'], 'missing')
+        self.assertIsNone(result['months'][0]['weekly_average'])
+
+    def test_first_current_future_months_do_not_distort_average(self):
+        events = [event(1, '2026-07-01'), event(2, '2026-08-01'), event(3, '2026-09-01'), event(4, '2026-10-01')]
+        result = overview(events, [], [], 2026, 9, now=NOW, first_record_date='2026-07-01')
+        self.assertEqual(result['months'][6]['coverage'], 'partial')
+        self.assertEqual(result['months'][8]['coverage'], 'current')
+        self.assertEqual(result['months'][9]['coverage'], 'future')
+        self.assertEqual(result['annual']['months'], 1)
+
     def test_four_states_and_session_identity(self):
         events=[event(1,partner_client_id='partner'),event(2,hour=10),event(3,hour=12,status='cancelled',settled=True),
                 event(4,hour=13,status='cancelled'),event(5,hour=15,status='deleted'),event(6,hour=16,status='deleted')]

@@ -2,12 +2,20 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
+import TrainerSection from '../components/TrainerSection';
 import DropdownPicker from '../components/DropdownPicker';
 import { MONTHS, PanelButton, LoadState, usePanelTheme } from '../components/TrainerPanels';
 import { openDialog, showError } from '../services/confirm';
 import * as api from '../services/api';
 
 export default function SeasonalityScreen({ navigation }) {
+  const {s}=usePanelTheme();
+  return <AppLayout navigation={navigation} title="Raport sezonowości" showBack>
+    <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled"><SeasonalityContent/></ScrollView>
+  </AppLayout>;
+}
+
+export function SeasonalityContent() {
   const { s, C, T } = usePanelTheme();
   const now = new Date();
   const initial = useRef({ from: Math.max(2000, now.getFullYear() - 4), to: now.getFullYear() });
@@ -15,6 +23,7 @@ export default function SeasonalityScreen({ navigation }) {
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [editYear, setEditYear] = useState(now.getFullYear() - 1), [editMonth, setEditMonth] = useState(1), [count, setCount] = useState('');
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const [editor,setEditor]=useState(false);
   const sequence = useRef(0), lock = useRef(false), formRef = useRef(null), generateRef = useRef(null), restoreFocus = useRef(false);
   const load = useCallback(async (start, end) => {
     const seq = ++sequence.current; setLoading(true); setError('');
@@ -73,9 +82,8 @@ export default function SeasonalityScreen({ navigation }) {
   const quiet = data?.seasonal.filter(m => m.recurring_quiet) || [];
   const busyMonths = data?.seasonal.filter(m => m.recurring_busy) || [];
   const extremum = rows => rows?.length ? rows.map(r => `${MONTHS[r.month - 1]} ${r.year}: ${r.count}`).join(' · ') : 'Za mało zakończonych miesięcy z danymi.';
-  return <AppLayout navigation={navigation} title="Raport sezonowości" showBack>
-    <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-      <Text style={s.heading}>Jak zmienia się Twój rok pracy?</Text>
+  return <>
+      <Text style={s.heading}>Zaplanuj swój rok</Text>
       <Text style={s.muted}>Porównuj treningi odbyte i odwołane opłacone. Wspólny trening liczy się jako jedna sesja trenera.</Text>
       <View style={s.card}>
         <View style={s.row}>
@@ -86,21 +94,22 @@ export default function SeasonalityScreen({ navigation }) {
       </View>
       <LoadState loading={loading} error={error} retry={generate}/>
       {!loading && !error && data && <>
-        <View style={s.card}>
-          <Text style={s.title}>Najbardziej i najmniej pracowite miesiące</Text>
+        <View style={s.card} testID="seasonality-patterns">
+          <Text style={s.muted}>URLOP I SPOKOJNIEJSZY OKRES</Text>
+          <Text style={s.heading}>{quiet.length ? quiet.map(m => MONTHS[m.month - 1]).join(', ') : 'Potrzebujemy więcej historii'}</Text>
+          <Text style={s.text}>{quiet.length ? 'Te miesiące powtarzają się wśród spokojniejszych w pełnych latach. Rozważ w nich dłuższą przerwę, sprawdzając wcześniej aktualne rezerwacje.' : 'Nie ma jeszcze wystarczająco zgodnego wzorca spokojniejszych miesięcy. Uzupełnij historię; nie będziemy zgadywać terminu urlopu.'}</Text>
+          <Text style={s.muted}>WIĘKSZE OBŁOŻENIE</Text>
+          <Text style={s.heading}>{busyMonths.length ? busyMonths.map(m => MONTHS[m.month - 1]).join(', ') : 'Brak potwierdzonego wzorca'}</Text>
+          <Text style={s.text}>{busyMonths.length ? 'W tych miesiącach warto wcześniej uzgodnić stałe terminy i zostawić więcej dostępności dla klientów. To wskazówka z historii, nie prognoza popytu.' : 'Wnioski pojawią się, gdy miesiące z większą liczbą sesji będą powtarzać się w porównywalnych latach.'}</Text>
+          <Text style={s.muted}>Podstawa: pełne lata {data.comparable_years.join(', ') || '— brak pełnych lat do porównania'}.</Text>
+        </View>
+        <TrainerSection title="Jak powstają wnioski?">
           <Text style={s.text}>Najwięcej treningów: {extremum(data.best)}</Text>
           <Text style={s.text}>Najmniej treningów: {extremum(data.worst)}</Text>
           <Text style={s.muted}>Ranking pomija brakujące dane, miesiąc bieżący i pierwszy miesiąc zapisów aplikacji. Ręczny wpis oznacza pełny wynik miesiąca.</Text>
-        </View>
-        <View style={s.card} testID="seasonality-patterns">
-          <Text style={s.title}>Kiedy rozważyć urlop?</Text>
-          <Text style={s.text}>{quiet.length ? `Powtarzające się spokojniejsze miesiące: ${quiet.map(m => MONTHS[m.month - 1]).join(', ')}.` : 'Za mało zgodnych danych, aby wskazać powtarzający się spokojny sezon.'}</Text>
-          {!!busyMonths.length && <Text style={s.text}>Powtarzające się intensywne miesiące: {busyMonths.map(m => MONTHS[m.month - 1]).join(', ')}.</Text>}
-          <Text style={s.muted}>Porównane pełne lata: {data.comparable_years.join(', ') || 'brak'}. Szukamy miesięcy w trzech najspokojniejszych lub najbardziej intensywnych w danym roku, powtarzających się w co najmniej dwóch i ⅔ pełnych lat. Lata bez zróżnicowania pomijamy.</Text>
-          <Text style={s.muted}>To opis historii zapisanych treningów. Przed wyborem urlopu sprawdź też aktualne rezerwacje.</Text>
-        </View>
-        <View style={s.card}>
-          <Text style={s.title}>Miesiąc do miesiąca w kolejnych latach</Text>
+          <Text style={s.muted}>Szukamy miesięcy w trzech najspokojniejszych lub najbardziej intensywnych w danym roku, powtarzających się w co najmniej dwóch i ⅔ pełnych lat. Lata bez zróżnicowania pomijamy. Liczymy odbyte sesje i opłacone odwołania.</Text>
+        </TrainerSection>
+        <TrainerSection title="Porównaj liczby miesiąc po miesiącu">
           <Text style={s.muted}>Przewiń tabelę w bok. Wybierz zakończony miesiąc, aby uzupełnić lub poprawić jego wynik.</Text>
           <ScrollView horizontal testID="seasonality-table">
             <View>
@@ -112,7 +121,7 @@ export default function SeasonalityScreen({ navigation }) {
                   const past = y.year < now.getFullYear() || y.year === now.getFullYear() && i < now.getMonth();
                   return <PanelButton key={y.year} style={{ width: 100, margin: 2, paddingHorizontal: 6 }} disabled={!past || busy}
                     label={`${name} ${y.year}: ${cell.count == null ? 'brak danych' : cell.count}, ${cell.source === 'manual' ? 'ręcznie' : cell.source === 'app' ? 'aplikacja' : 'brak danych'}`}
-                    onPress={() => { setEditYear(y.year); setEditMonth(i + 1); setMessage(''); requestAnimationFrame(() => formRef.current?.focus()); }}>
+                    onPress={() => { setEditYear(y.year); setEditMonth(i + 1); setEditor(true); setMessage(''); requestAnimationFrame(() => formRef.current?.focus()); }}>
                     <Text style={s.title}>{cell.count ?? '—'}</Text>
                     <Text style={[s.muted, { fontSize: 11 }]}>{cell.source === 'manual' ? 'Ręcznie' : cell.source === 'app' ? 'Aplikacja' : 'Brak danych'}{cell.partial && cell.count != null ? ' · część' : ''}</Text>
                   </PanelButton>;
@@ -121,9 +130,8 @@ export default function SeasonalityScreen({ navigation }) {
             </View>
           </ScrollView>
           <Text style={s.muted}>„—” oznacza brak danych, a 0 to jawnie wpisany miesiąc bez treningów. Wyniki z aplikacji odzwierciedlają zapisane sesje i mogą wymagać uzupełnienia starszej historii.</Text>
-        </View>
-        <View style={s.card} testID="historical-month-editor">
-          <Text style={s.title}>Uzupełnij dane historyczne</Text>
+        </TrainerSection>
+        <TrainerSection title="Uzupełnij dane historyczne" open={editor} onToggle={v=>{if(!busy)setEditor(v);}} testID="historical-month-editor">
           <View style={s.row}>
             <DropdownPicker accessibilityLabel="Rok historii" placeholder="Rok historii" selectedValue={editYear} onValueChange={v => { if (!busy) setEditYear(Number(v)); }} style={{ flex: 1, minWidth: 100 }} items={data.years.map(y => ({ label: String(y.year), value: y.year }))}/>
             <DropdownPicker accessibilityLabel="Miesiąc historii" placeholder="Miesiąc historii" selectedValue={editMonth} onValueChange={v => { if (!busy) setEditMonth(Number(v)); }} style={{ flex: 1, minWidth: 130 }} items={MONTHS.map((label, i) => ({ label, value: i + 1 }))}/>
@@ -135,16 +143,14 @@ export default function SeasonalityScreen({ navigation }) {
           <PanelButton disabled={!historical || busy} onPress={() => save()}>{busy ? 'Zapisywanie…' : 'Zapisz miesiąc'}</PanelButton>
           {selected?.source === 'manual' && <PanelButton disabled={busy} onPress={() => save(true)}>Usuń ręczny wpis</PanelButton>}
           {!!message && <Text accessibilityLiveRegion="polite" role="status" style={s.text}>{message}</Text>}
-        </View>
-        <View style={s.card}>
-          <Text style={s.title}>Średnia liczba treningów według miesiąca</Text>
+        </TrainerSection>
+        <TrainerSection title="Średnia liczba treningów według miesiąca">
           {data.seasonal.map(m => <View key={m.month} style={{ gap: 4 }}>
             <Text style={s.text}>{MONTHS[m.month - 1]}: {m.average ?? '—'} · liczba lat z danymi: {m.samples}</Text>
             <View accessibilityElementsHidden aria-hidden style={{ height: 8, backgroundColor: T.border, borderRadius: 4 }}><View style={{ width: `${100 * (m.average || 0) / Math.max(1, ...data.seasonal.map(x => x.average || 0))}%`, height: 8, borderRadius: 4, backgroundColor: C.accent }}/></View>
           </View>)}
           <Text style={s.muted}>Średnie opisują dostępne zakończone miesiące. Różna liczba lat i wzrost firmy mogą wpływać na ich porównanie.</Text>
-        </View>
+        </TrainerSection>
       </>}
-    </ScrollView>
-  </AppLayout>;
+  </>;
 }

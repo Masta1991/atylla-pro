@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from routers import clients, calendar, workouts, measurements, config_router, auth, trainer
+from routers import clients, calendar, workouts, measurements, config_router, auth, trainer, planning
 import config as runtime_settings
 from runtime_config import ConfigurationError, validate_config
 
@@ -17,7 +17,7 @@ async def lifespan(app):
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.1.20",
+    version="2.1.21",
     lifespan=lifespan,
 )
 
@@ -69,6 +69,7 @@ app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(calendar.router)
 app.include_router(trainer.router)
+app.include_router(planning.router)
 app.include_router(workouts.router)
 app.include_router(measurements.router)
 app.include_router(config_router.router)
@@ -155,7 +156,6 @@ if os.path.isdir(STATIC_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 
 
 

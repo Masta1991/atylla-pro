@@ -1,0 +1,2136 @@
+{
+  "baseline": false,
+  "build": "C:\\Projects\\Development\\atylla-pro\\.tmp\\release-2.1.21\\production-build",
+  "results": [
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+          ]
+        }
+      ],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "overview",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "annual",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "weeks",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "planning",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "dropdown",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "protected-break",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "questions",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "write-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "report",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "read-error",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "conflict-recovery",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "season",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "history-editor",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "name": "settings",
+      "overflow": false,
+      "hiddenFocus": false,
+      "brokenImages": 0,
+      "violations": [],
+      "introduced": []
+    }
+  ],
+  "functional": [
+    {
+      "theme": "light",
+      "width": 390,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 1366,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "light",
+      "width": 720,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 1366,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    },
+    {
+      "theme": "dark",
+      "width": 720,
+      "status": "PASS",
+      "errors": [],
+      "blocked": [],
+      "writes": 5
+    }
+  ],
+  "status": "PASS",
+  "visual_review": "14 montage sheets and full-size mobile/desktop views inspected; no blocking layout defect",
+  "scope": "Synthetic API, reviewed exact production artifact; no real customer writes",
+  "limits": [
+    "Physical device not tested",
+    "Authenticated production browser session not tested"
+  ]
+}

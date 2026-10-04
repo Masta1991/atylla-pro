@@ -809,3 +809,11 @@ export function saveHistoricalMonth(year, month, data) {
 export function deleteHistoricalMonth(year, month, expectedUpdatedAt) {
   return request(`/trainer/history/${year}/${month}`, {method:'DELETE', body:{expected_updated_at:expectedUpdatedAt}});
 }
+
+// Trainer planning: all ownership is established by the authenticated API.
+export const getPlanningPreferences = () => request('/trainer/planning/preferences');
+export const savePlanningPreferences = data => request('/trainer/planning/preferences', {method:'PUT',body:data});
+export const getPlanningContext = months => request(`/trainer/planning/context?months=${months}`);
+export const createPlanningAnalysis = data => request('/trainer/planning/analyses', {method:'POST',body:data});
+export const getPlanningAnalyses = () => request('/trainer/planning/analyses');
+export const getPlanningAnalysis = id => request(`/trainer/planning/analyses/${encodeURIComponent(id)}`);

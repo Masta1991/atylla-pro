@@ -27,7 +27,17 @@ def get_overview(request: Request, year: int = Query(..., ge=2000, le=2100), mon
         raise HTTPException(404, 'Nie znaleziono klienta.')
     # Previous December is needed for January's like-for-like comparison.
     events, absences = read_facts(db, actor, date(year-1, 12, 1), date(year, 12, 31))
-    return overview(events, absences, clients, year, month, client_id)
+    first_rows = []
+    for status in ('active', 'cancelled'):
+        query = db.table('calendar_events').select('event_date').eq('trainer_id', actor).eq('status', status)
+        if status == 'cancelled':
+            query = query.eq('is_settled', True)
+        if client_id:
+            # The separate client report uses its own observed history.
+            continue
+        first_rows.extend(query.order('event_date').limit(1).execute().data or [])
+    first = min((r['event_date'] for r in first_rows), default=None)
+    return overview(events, absences, clients, year, month, client_id, first_record_date=first)
 
 
 def monday_date(value):

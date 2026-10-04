@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../assets/theme';
 import { useTheme, THEMES, BAR_STYLES } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
+import TrainerPlanning from '../components/TrainerPlanning';
+import TrainerSection from '../components/TrainerSection';
 import * as api from '../services/api';
 import { APP_VERSION } from '../version';
 
@@ -105,6 +107,9 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
 
+
+        <Text style={styles.sectionTitle}>Organizacja pracy</Text>
+        <TrainerSection title="Ustawienia pracy trenera"><TrainerPlanning settingsOnly navigation={navigation}/></TrainerSection>
 
         <Text style={styles.sectionTitle}>Aktualizacja</Text>
         <View style={[styles.navButton, { flexDirection: 'column', alignItems: 'stretch', padding: 16 }]}>
