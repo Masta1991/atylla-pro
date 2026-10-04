@@ -30,20 +30,21 @@ export default function PaymentsScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const isClientView = route?.name === 'ClientPayments';
   const [expandedClientId, setExpandedClientId] = useState(isClientView ? route?.params?.clientId : null);
-  const [moreClientId, setMoreClientId] = useState(null);
+  const [search, setSearch] = useState('');
+  const normalizeName = value => String(value || '').toLocaleLowerCase('pl')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l');
+  const searchWords = normalizeName(search).trim().split(/\s+/).filter(Boolean);
   const toggleClient = id => {
     setExpandedClientId(current => current === id ? null : id);
-    setMoreClientId(null);
   };
   useEffect(() => {
     if (isClientView) {
       setExpandedClientId(route?.params?.clientId || null);
-      setMoreClientId(null);
     }
   }, [isClientView, route?.params?.clientId]);
   const visibleClients = isClientView
     ? clients.filter(client => client.id === route?.params?.clientId)
-    : clients;
+    : clients.filter(client => searchWords.every(word => normalizeName(client.name).includes(word)));
   
   // History modal states
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
@@ -557,6 +558,7 @@ export default function PaymentsScreen({ navigation, route }) {
     <AppLayout navigation={navigation} title="Rozliczenia" showBack>
       <ScrollView
         contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
       >
         <Text style={styles.title}>{isClientView ? 'Rozliczenia klienta' : 'Status Płatności Podopiecznych'}</Text>
@@ -564,6 +566,18 @@ export default function PaymentsScreen({ navigation, route }) {
           ? 'Pakiet, bieżące rozliczenie i historia wybranej osoby.'
           : 'Sprawdź statusy pakietów oraz rozliczenia miesięczne swoich klientów.'}</Text>
         
+        {!isClientView && <TextInput
+          accessibilityLabel="Szukaj klienta po imieniu lub nazwisku"
+          placeholder="Szukaj klienta"
+          placeholderTextColor={themeColors.textSecondary}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          style={styles.searchInput}
+        />}
+
         {visibleClients.map(client => {
           const isPackage = client.billing_type === 'package';
           const isSingle = client.billing_type === 'single' || (!client.billing_type && !isPackage);
@@ -695,26 +709,15 @@ export default function PaymentsScreen({ navigation, route }) {
 
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityState={{ expanded: moreClientId === client.id }}
-                  accessibilityLabel="Więcej"
-                  aria-expanded={moreClientId === client.id}
-                  aria-controls={`payment-more-${client.id}`}
-                  style={[styles.btn, styles.btnSecondary, { minWidth: '100%' }]}
-                  onPress={() => setMoreClientId(current => current === client.id ? null : client.id)}
-                >
-                  <Text style={styles.btnSecondaryText}>Więcej</Text>
-                  <Ionicons name={moreClientId === client.id ? 'chevron-up' : 'ellipsis-horizontal'} size={18} color={C.accent} />
-                </TouchableOpacity>
-                {moreClientId === client.id && <TouchableOpacity
-                  nativeID={`payment-more-${client.id}`}
+                  accessibilityLabel="Twardy reset"
                   style={[styles.btn, { flex: 1, minWidth: '100%', backgroundColor: 'transparent', borderColor: themeColors.danger, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 6, marginTop: 4 }]}
                   onPress={() => handleHardReset(client)}
                 >
                   <Ionicons name="warning-outline" size={16} color={themeColors.danger} />
                   <Text style={{ color: themeColors.danger, fontWeight: '600', fontSize: 13 }}>
-                    Twardy Reset (Wyzeruj)
+                    Twardy reset
                   </Text>
-                </TouchableOpacity>}
+                </TouchableOpacity>
               </View>
               </View>}
             </View>
@@ -724,7 +727,7 @@ export default function PaymentsScreen({ navigation, route }) {
         {visibleClients.length === 0 && (
           <View style={styles.emptyContainer}>
             <Ionicons name="people-outline" size={48} color={themeColors.textMuted} />
-            <Text style={styles.emptyText}>{isClientView ? 'Nie znaleziono wybranego klienta. Wróć do kalendarza i odśwież dane.' : 'Brak klientów do wyświetlenia.'}</Text>
+            <Text style={styles.emptyText}>{isClientView ? 'Nie znaleziono wybranego klienta. Wróć do kalendarza i odśwież dane.' : searchWords.length ? 'Brak klientów pasujących do wyszukiwania' : 'Brak klientów do wyświetlenia.'}</Text>
           </View>
         )}
       </ScrollView>
@@ -1157,6 +1160,7 @@ function makeStyles(C, TC, mode) {
       color: TC.textSecondary,
       marginBottom: SPACING.lg,
     },
+    searchInput: { minHeight: 46, borderWidth: 1, borderColor: TC.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: TC.surface, color: TC.text, fontSize: 16, marginBottom: SPACING.md },
     card: {
       backgroundColor: TC.surface,
       borderRadius: 16,
