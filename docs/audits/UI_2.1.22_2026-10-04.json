@@ -1,0 +1,4558 @@
+{
+  "version": "2.1.22",
+  "status": "PASS",
+  "verified_at_utc": "2026-10-04T12:57:08.012168+00:00",
+  "reference": "atylla-strefa-trenera.html; original approved local conversation visualization",
+  "bundle": "index-a83e0f7171d26977d4731cf5cc4b8625.js",
+  "bundle_sha256": "c9e6394528e32d12307f7a737678251bed64d84054caefbdc283ad46622861ba",
+  "full_matrix": {
+    "artifact": "production-build-2",
+    "states": 224,
+    "variants": 14,
+    "report": {
+      "baseline": false,
+      "build": "C:\\Projects\\Development\\atylla-pro\\.tmp\\release-2.1.22\\production-build-2",
+      "results": [
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        }
+      ],
+      "functional": [
+        {
+          "theme": "light",
+          "width": 390,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        }
+      ]
+    }
+  },
+  "final_matrix": {
+    "artifact": "production-build-final",
+    "states": 128,
+    "variants": 14,
+    "scope": "Full functional flow at 390 px in both themes; changed overview and seasonality at all remaining widths, including missing/future values and year selection",
+    "report": {
+      "baseline": false,
+      "build": "C:\\Projects\\Development\\atylla-pro\\.tmp\\release-2.1.22\\production-build-final",
+      "results": [
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [
+            {
+              "id": "color-contrast",
+              "nodes": [
+                "<div dir=\"auto\" class=\"css-146c3p1 r-832o92 r-1b43r93 r-b88u0q r-ud0q2t r-15d164r r-11c0sde r-tsynxw\">Aktualizacja</div>"
+              ]
+            }
+          ],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "planning",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "dropdown",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "protected-break",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "questions",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "write-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "report",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "read-error",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "conflict-recovery",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "settings",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "future-month",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "weeks",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "season",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "history-editor",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        }
+      ],
+      "functional": [
+        {
+          "theme": "light",
+          "width": 390,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "status": "PASS",
+          "errors": [],
+          "blocked": [],
+          "writes": 5
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "status": "PASS",
+          "scope": "Final changed overview and seasonality",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        }
+      ]
+    }
+  },
+  "release_matrix": {
+    "artifact": "production-build-release",
+    "states": 56,
+    "variants": 14,
+    "scope": "Only change after final matrix: paid-cancellation column flex weight 1 to 1.3 to prevent broken header word at 320 px; all annual header text occupies at most two lines",
+    "report": {
+      "baseline": false,
+      "build": "C:\\Projects\\Development\\atylla-pro\\.tmp\\release-2.1.22\\production-build-release",
+      "results": [
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "overview",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "period-menu",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "name": "annual-table",
+          "overflow": false,
+          "hiddenFocus": false,
+          "brokenImages": 0,
+          "violations": [],
+          "introduced": []
+        }
+      ],
+      "functional": [
+        {
+          "theme": "light",
+          "width": 390,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 320,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 768,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1024,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1366,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 1440,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "light",
+          "width": 720,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 390,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 320,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 768,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1024,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1366,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 1440,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        },
+        {
+          "theme": "dark",
+          "width": 720,
+          "status": "PASS",
+          "scope": "Release artifact overview and annual table typography",
+          "errors": [],
+          "blocked": [],
+          "writes": 0
+        }
+      ]
+    }
+  },
+  "visual_review": "All 14 full-matrix montages and final changed-state montages inspected; reference rendered at matching widths/themes",
+  "independent_review": "Both P2 fixes confirmed; no open findings in final scoped review",
+  "test_harness_corrections": [
+    "Income assertion scoped to its synthetic proposal",
+    "Virtualized year list scrolled progressively before choosing 2024 at low viewport height"
+  ],
+  "limits": [
+    "Synthetic API, no authenticated production writes",
+    "No physical device test",
+    "Existing accessibility violations retained in report; no introduced serious/critical violations vs 2.1.21"
+  ]
+}

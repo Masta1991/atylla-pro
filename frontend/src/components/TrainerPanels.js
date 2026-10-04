@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
@@ -12,8 +12,17 @@ export const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,
 export const mondayOf = d => {const n = new Date(d); n.setDate(n.getDate() - (n.getDay()+6)%7); return n;};
 export const addDays = (day, n) => {const d = new Date(day+'T12:00:00'); d.setDate(d.getDate()+n); return iso(d);};
 
+// Scoped to the approved trainer mockup; other reports retain their own layout.
+const TrainerDesign = createContext(false);
+export const TrainerDesignProvider = ({children}) => <TrainerDesign.Provider value>{children}</TrainerDesign.Provider>;
+
 export function usePanelTheme() {
-  const {colors: C, themeColors: T, mode} = useTheme();
+  const {colors, themeColors, mode} = useTheme();
+  const design = useContext(TrainerDesign);
+  const T = useMemo(() => !design ? themeColors : {...themeColors, ...(mode==='light'
+    ? {background:'#faf7f1',surface:'#fffdfa',raised:'#f2e9dd',text:'#3c3429',textSecondary:'#746856',border:'#e7dccd',copper:'#9b6245'}
+    : {background:'#0d1117',surface:'#171d25',raised:'#222a35',text:'#e7edf3',textSecondary:'#a4aebc',border:'#303844',copper:'#d09a78'})},[design,themeColors,mode]);
+  const C = design ? {...colors,accent:'#c68b6d'} : colors;
   const {width} = useWindowDimensions();
   const palette = mode === 'light'
     ? {done:'#087a54', planned:'#825400', paid:'#a04400', free:'#bc2929', unknown:'#586171'}
@@ -26,8 +35,21 @@ export function usePanelTheme() {
     buttonText:{color:T.text,fontSize:14,fontWeight:'600'}, grid:{flexDirection:'row',flexWrap:'wrap',gap:10},
     metric:{flexGrow:1,flexBasis:width>=768?'22%':'45%',minWidth:120}, number:{fontSize:30,fontWeight:'800',color:T.text},
     line:{borderTopColor:T.border,borderTopWidth:1,paddingTop:12,gap:5}, error:{color:T.danger,fontSize:14,lineHeight:21},
-  }),[T,width]);
-  return {C,T,s,palette};
+    ...(design?{
+      scroll:{padding:16,paddingTop:12,paddingBottom:140,gap:20,width:'100%',maxWidth:768,alignSelf:'center'},
+      card:{backgroundColor:T.surface,borderColor:T.border,borderWidth:1,borderRadius:16,padding:16,gap:14},
+      heading:{color:T.text,fontSize:21,lineHeight:27,fontWeight:'700',letterSpacing:-0.4},
+      title:{color:T.text,fontSize:15,lineHeight:21,fontWeight:'700'},
+      muted:{color:T.textSecondary,fontSize:12,lineHeight:18},
+      button:{borderColor:T.border,borderWidth:1,borderRadius:10,minHeight:44,paddingVertical:9,paddingHorizontal:12,justifyContent:'center'},
+      note:{borderLeftWidth:3,borderLeftColor:T.copper,paddingLeft:12,gap:5},
+      kicker:{color:T.copper,fontSize:12,fontWeight:'700',letterSpacing:1,textTransform:'uppercase'},
+      link:{borderWidth:0,paddingHorizontal:0,alignSelf:'flex-start'},
+      evidence:{backgroundColor:T.raised,borderRadius:9,padding:12,flexDirection:'row',justifyContent:'space-between',gap:12},
+      comparison:{backgroundColor:T.raised,borderRadius:12,padding:14,flexDirection:'row',gap:12},
+    }:{}),
+  }),[T,width,design]);
+  return {C,T,s,palette,design};
 }
 
 export function PanelButton({children,onPress,disabled,selected,style,label,...rest}) {
@@ -83,13 +105,14 @@ export function LoadState({loading,error,retry}) {
   return null;
 }
 
-export function SessionList({rows,navigation,title='Treningi',empty='Brak wpisów w wybranym okresie.'}) {
+export function SessionList({rows,navigation,title='Treningi',empty='Brak wpisów w wybranym okresie.',compact=false}) {
   const {s,palette}=usePanelTheme();const [limit,setLimit]=useState(30);
-  return <View style={s.card}>
-    <Text style={s.title}>{title} · {rows.length}</Text>
+  return <View style={compact?{gap:0}:s.card}>
+    {!compact&&<Text style={s.title}>{title} · {rows.length}</Text>}
     {!rows.length&&<Text style={s.muted}>{empty}</Text>}
     {rows.slice(0,limit).map(r=><PanelButton key={r.id} onPress={()=>new Date(r.date+'T12:00:00').getDay()===0
       ? navigation.navigate('WeekSummary',{weekOf:r.date}) : navigation.navigate('Calendar',{focusDate:r.date,focusHour:r.hour})}
+      style={compact?{borderWidth:0,borderBottomWidth:1,paddingHorizontal:0,borderRadius:0,paddingVertical:10}:null}
       label={`${r.name}, ${r.date}, ${r.hour==null?'cały dzień':r.hour+':00'}, ${STATUS_NAMES[r.state]}. Otwórz kalendarz`}>
       <Text style={s.title}>{r.name}</Text>
       <Text style={s.muted}>{r.date} · {r.hour==null?'cały dzień':`${r.hour}:00`}</Text>

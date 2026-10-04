@@ -4,18 +4,21 @@ import { useFocusEffect } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
 import TrainerSection from '../components/TrainerSection';
 import DropdownPicker from '../components/DropdownPicker';
-import { MONTHS, PanelButton, LoadState, usePanelTheme } from '../components/TrainerPanels';
+import { TrainerDesignProvider, MONTHS, PanelButton, LoadState, usePanelTheme } from '../components/TrainerPanels';
 import { openDialog, showError } from '../services/confirm';
 import * as api from '../services/api';
 
 export default function SeasonalityScreen({ navigation }) {
+  return <TrainerDesignProvider><SeasonalityPage navigation={navigation}/></TrainerDesignProvider>;
+}
+function SeasonalityPage({navigation}) {
   const {s}=usePanelTheme();
   return <AppLayout navigation={navigation} title="Raport sezonowości" showBack>
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled"><SeasonalityContent/></ScrollView>
   </AppLayout>;
 }
 
-export function SeasonalityContent() {
+export function SeasonalityContent({onOverview}) {
   const { s, C, T } = usePanelTheme();
   const now = new Date();
   const initial = useRef({ from: Math.max(2000, now.getFullYear() - 4), to: now.getFullYear() });
@@ -81,34 +84,33 @@ export function SeasonalityContent() {
   }
   const quiet = data?.seasonal.filter(m => m.recurring_quiet) || [];
   const busyMonths = data?.seasonal.filter(m => m.recurring_busy) || [];
+  const changeRange=(start,end)=>{setFrom(String(start));setTo(String(end));initial.current={from:start,to:end};setMessage('');load(start,end);};
+  const evidence=months=>{
+    const cells=data?.cells.filter(c=>data.comparable_years.includes(c.year)&&months.some(m=>m.month===c.month)&&c.count!=null)||[];
+    return cells.length?Math.round(cells.reduce((sum,c)=>sum+c.count,0)/cells.length):null;
+  };
   const extremum = rows => rows?.length ? rows.map(r => `${MONTHS[r.month - 1]} ${r.year}: ${r.count}`).join(' · ') : 'Za mało zakończonych miesięcy z danymi.';
   return <>
-      <Text style={s.heading}>Zaplanuj swój rok</Text>
-      <Text style={s.muted}>Porównuj treningi odbyte i odwołane opłacone. Wspólny trening liczy się jako jedna sesja trenera.</Text>
-      <View style={s.card}>
-        <View style={s.row}>
-          <View style={{ flex: 1, minWidth: 100 }}><Text style={s.text}>Od roku</Text><TextInput ref={generateRef} accessibilityLabel="Od roku" style={input} value={from} onChangeText={setFrom} keyboardType="numeric" maxLength={4} editable={!busy}/></View>
-          <View style={{ flex: 1, minWidth: 100 }}><Text style={s.text}>Do roku</Text><TextInput accessibilityLabel="Do roku" style={input} value={to} onChangeText={setTo} keyboardType="numeric" maxLength={4} editable={!busy}/></View>
-        </View>
-        <PanelButton disabled={loading || busy} onPress={generate}>Wygeneruj raport</PanelButton>
+      <View style={{gap:8}}><Text style={s.kicker}>Raport sezonowości</Text><Text style={s.heading}>Zaplanuj swój rok</Text>
+      <Text style={s.muted}>Gotowe wnioski z Twojej historii treningów.</Text></View>
+      <View style={{flexDirection:'row',gap:12}}>
+        <View style={{flex:1,gap:6}}><Text style={s.muted}>Od roku</Text><DropdownPicker placeholder="Od roku" selectedValue={Number(from)} disabled={busy} style={input} items={Array.from({length:now.getFullYear()-1999},(_,i)=>({label:String(2000+i),value:2000+i}))} onValueChange={v=>changeRange(Number(v),Math.max(Number(v),Math.min(Number(to),Number(v)+9)))}/></View>
+        <View style={{flex:1,gap:6}}><Text style={s.muted}>Do roku</Text><DropdownPicker placeholder="Do roku" selectedValue={Number(to)} disabled={busy} style={input} items={Array.from({length:now.getFullYear()-1999},(_,i)=>({label:String(2000+i),value:2000+i}))} onValueChange={v=>changeRange(Math.min(Number(v),Math.max(Number(from),Number(v)-9)),Number(v))}/></View>
       </View>
       <LoadState loading={loading} error={error} retry={generate}/>
       {!loading && !error && data && <>
         <View style={s.card} testID="seasonality-patterns">
-          <Text style={s.muted}>URLOP I SPOKOJNIEJSZY OKRES</Text>
+          <Text style={s.kicker}>URLOP I SPOKOJNIEJSZY OKRES</Text>
           <Text style={s.heading}>{quiet.length ? quiet.map(m => MONTHS[m.month - 1]).join(', ') : 'Potrzebujemy więcej historii'}</Text>
           <Text style={s.text}>{quiet.length ? 'Te miesiące powtarzają się wśród spokojniejszych w pełnych latach. Rozważ w nich dłuższą przerwę, sprawdzając wcześniej aktualne rezerwacje.' : 'Nie ma jeszcze wystarczająco zgodnego wzorca spokojniejszych miesięcy. Uzupełnij historię; nie będziemy zgadywać terminu urlopu.'}</Text>
-          <Text style={s.muted}>WIĘKSZE OBŁOŻENIE</Text>
+          {evidence(quiet)!=null&&<View style={s.evidence}><Text style={s.muted}>Średnio w tych miesiącach</Text><Text style={s.title}>{evidence(quiet)} sesji</Text></View>}
+          <View style={{borderTopWidth:1,borderTopColor:T.border}}/>
+          <Text style={s.kicker}>WIĘKSZE OBŁOŻENIE</Text>
           <Text style={s.heading}>{busyMonths.length ? busyMonths.map(m => MONTHS[m.month - 1]).join(', ') : 'Brak potwierdzonego wzorca'}</Text>
           <Text style={s.text}>{busyMonths.length ? 'W tych miesiącach warto wcześniej uzgodnić stałe terminy i zostawić więcej dostępności dla klientów. To wskazówka z historii, nie prognoza popytu.' : 'Wnioski pojawią się, gdy miesiące z większą liczbą sesji będą powtarzać się w porównywalnych latach.'}</Text>
-          <Text style={s.muted}>Podstawa: pełne lata {data.comparable_years.join(', ') || '— brak pełnych lat do porównania'}.</Text>
+          {evidence(busyMonths)!=null&&<View style={s.evidence}><Text style={s.muted}>Średnio w tych miesiącach</Text><Text style={s.title}>{evidence(busyMonths)} sesji</Text></View>}
         </View>
-        <TrainerSection title="Jak powstają wnioski?">
-          <Text style={s.text}>Najwięcej treningów: {extremum(data.best)}</Text>
-          <Text style={s.text}>Najmniej treningów: {extremum(data.worst)}</Text>
-          <Text style={s.muted}>Ranking pomija brakujące dane, miesiąc bieżący i pierwszy miesiąc zapisów aplikacji. Ręczny wpis oznacza pełny wynik miesiąca.</Text>
-          <Text style={s.muted}>Szukamy miesięcy w trzech najspokojniejszych lub najbardziej intensywnych w danym roku, powtarzających się w co najmniej dwóch i ⅔ pełnych lat. Lata bez zróżnicowania pomijamy. Liczymy odbyte sesje i opłacone odwołania.</Text>
-        </TrainerSection>
+        <Text style={s.muted}>Podstawa: pełne lata {data.comparable_years.join(', ') || '— brak pełnych lat do porównania'}.</Text>
         <TrainerSection title="Porównaj liczby miesiąc po miesiącu">
           <Text style={s.muted}>Przewiń tabelę w bok. Wybierz zakończony miesiąc, aby uzupełnić lub poprawić jego wynik.</Text>
           <ScrollView horizontal testID="seasonality-table">
@@ -133,8 +135,8 @@ export function SeasonalityContent() {
         </TrainerSection>
         <TrainerSection title="Uzupełnij dane historyczne" open={editor} onToggle={v=>{if(!busy)setEditor(v);}} testID="historical-month-editor">
           <View style={s.row}>
-            <DropdownPicker accessibilityLabel="Rok historii" placeholder="Rok historii" selectedValue={editYear} onValueChange={v => { if (!busy) setEditYear(Number(v)); }} style={{ flex: 1, minWidth: 100 }} items={data.years.map(y => ({ label: String(y.year), value: y.year }))}/>
             <DropdownPicker accessibilityLabel="Miesiąc historii" placeholder="Miesiąc historii" selectedValue={editMonth} onValueChange={v => { if (!busy) setEditMonth(Number(v)); }} style={{ flex: 1, minWidth: 130 }} items={MONTHS.map((label, i) => ({ label, value: i + 1 }))}/>
+            <DropdownPicker accessibilityLabel="Rok historii" placeholder="Rok historii" selectedValue={editYear} onValueChange={v => { if (!busy) setEditYear(Number(v)); }} style={{ flex: 1, minWidth: 100 }} items={data.years.map(y => ({ label: String(y.year), value: y.year }))}/>
           </View>
           <Text style={s.text}>Liczba treningów · {MONTHS[editMonth - 1]} {editYear}</Text>
           <TextInput ref={formRef} accessibilityLabel="Liczba treningów" style={input} value={count} onChangeText={setCount} keyboardType="numeric" editable={!busy && historical} maxLength={5}/>
@@ -144,6 +146,12 @@ export function SeasonalityContent() {
           {selected?.source === 'manual' && <PanelButton disabled={busy} onPress={() => save(true)}>Usuń ręczny wpis</PanelButton>}
           {!!message && <Text accessibilityLiveRegion="polite" role="status" style={s.text}>{message}</Text>}
         </TrainerSection>
+        <TrainerSection title="Jak powstają wnioski?">
+          <Text style={s.text}>Najwięcej treningów: {extremum(data.best)}</Text>
+          <Text style={s.text}>Najmniej treningów: {extremum(data.worst)}</Text>
+          <Text style={s.muted}>Ranking pomija brakujące dane, miesiąc bieżący i pierwszy miesiąc zapisów aplikacji. Ręczny wpis oznacza pełny wynik miesiąca.</Text>
+          <Text style={s.muted}>Szukamy miesięcy w trzech najspokojniejszych lub najbardziej intensywnych w danym roku, powtarzających się w co najmniej dwóch i ⅔ pełnych lat. Lata bez zróżnicowania pomijamy. Liczymy odbyte sesje i opłacone odwołania.</Text>
+        </TrainerSection>
         <TrainerSection title="Średnia liczba treningów według miesiąca">
           {data.seasonal.map(m => <View key={m.month} style={{ gap: 4 }}>
             <Text style={s.text}>{MONTHS[m.month - 1]}: {m.average ?? '—'} · liczba lat z danymi: {m.samples}</Text>
@@ -152,5 +160,6 @@ export function SeasonalityContent() {
           <Text style={s.muted}>Średnie opisują dostępne zakończone miesiące. Różna liczba lat i wzrost firmy mogą wpływać na ich porównanie.</Text>
         </TrainerSection>
       </>}
+      {!!onOverview&&<PanelButton style={s.link} onPress={onOverview}><Text style={[s.text,{color:T.copper}]}>← Podsumowanie miesiąca</Text></PanelButton>}
   </>;
 }

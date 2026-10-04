@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as api from '../services/api';
 import { PanelButton, LoadState, usePanelTheme } from './TrainerPanels';
 import TrainerSection from './TrainerSection';
+import DropdownPicker from './DropdownPicker';
 import PlanningPreferences, { DAYS, GOALS, hour } from './PlanningPreferences';
 
 // A random operation identifier is for retry deduplication, never authorization.
@@ -58,17 +59,26 @@ export default function TrainerPlanning({navigation,settingsOnly=false}) {
   }
   const frozen=busy||!!pending.current;
   return <View style={{gap:16}} testID={settingsOnly?'planning-settings':'trainer-planning'}>
-    <Text style={s.heading}>{settingsOnly?'Praca i preferencje trenera':'Mniej okienek. Więcej dla Ciebie.'}</Text>
+    {!settingsOnly&&<Text style={s.kicker}>Organizacja pracy</Text>}
+    <Text style={s.heading}>{settingsOnly?'Praca i preferencje trenera':'Mniej okienek.\nWięcej dla Ciebie.'}</Text>
+    {!settingsOnly&&<Text style={s.muted}>Powtarzające się przerwy między sesjami.</Text>}
     {settingsOnly&&<Text style={s.muted}>Domyślnie dla każdego profilu: od 06:00, trening 60 minut, pełne godziny. Zapisane zmiany dotyczą wyłącznie Twojego profilu i będą punktem wyjścia kolejnych analiz.</Text>}
     {!report&&<>
-      {!settingsOnly&&<View style={s.row}>{[3,6].map(n=><PanelButton key={n} disabled={frozen} selected={months===n} onPress={()=>setMonths(n)}>{n===3?'3 pełne miesiące':'6 pełnych miesięcy'}</PanelButton>)}</View>}
+      {!settingsOnly&&<View style={{gap:6}}><Text style={s.muted}>Analizowany okres</Text><DropdownPicker placeholder="Analizowany okres" disabled={frozen} selectedValue={months} onValueChange={v=>setMonths(Number(v))} style={s.button} items={[{label:'3 pełne miesiące',value:3},{label:'6 pełnych miesięcy',value:6}]}/></View>}
       <LoadState loading={loading} error={error} retry={load}/>
       {!loading&&!error&&prefs&&context&&<>
-        {!settingsOnly&&<View style={s.card}>
+        {!settingsOnly&&<View style={s.note}>
           <Text style={s.title}>Najpierw historia, potem Twoje decyzje</Text>
           <Text style={s.text}>{context.range.from} – {context.range.to}</Text>
           <Text style={s.text}>{context.stats.sessions} zapisanych godzin treningów · {context.stats.days} dni z treningami</Text>
           <Text style={s.muted}>Puste godziny nie muszą być problemem. Potwierdź lub zmień ostatnie odpowiedzi przed nową analizą.</Text>
+        </View>}
+        {!settingsOnly&&context.patterns.length>0&&<View style={{gap:8}} testID="planning-patterns">
+          {context.patterns.slice(0,3).map(p=><View key={p.id} style={[s.card,{padding:12,gap:4}]}>
+            <Text style={s.title}>{DAYS[p.weekday]} · {hour(p.start_hour)}–{hour(p.end_hour)}</Text>
+            <Text style={s.muted}>{p.hits} z {p.observed_days} takich dni z zapisanymi treningami</Text>
+          </View>)}
+          <Text style={s.muted}>Okna z historii. W pytaniach poniżej określisz, które przerwy chcesz zachować.</Text>
         </View>}
         <PlanningPreferences key={`${months}-${context.revision}`} value={prefs} onChange={changePrefs} clients={context.clients} disabled={frozen}/>
         {!settingsOnly&&<>
@@ -116,7 +126,7 @@ function Question({question:q,pattern,index,value,onChange,disabled}) {
 }
 
 function Report({report,navigation}) {
-  const {s}=usePanelTheme(),r=report.result;
+  const {s,T}=usePanelTheme(),r=report.result;
   if(!r?.range||!r?.target_range||!r?.stats||!Array.isArray(r.proposals)||!Array.isArray(r.warnings)||!Array.isArray(report.questions)||!report.preferences||!report.answers){
     return <View style={s.card}><Text role="alert" style={s.error}>Ten raport jest niekompletny. Uruchom nową analizę, aby odczytać aktualne dane.</Text></View>;
   }
@@ -129,11 +139,11 @@ function Report({report,navigation}) {
     </View>
     {r.proposals.length===0&&<View style={s.card}><Text style={s.title}>Brak pasujących propozycji</Text><Text style={s.text}>Obecny kalendarz i Twoje ograniczenia nie dają bezpiecznego wariantu. Możesz ponowić analizę po zmianie preferencji lub dodaniu przyszłych terminów.</Text></View>}
     {r.proposals.map(p=><View key={p.id} style={s.card} testID="planning-proposal">
-      <Text style={s.muted}>{p.date} · DO UZGODNIENIA</Text>
+      <Text style={s.kicker}>Propozycja do uzgodnienia · {p.date}</Text>
       <Text style={s.heading}>{p.kind==='income'?'Dodatkowa sesja w oknie':p.clients.map(c=>c.name).join(' + ')}</Text>
       {p.moves.map(m=><Text key={m.event_id} style={s.text}>{m.names.join(' + ')}: {m.from_date} {hour(m.from_hour)} → {m.to_date} {hour(m.to_hour)}</Text>)}
       {p.slot&&<Text style={s.text}>Termin do rozważenia: {p.slot.date}, {hour(p.slot.hour)}–{hour(p.slot.hour+1)}</Text>}
-      <View style={s.row}><View style={{flex:1,minWidth:100}}><Text style={s.muted}>Obecny koniec</Text><Text style={s.heading}>{hour(p.before_end)}</Text></View><View style={{flex:1,minWidth:100}}><Text style={s.muted}>Po zmianie</Text><Text style={s.heading}>{hour(p.after_end)}</Text></View></View>
+      <View style={[s.row,{borderTopWidth:1,borderBottomWidth:1,borderColor:T.border,paddingVertical:12}]}><View style={{flex:1,minWidth:100}}><Text style={s.muted}>Teraz koniec dnia</Text><Text style={s.heading}>{hour(p.before_end)}</Text></View><View style={{flex:1,minWidth:100}}><Text style={s.muted}>{p.kind==='income'?'Po dodaniu sesji':'Po przesunięciu'}</Text><Text style={s.heading}>{hour(p.after_end)}</Text></View></View>
       <Text style={s.title}>{p.kind==='income'?`Dodatkowo: ${p.additional_sessions} sesja${p.additional_revenue==null?'':` · ${p.additional_revenue.toLocaleString('pl-PL')} zł przychodu`}`:`${p.saved_minutes} minut wcześniej · ta sama liczba sesji`}</Text>
       <Text style={s.text}>{p.reason}</Text>
       <TrainerSection title="Na czym opiera się propozycja?"><Text style={s.muted}>{p.evidence}</Text><Text style={s.muted}>Dotyczy wskazanej daty. Nie zmienia stałego harmonogramu klienta. Potwierdź dostępność wszystkich uczestników.</Text></TrainerSection>

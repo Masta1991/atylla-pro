@@ -10,8 +10,9 @@ export default function DropdownPicker({
   style,
   placeholder = "Wybierz opcję",
   dropdownIconColor,
-  placeholderTextColor
-  , disabled = false
+  placeholderTextColor,
+  disabled = false,
+  compact = false
 }) {
   const { colors: C, themeColors, mode } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -51,10 +52,10 @@ export default function DropdownPicker({
         style={[styles.container, { backgroundColor: 'transparent', borderColor: themeColors.border }, style, focusStyle('trigger')]}
         onPress={() => setModalVisible(true)}
       >
-        <Text style={[styles.text, { color: selectedItem ? themeColors.text : (placeholderTextColor || themeColors.textMuted) }]} numberOfLines={1}>
+        <Text style={[styles.text, compact&&{fontSize:14,marginRight:3}, { color: selectedItem ? themeColors.text : (placeholderTextColor || themeColors.textMuted) }]} numberOfLines={1}>
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={20} color={dropdownIconColor || themeColors.textSecondary} />
+        <Ionicons name="chevron-down" size={compact?12:20} color={dropdownIconColor || themeColors.textSecondary} />
       </TouchableOpacity>
 
       {modalVisible && <Modal ref={modalRef} visible transparent animationType={Platform.OS === 'web' ? 'none' : 'fade'} onRequestClose={close}
