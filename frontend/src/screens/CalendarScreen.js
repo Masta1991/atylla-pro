@@ -951,7 +951,7 @@ function CalendarScreen({ navigation, route }) {
           <Text style={styles.sheetTitle}>
             {selSlot.date} • {selSlot.hour}:00 — {selSlot.ev?.clients?.name || (selAbs ? `✕ nieobecność: ${selAbsName || ''}` : 'wolny slot')}
           </Text>
-          <TouchableOpacity ref={drawerCloseRef} testID="calendar-drawer-close" accessibilityRole="button" accessibilityLabel="Zamknij szufladę" onPress={() => { setSelSlot(null); setAbsenceAsk(false); }} style={{ padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <TouchableOpacity ref={drawerCloseRef} testID="calendar-drawer-close" accessibilityRole="button" accessibilityLabel="Zamknij szufladę" onPress={() => { setSelSlot(null); setAbsenceAsk(false); setStartPanel(null); }} style={{ padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="close" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -980,7 +980,7 @@ function CalendarScreen({ navigation, route }) {
         })()}
         {!absenceAsk && <CalendarNotesPreview key={selSlot.ev?.id || 'empty'} event={selSlot.ev} onAcknowledged={handleNoteRead} onRefresh={loadWeek} onEmptyFocus={() => drawerCloseRef.current?.focus()} />}
         <View style={styles.sheetBtns}>
-          {!absenceAsk && (
+          {!absenceAsk && !startPanel && (
           <TouchableOpacity
             style={[styles.sheetBtn, { backgroundColor: C.accent }]}
             onPress={() => { const s = selSlot; setSelSlot(null); navigation.navigate('Training', { date: s.date, hour: s.hour, ev: s.ev, ...(selAbs ? { replaceClientId: selAbs.client_id } : {}) }); }}
@@ -988,7 +988,7 @@ function CalendarScreen({ navigation, route }) {
             <Text style={[styles.sheetBtnText, { color: solidButtonText(C.accent) }]}>{selSlot.ev ? 'Trening' : (selAbs ? 'Zastępstwo' : 'Dodaj')}</Text>
           </TouchableOpacity>
           )}
-          {!absenceAsk && !!selAbs && !selSlot.ev && (
+          {!absenceAsk && !startPanel && !!selAbs && !selSlot.ev && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
               onPress={async () => {
@@ -999,7 +999,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Cofnij</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && (
+          {!absenceAsk && !startPanel && (
           <TouchableOpacity
             style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
             onPress={() => { if (selSlot.ev) { handleMoveStart(selSlot.date, selSlot.hour, selSlot.ev); } setSelSlot(null); }}
@@ -1010,7 +1010,7 @@ function CalendarScreen({ navigation, route }) {
           {/* Start rozliczenia z szuflady: oba warianty (typ wybierany przy starcie,
               nie w karcie klienta). Pakiet startuje w Rozliczeniach (modal: rozmiar),
               cykl od daty slotu. Widoczne tylko bez aktywnego rozliczenia. */}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && !selSlot.ev.in_closed_cycle && (
+          {!absenceAsk && !startPanel && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && !drawerClient.package_purchase_date && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               testID="drawer-start-package" accessibilityRole="button" focusable
               {...(Platform.OS === 'web' ? { tabIndex: 0 } : {})}
@@ -1090,7 +1090,7 @@ function CalendarScreen({ navigation, route }) {
               </View>
             </View>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient?.active_package_id && !selSlot.ev.in_closed_cycle && (
+          {!absenceAsk && !startPanel && !!selSlot.ev?.client_id && drawerClient?.active_package_id && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endPackageFromDrawer}
@@ -1098,7 +1098,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ pakiet</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && drawerClient?.package_purchase_date && !selSlot.ev.in_closed_cycle && (
+          {!absenceAsk && !startPanel && !!selSlot.ev?.client_id && drawerClient && !drawerClient.active_package_id && drawerClient?.package_purchase_date && !selSlot.ev.in_closed_cycle && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={endCycleFromDrawer}
@@ -1106,7 +1106,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.danger }]}>Zakończ cykl</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && selSlot.ev.status === 'active' && !absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && !absenceAsk && !startPanel && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => setAbsenceAsk(true)}
@@ -1114,7 +1114,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Odwołaj trening</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && !startPanel && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.danger }]}
               onPress={() => { const s = selSlot; reportAbsence(s.date, s.hour, s.ev, true); }}
@@ -1122,7 +1122,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: solidButtonText(themeColors.danger) }]}>Potwierdź odwołanie</Text>
             </TouchableOpacity>
           )}
-          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
+          {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && !startPanel && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.border }]}
               onPress={() => setAbsenceAsk(false)}
@@ -1131,7 +1131,7 @@ function CalendarScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
           {/* 2.0: brak przycisku Rozlicz (treningi licza sie pozycyjnie). */}
-          {!absenceAsk && !!selSlot.ev?.client_id && (
+          {!absenceAsk && !startPanel && !!selSlot.ev?.client_id && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: themeColors.surfaceLight, borderWidth: 1, borderColor: themeColors.border }]}
               onPress={() => { const s = selSlot; setSelSlot(null); handleShowHistory(s.ev.client_id, s.ev.clients?.name); }}
@@ -1139,7 +1139,7 @@ function CalendarScreen({ navigation, route }) {
               <Text style={[styles.sheetBtnText, { color: themeColors.text }]}>Historia</Text>
             </TouchableOpacity>
           )}
-          {!absenceAsk && !!selSlot.ev && (
+          {!absenceAsk && !startPanel && !!selSlot.ev && (
             <TouchableOpacity
               style={[styles.sheetBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: themeColors.danger }]}
               onPress={() => { const s = selSlot; setSelSlot(null); requestDelete(s.date, s.hour, s.ev); }}
