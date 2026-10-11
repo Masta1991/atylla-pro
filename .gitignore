@@ -39,3 +39,8 @@ docs/credentials_and_docs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Expo exports dependency fonts/images under paths containing node_modules.
+# These are public runtime assets, not installed dependencies.
+!backend/static/assets/**/node_modules/
+!backend/static/assets/**/node_modules/**

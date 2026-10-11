@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),http=require('http'),assert=require(
 const root=process.cwd(),{chromium}=require(path.join(root,'.tmp/billing-qa/node_modules/playwright'));
 const build=path.resolve(process.argv[2]),out=path.resolve(process.env.ATYLLA_QA_OUTPUT||path.join(root,'.tmp/absences-20261011/browser'));fs.mkdirSync(out,{recursive:true});
 const apiOrigin=process.env.ATYLLA_QA_API_ORIGIN||'http://127.0.0.1:8000';
-const server=http.createServer((req,res)=>{let f=path.join(build,decodeURIComponent(req.url.split('?')[0]));if(!fs.existsSync(f)||fs.statSync(f).isDirectory())f=path.join(build,'index.html');res.setHeader('Content-Type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.ttf':'font/ttf','.png':'image/png','.ico':'image/x-icon'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res)});
+const server=http.createServer((req,res)=>{const requested=decodeURIComponent(req.url.split('?')[0]);let f=path.join(build,requested);if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){if(requested.startsWith('/assets/')||requested.startsWith('/_expo/')){res.writeHead(404);res.end();return;}f=path.join(build,'index.html');}res.setHeader('Content-Type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.ttf':'font/ttf','.png':'image/png','.ico':'image/x-icon'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res)});
 const clients=['Adam QA','Beata QA'].map((name,i)=>({id:`00000000-0000-4000-8000-00000000000${i+1}`,name,training_schedule:i?[]:[{day:0,hour:9}],billing_type:'package',payment_history:[],strength_progression:[]}));
 const date=days=>{const d=new Date();d.setDate(d.getDate()+days);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const day=date(2),future=date(9),revision='2026-10-11T00:00:00Z';
@@ -42,15 +42,22 @@ let browser;
    else if(url.pathname==='/calendar/stats')body={chart_data:[]};
    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body),headers:{'Access-Control-Allow-Origin':'*'}});
   });
-  async function open(){try{await page.goto(origin);await page.getByText('ATYLLA PRO',{exact:true}).first().waitFor();await page.getByRole('button',{name:'Otwórz menu',exact:true}).click();await page.getByText('Wyloguj',{exact:true}).waitFor();await page.getByText('Absencje',{exact:true}).click();await page.getByText('Zgłoś Absencję',{exact:true}).waitFor();}catch(e){await page.screenshot({path:path.join(out,`${key}-startup-error.png`),fullPage:true});console.error(JSON.stringify({key,errors,blocked,consoleErrors,body:await page.locator('body').innerText()}));throw e;}}
+  async function iconFonts(){
+    await page.evaluate(()=>document.fonts.ready);
+    const fonts=await page.evaluate(()=>Array.from(document.fonts,f=>({family:f.family,status:f.status})));
+    for(const family of ['ionicons','material-community'])assert(fonts.some(f=>f.family.toLowerCase().includes(family)&&f.status==='loaded'),`${key}: missing icon font ${family}: ${JSON.stringify(fonts)}`);
+    assert(!fonts.some(f=>f.status==='error'),`${key}: failed font`);
+    return fonts;
+  }
+  async function open(){try{await page.goto(origin);await page.getByText('ATYLLA PRO',{exact:true}).first().waitFor();await page.waitForTimeout(400);await page.screenshot({path:path.join(out,`${key}-calendar.png`),fullPage:true});await iconFonts();await page.getByRole('button',{name:'Otwórz menu',exact:true}).click();await page.getByText('Wyloguj',{exact:true}).waitFor();await page.screenshot({path:path.join(out,`${key}-menu.png`),fullPage:true});await page.getByText('Absencje',{exact:true}).click();await page.getByText('Zgłoś Absencję',{exact:true}).waitFor();}catch(e){await page.screenshot({path:path.join(out,`${key}-startup-error.png`),fullPage:true});console.error(JSON.stringify({key,errors,blocked,consoleErrors,body:await page.locator('body').innerText()}));throw e;}}
   async function choose(name='Adam QA'){await page.getByRole('button',{name:'Wybierz klienta',exact:true}).click();await page.getByRole('button',{name,exact:true}).click();await page.getByRole('button',{name:'— Rozwiń listę dat —',exact:true}).click();await page.getByRole('button',{name:new RegExp(`9:00 \\(${day}\\)`)}).waitFor();}
   const slot=hour=>page.getByRole('button',{name:new RegExp(`${hour}:00 \\(${day}\\)`)});
   async function snap(state){
-    await page.waitForTimeout(100);await page.screenshot({path:path.join(out,`${key}-${state}.png`),fullPage:true});
+    await page.waitForTimeout(100);const fonts=await iconFonts();await page.screenshot({path:path.join(out,`${key}-${state}.png`),fullPage:true});
     await page.addScriptTag({path:path.join(root,'.tmp/billing-qa/node_modules/axe-core/axe.min.js')});
     const violations=await page.evaluate(async()=> (await axe.run()).violations.filter(v=>['serious','critical'].includes(v.impact)).map(v=>({id:v.id,nodes:v.nodes.map(n=>n.html)})));
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert(!overflow,`${key}/${state} overflow`);assert.deepEqual(violations,[],`${key}/${state} axe`);
-    results.push({...variant,state,overflow,violations});
+    results.push({...variant,state,overflow,violations,fonts});
   }
   await open();await page.getByText('Brak zgłoszonych absencji w wyświetlanym okresie.',{exact:true}).waitFor();
   await choose();await snap('options');
