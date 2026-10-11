@@ -10,7 +10,7 @@ const day=date(2),future=date(9),revision='2026-10-11T00:00:00Z';
 const option=(hour,extra={})=>({date:day,hour,kind:'event',event_id:`00000000-0000-4000-8000-${String(100+hour).padStart(12,'0')}`,updated_at:revision,paired:false,...extra});
 let browser;
 (async()=>{
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=process.env.ATYLLA_QA_LIVE_BASE||`http://127.0.0.1:${server.address().port}`;
  browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});const results=[];
  const variants=[...['dark','light'].flatMap(theme=>[320,390,768,1024,1366,1440].map(width=>({theme,width,height:width===1366?768:900}))),{theme:'dark',width:844,height:390},{theme:'dark',width:720,height:500,reflow200:true}];
  for(const variant of variants){
@@ -20,7 +20,10 @@ let browser;
   const errors=[],blocked=[],consoleErrors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('status of 503')&&!m.text().includes('status of 502')&&!m.text().includes('status of 409'))consoleErrors.push(m.text())});
   await context.addInitScript(({theme})=>{localStorage.setItem('atylla_session_v2',JSON.stringify({access_token:'synthetic',refresh_token:'synthetic',idle_token:'synthetic',idle_expires_at:Math.floor(Date.now()/1000)+259200,session_id:'synthetic',email:'nobody@example.invalid',revision:0}));localStorage.setItem('appThemeMode',theme);},{theme});
   await context.route('**/*',async route=>{
-   const req=route.request(),url=new URL(req.url());if(url.origin===origin)return route.continue();
+   const req=route.request(),url=new URL(req.url());
+   // Live mode reads public static files only. Every API call, including writes,
+   // is fulfilled below with synthetic fixtures before it reaches the server.
+   if(url.origin===origin&&(!process.env.ATYLLA_QA_LIVE_BASE||(req.method()==='GET'&&(url.pathname==='/'||url.pathname.startsWith('/assets/')||url.pathname.startsWith('/_expo/')||['/favicon.ico','/manifest.json','/apple-touch-icon.png','/icon-192.png','/icon-512.png'].includes(url.pathname)))))return route.continue();
    if(url.origin!==apiOrigin){blocked.push(url.origin);return route.abort();}
    let body=[],status=200;
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS'}});
