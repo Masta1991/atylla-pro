@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import date, datetime
 from uuid import UUID
 
@@ -165,6 +165,13 @@ class AbsenceBase(BaseModel):
 
 class AbsenceCreate(AbsenceBase):
     paid: bool = True
+    mode: Literal['cancel', 'schedule'] = 'cancel'
+    absence_hour: int = Field(ge=6, le=21)
+    expected_event_id: Optional[UUID]
+    expected_updated_at: Optional[datetime]
+
+class AbsenceBatchCreate(BaseModel):
+    items: List[AbsenceCreate] = Field(min_length=1, max_length=30)
 
 class AbsenceResponse(AbsenceBase):
     id: UUID

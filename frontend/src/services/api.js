@@ -459,6 +459,14 @@ export function createAbsence(data) {
   return request('/calendar/absences', { method: 'POST', body: data });
 }
 
+export function getAbsenceOptions(clientId) {
+  return request(`/calendar/absence-options/${encodeURIComponent(clientId)}`);
+}
+
+export function createAbsences(items) {
+  return request('/calendar/absences/batch', { method: 'POST', body: { items } });
+}
+
 export function deleteAbsence(id) {
   return request(`/calendar/absences/${id}`, { method: 'DELETE' });
 }

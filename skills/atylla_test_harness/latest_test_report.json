@@ -1,9 +1,8 @@
 {
-  "timestamp": "2026-10-04T12:30:33.725382+00:00",
+  "timestamp": "2026-10-11T02:27:47.710056+00:00",
   "overall_status": "PASS",
-  "scope": "offline Python/API, frontend module; synthetic data",
+  "scope": "offline Python/API, frontend module and PGlite PostgreSQL/RLS/rollback; synthetic data",
   "not_verified": [
-    "PostgreSQL execution/RLS/transactions",
     "multi-connection concurrency",
     "Supabase/PostgREST integration",
     "browser/device E2E",
@@ -12,7 +11,7 @@
   "cycles": [
     {
       "cycle": 1,
-      "tests": 128,
+      "tests": 151,
       "failures": 0,
       "errors": 0
     }
@@ -51,7 +50,55 @@
     {
       "script": "scripts/check-frontend.cjs",
       "exit_code": 0,
-      "output": "{\"status\":\"PASS\",\"parsed_modules\":46}",
+      "output": "{\"status\":\"PASS\",\"parsed_modules\":50}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/frontend_daily_facts.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"actual daily facts selector; local bundled data; eight calendar years\",\"tests\":[{\"name\":\"all_313_source_dates_and_exact_unicode_text\",\"status\":\"PASS\"},{\"name\":\"before_start_and_sundays_are_empty\",\"status\":\"PASS\"},{\"name\":\"one_day_preview_is_limited_to_4_October_2026_in_Warsaw\",\"status\":\"PASS\"},{\"name\":\"saturday_monday_and_repeat_start\",\"status\":\"PASS\"},{\"name\":\"eight_years_match_independent_day_by_day_cycle_including_leap_days\",\"status\":\"PASS\"},{\"name\":\"Warsaw_midnight_in_summer_and_winter\",\"status\":\"PASS\"},{\"name\":\"next_day_timer_handles_23_24_and_25_hour_days\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_absences.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite PostgreSQL\",\"synthetic\":true,\"tests\":[{\"name\":\"original_scheduled_slot_failure_is_reproduced_before_migration\",\"status\":\"PASS\"},{\"name\":\"active_package_anchor_keeps_identity_and_counts_one_cancellation\",\"status\":\"PASS\"},{\"name\":\"future_regular_absence_without_tile_saves_only_marker_and_keeps_package\",\"status\":\"PASS\"},{\"name\":\"copy_week_skips_scheduled_absence_for_primary_or_partner\",\"status\":\"PASS\"},{\"name\":\"removing_future_marker_allows_normal_week_copy_without_cancellation\",\"status\":\"PASS\"},{\"name\":\"new_absence_invalidates_copy_preview_and_rolls_back_other_slots\",\"status\":\"PASS\"},{\"name\":\"future_marker_requires_current_schedule_and_future_time\",\"status\":\"PASS\"},{\"name\":\"booking_added_after_preview_is_preserved_for_both_own_and_other_client\",\"status\":\"PASS\"},{\"name\":\"partner_cancels_shared_session_once_without_creating_a_second_event\",\"status\":\"PASS\"},{\"name\":\"stale_event_version_and_replaced_id_do_not_cancel\",\"status\":\"PASS\"},{\"name\":\"deleted_training_is_not_revived_and_charged\",\"status\":\"PASS\"},{\"name\":\"batch_failure_rolls_back_prior_cancellation_and_marker\",\"status\":\"PASS\"},{\"name\":\"batch_success_and_duplicate_items_are_idempotent\",\"status\":\"PASS\"},{\"name\":\"removing_marker_never_undoes_payment_or_package_anchor\",\"status\":\"PASS\"},{\"name\":\"foreign_user_cannot_record_or_delete_another_trainers_absence\",\"status\":\"PASS\"},{\"name\":\"anon_cannot_execute_single_batch_or_delete\",\"status\":\"PASS\"},{\"name\":\"closed_package_cancellation_rolls_back_and_retry_preserves_history\",\"status\":\"PASS\"},{\"name\":\"unpaid_invalid_hour_and_invalid_batch_are_rejected\",\"status\":\"PASS\"},{\"name\":\"old_rpc_and_omitted_review_cannot_bypass_the_new_contract\",\"status\":\"PASS\"},{\"name\":\"rollback_restores_legacy_permission_and_reapply_restores_protection\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_billing.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite PostgreSQL\",\"scope\":\"real SQL, RLS, FK, rollback; synthetic local data\",\"tests\":[{\"name\":\"paid_free_paid_and_repeated_request_are_atomic_and_idempotent\",\"status\":\"PASS\"},{\"name\":\"whole_day_null_hour_request_does_not_duplicate\",\"status\":\"PASS\"},{\"name\":\"free_anchor_can_be_rebooked_explicitly_with_version_check\",\"status\":\"PASS\"},{\"name\":\"bulk_week_cannot_silently_cancel_open_package\",\"status\":\"PASS\"},{\"name\":\"foreign_trainer_cannot_change_absence_or_calendar\",\"status\":\"PASS\"},{\"name\":\"anon_cannot_execute_any_write_rpc\",\"status\":\"PASS\"},{\"name\":\"workout_batch_failure_rolls_back_deleted_logs\",\"status\":\"PASS\"},{\"name\":\"swap_preserves_event_id_package_anchor_and_moves_logs\",\"status\":\"PASS\"},{\"name\":\"closed_package_absence_delete_and_move_roll_back\",\"status\":\"PASS\"},{\"name\":\"closed_interior_billing_fact_is_protected\",\"status\":\"PASS\"},{\"name\":\"cannot_insert_backdated_session_into_closed_package\",\"status\":\"PASS\"},{\"name\":\"combined_calendar_workout_save_rollback_version_and_empty_logs\",\"status\":\"PASS\"},{\"name\":\"monthly_read_failure_leaves_cycle_and_history_unchanged\",\"status\":\"PASS\"},{\"name\":\"monthly_count_all_pages_shared_paid_free_and_repeat\",\"status\":\"PASS\"},{\"name\":\"invalid_date_missing_version_and_foreign_user_do_not_write\",\"status\":\"PASS\"},{\"name\":\"reset_failure_after_deletion_rolls_back_packages_and_membership\",\"status\":\"PASS\"},{\"name\":\"reset_cleans_both_directions_preserves_history_and_rejects_stale_retry\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_sessions.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"PGlite real SQL, local synthetic data\",\"tests\":[{\"name\":\"migration_links_only_unambiguous_history_and_is_repeatable\",\"status\":\"PASS\"},{\"name\":\"second_session_requires_confirmation_without_partial_writes\",\"status\":\"PASS\"},{\"name\":\"confirmed_sessions_have_independent_exercises_and_empty_new_session\",\"status\":\"PASS\"},{\"name\":\"edit_clear_and_stale_save_do_not_change_other_session\",\"status\":\"PASS\"},{\"name\":\"invalid_log_rolls_back_both_calendar_metadata_and_log_replacement\",\"status\":\"PASS\"},{\"name\":\"legacy_day_writer_cannot_overwrite_multiple_sessions\",\"status\":\"PASS\"},{\"name\":\"same_day_swap_and_cross_day_move_follow_event_identity\",\"status\":\"PASS\"},{\"name\":\"delete_one_session_preserves_other_and_ambiguous_legacy_history\",\"status\":\"PASS\"},{\"name\":\"foreign_actor_and_anon_cannot_write_event_logs\",\"status\":\"PASS\"},{\"name\":\"direct_mismatched_event_link_rejected\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_week_copy.test.cjs",
+      "exit_code": 0,
+      "output": "{\"scope\":\"PGlite SQL; synthetic data; migration installed twice\",\"tests\":[{\"name\":\"preview_is_read_only_and_pair_copy_has_no_results_or_settlement\",\"status\":\"PASS\"},{\"name\":\"occupied_slot_is_preserved_unless_explicitly_selected_for_replacement\",\"status\":\"PASS\"},{\"name\":\"absence_is_hour_scoped_and_checks_both_participants\",\"status\":\"PASS\"},{\"name\":\"whole_day_absence_blocks_every_hour\",\"status\":\"PASS\"},{\"name\":\"stale_target_rolls_back_other_inserts_in_the_same_batch\",\"status\":\"PASS\"},{\"name\":\"new_absence_after_preview_rejects_every_change\",\"status\":\"PASS\"},{\"name\":\"double_source_slot_is_not_silently_overwritten\",\"status\":\"PASS\"},{\"name\":\"paid_session_log_and_package_anchor_are_protected\",\"status\":\"PASS\"},{\"name\":\"foreign_client_plan_anon_and_past_cannot_write\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_workout_notes.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"migration_is_repeatable_and_preserves_text\",\"status\":\"PASS\"},{\"name\":\"read_is_persistent_idempotent_and_does_not_modify_workout_version_or_logs\",\"status\":\"PASS\"},{\"name\":\"changed_note_reopens_reminder_and_stale_ack_cannot_hide_it\",\"status\":\"PASS\"},{\"name\":\"billing_marker_only_change_keeps_read_state\",\"status\":\"PASS\"},{\"name\":\"ack_does_not_conflict_with_concurrent_workout_save_version\",\"status\":\"PASS\"},{\"name\":\"foreign_trainer_cannot_read_or_ack_another_note\",\"status\":\"PASS\"},{\"name\":\"anonymous_cannot_ack\",\"status\":\"PASS\"},{\"name\":\"clearing_note_resets_read_state_and_blocks_ack\",\"status\":\"PASS\"},{\"name\":\"closed_package_allows_ack_without_changing_financial_facts\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_seasonality.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"explicit_zero_is_persisted_with_owner_and_version\",\"status\":\"PASS\"},{\"name\":\"repeatable_migration_preserves_existing_history\",\"status\":\"PASS\"},{\"name\":\"create_conflict_and_stale_update_leave_value_unchanged\",\"status\":\"PASS\"},{\"name\":\"zero_update_and_version_checked_delete\",\"status\":\"PASS\"},{\"name\":\"same_month_isolated_between_trainers_and_foreign_version_rejected\",\"status\":\"PASS\"},{\"name\":\"authenticated_direct_table_writes_are_denied\",\"status\":\"PASS\"},{\"name\":\"anonymous_cannot_read_or_execute_mutations\",\"status\":\"PASS\"},{\"name\":\"missing_actor_and_nonexistent_user_are_rejected\",\"status\":\"PASS\"},{\"name\":\"invalid_values_and_current_future_months_cannot_mutate_history\",\"status\":\"PASS\"},{\"name\":\"conflict_rolls_back_the_entire_transaction\",\"status\":\"PASS\"},{\"name\":\"user_foreign_key_cascades_only_its_own_history\",\"status\":\"PASS\"}]}",
+      "error": ""
+    },
+    {
+      "script": "backend/tests/offline/postgres_planning.test.cjs",
+      "exit_code": 0,
+      "output": "{\"engine\":\"PGlite SQL\",\"tests\":[{\"name\":\"new_actor_needs_no_seed_and_first_revision_is_one\",\"status\":\"PASS\"},{\"name\":\"compare_and_swap_rejects_stale_and_updates_current\",\"status\":\"PASS\"},{\"name\":\"profiles_are_isolated_by_rls_and_no_caller_owner_argument\",\"status\":\"PASS\"},{\"name\":\"foreign_locked_client_and_direct_table_writes_are_denied\",\"status\":\"PASS\"},{\"name\":\"analysis_and_preferences_save_atomically\",\"status\":\"PASS\"},{\"name\":\"idempotent_retry_returns_original_even_after_profile_changes\",\"status\":\"PASS\"},{\"name\":\"request_collision_cannot_overwrite_snapshot\",\"status\":\"PASS\"},{\"name\":\"same_request_id_in_another_profile_is_separate_and_invisible\",\"status\":\"PASS\"},{\"name\":\"snapshot_failure_rolls_back_preference_write\",\"status\":\"PASS\"},{\"name\":\"analysis_stale_revision_and_foreign_proposal_clients_are_rejected\",\"status\":\"PASS\"},{\"name\":\"preserve_answers_can_add_durable_windows_but_never_remove_existing\",\"status\":\"PASS\"},{\"name\":\"invalid_sql_preferences_do_not_bypass_python_validation\",\"status\":\"PASS\"},{\"name\":\"anonymous_and_missing_actor_cannot_read_or_execute\",\"status\":\"PASS\"},{\"name\":\"authenticated_cannot_forge_snapshots_or_call_actor_helper\",\"status\":\"PASS\"},{\"name\":\"missing_result_arrays_fail_closed_without_profile_update\",\"status\":\"PASS\"},{\"name\":\"repeatable_migration_preserves_data_and_permissions\",\"status\":\"PASS\"}]}",
       "error": ""
     }
   ]

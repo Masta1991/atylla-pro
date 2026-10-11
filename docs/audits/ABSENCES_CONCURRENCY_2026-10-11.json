@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "scope": "PostgreSQL 17, multiple connections, synthetic data, isolated no-network container",
+  "results": [
+    "simultaneous_schedule_is_idempotent_without_event",
+    "simultaneous_cancellation_preserves_one_event_and_marker",
+    "schedule_waits_for_booking_and_preserves_other_client",
+    "schedule_waits_for_profile_update_and_rejects_removed_slot"
+  ]
+}

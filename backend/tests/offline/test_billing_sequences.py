@@ -154,23 +154,23 @@ class BillingSequences(unittest.TestCase):
         db = Mock()
         db.rpc.return_value.execute.return_value.data = {'id': EID}
         with patch.object(calendar, 'get_user_supabase', return_value=(db,UID)):
-            calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, paid=True), None)
+            calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, paid=True, expected_event_id=EID, expected_updated_at='2026-09-13T00:00:00Z'), None)
         db.table.assert_not_called()
         args = db.rpc.call_args.args
-        self.assertEqual(args[0], 'record_absence_v3')
+        self.assertEqual(args[0], 'record_absence_v4')
         self.assertIs(args[1]['p_payload']['paid'], True)
 
     def test_unpaid_cancellation_is_rejected_without_writes(self):
         db = Mock()
         with patch.object(calendar, 'get_user_supabase', return_value=(db, UID)):
             with self.assertRaises(HTTPException) as failure:
-                calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', paid=False), None)
+                calendar.create_absence(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, paid=False, expected_event_id=EID, expected_updated_at='2026-09-13T00:00:00Z'), None)
         self.assertEqual(failure.exception.status_code, 422)
         db.rpc.assert_not_called()
         db.table.assert_not_called()
 
     def test_omitted_payment_means_paid_cancellation(self):
-        self.assertTrue(AbsenceCreate(client_id=CID, absence_date='2026-09-10').paid)
+        self.assertTrue(AbsenceCreate(client_id=CID, absence_date='2026-09-10', absence_hour=11, expected_event_id=EID, expected_updated_at='2026-09-13T00:00:00Z').paid)
 
     def test_long_history_is_not_truncated_at_1000(self):
         rows = [event(EID if i==0 else f'row-{i}', '2026-09-01') for i in range(1050)]

@@ -17,7 +17,7 @@ async def lifespan(app):
 app = FastAPI(
     title="Atylla Pro API",
     description="Backend API for Atylla Pro — Personal Trainer Management",
-    version="2.1.24",
+    version="2.1.25",
     lifespan=lifespan,
 )
 
@@ -156,7 +156,6 @@ if os.path.isdir(STATIC_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 
 
 

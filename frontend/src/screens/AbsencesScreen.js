@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import DropdownPicker from '../components/DropdownPicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,7 +6,7 @@ import { SPACING } from '../assets/theme';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import * as api from '../services/api';
-import { AppAlert as Alert } from '../services/confirm';
+import { AppAlert as Alert, askConfirmation } from '../services/confirm';
 
 export default function AbsencesScreen({ navigation }) {
   const { colors: C, themeColors, mode } = useTheme();
@@ -21,26 +21,67 @@ export default function AbsencesScreen({ navigation }) {
   const [selectedDates, setSelectedDates] = useState([]);
   const [adding, setAdding] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  // Compare calendar dates so DST and UTC parsing cannot shift the 30-day cutoff.
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - 30);
-  const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const visibleAbsences = absences.filter(abs => abs.absence_date >= localDate(cutoff));
+  const [options, setOptions] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState('');
+  const [deleting, setDeleting] = useState(null);
+  const optionsRequest = useRef(0);
+  const reviewedOptions = useRef([]);
+  const mutationBusy = useRef(false);
+  const datesToggleRef = useRef(null);
+  // Billing and the 60-day options use Warsaw calendar dates on every device.
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const cutoff = new Date(todayStr + 'T12:00:00Z');
+  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  const visibleAbsences = absences.filter(abs => abs.absence_date >= cutoff.toISOString().slice(0, 10));
 
   function toggleDate(value) {
+    if (mutationBusy.current) return;
     setSelectedDates(prev => {
       if (prev.includes(value)) {
         return prev.filter(v => v !== value);
       }
-      return [...prev, value];
+      return prev.length < 30 ? [...prev, value] : prev;
     });
   }
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    loadOptions(selectedClient);
+    return () => { optionsRequest.current += 1; };
+  }, [selectedClient]);
+
+  async function loadOptions(clientId) {
+    const revision = ++optionsRequest.current;
+    const previous = reviewedOptions.current;
+    setOptions([]);
+    setOptionsError('');
+    if (!clientId) { reviewedOptions.current = []; setOptionsLoading(false); return true; }
+    setOptionsLoading(true);
+    try {
+      const rows = await api.getAbsenceOptions(clientId);
+      if (revision !== optionsRequest.current) return false;
+      if (!Array.isArray(rows)) throw new Error('Nieprawidłowa lista terminów. Odśwież aplikację.');
+      setOptions(rows || []);
+      reviewedOptions.current = rows || [];
+      // A refreshed slot must never silently turn a free scheduling block into
+      // a paid cancellation, or carry consent over to an edited/replaced event.
+      const available = new Set((rows || []).filter(row => previous.some(old =>
+        old.date === row.date && old.hour === row.hour && old.kind === row.kind &&
+        old.event_id === row.event_id && old.updated_at === row.updated_at && old.paired === row.paired
+      )).map(row => `${row.date}|${row.hour}`));
+      setSelectedDates(prev => prev.filter(key => available.has(key)));
+      return true;
+    } catch (e) {
+      if (revision === optionsRequest.current) { setOptionsError(e.message || 'Nie udało się pobrać terminów.'); setSelectedDates([]); }
+      return false;
+    } finally {
+      if (revision === optionsRequest.current) setOptionsLoading(false);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -52,97 +93,68 @@ export default function AbsencesScreen({ navigation }) {
       ]);
       setClients(cls || []);
       setAbsences(abs || []);
+      return true;
     } catch (e) {
       setLoadError(e.message || 'Nie udało się pobrać absencji.');
+      return false;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
-  // Generate next 60 days of scheduled sessions based on client's training schedule
-  const upcomingDates = useMemo(() => {
-    if (!selectedClient) return [];
-    const clientObj = clients.find(c => c.id === selectedClient);
-    if (!clientObj || !clientObj.training_schedule || clientObj.training_schedule.length === 0) return [];
-
-    const dates = [];
-    const today = new Date();
-
-    for (let i = 0; i < 60; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-
-      const jsDay = d.getDay(); // 0=Sun, 1=Mon...
-      const isoDay = jsDay === 0 ? 7 : jsDay; // 1=Mon...7=Sun
-
-      // schedule.day is 0=Mon..5=Sat, isoDay is 1=Mon..7=Sun
-      const matches = clientObj.training_schedule.filter(s => (Number(s.day) + 1) === isoDay);
-
-      matches.forEach(match => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const dateStr = `${y}-${m}-${day}`;
-        const label = d.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' });
-
-        dates.push({
-          dateStr,
-          hour: match.hour ?? 8,
-          label: `${label} - ${match.hour ?? 8}:00`,
-          value: `${dateStr}|${match.hour ?? 8}`
-        });
-      });
-
-      if (dates.length >= 30) break;
-    }
-    return dates;
-  }, [selectedClient, clients]);
+  const upcomingDates = options.map(row => ({ ...row, dateStr: row.date,
+    label: `${new Date(row.date + 'T12:00:00Z').toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Warsaw' })} - ${row.hour}:00`,
+    value: `${row.date}|${row.hour}` }));
 
   async function handleAddAbsence() {
+    if (mutationBusy.current || loading || optionsLoading || loadError || optionsError) return;
     if (!selectedClient || selectedDates.length === 0) {
       Alert.alert('Błąd', 'Wybierz klienta i przynajmniej jedną datę.');
       return;
     }
 
-    const clientObj = clients.find(c => c.id === selectedClient);
-    if (!clientObj?.training_schedule || clientObj.training_schedule.length === 0) {
-      Alert.alert(
-        'Brak harmonogramu',
-        'Ten klient nie ma zdefiniowanego Harmonogramu stałych treningów w swoim profilu.\n\nFunkcja Absencji jest przeznaczona wyłącznie dla klientów o stałych godzinach.'
-      );
-      return;
-    }
-
+    mutationBusy.current = true;
     setAdding(true);
-    const pending = [...selectedDates];
     try {
-      for (const val of pending) {
-        const [d, h] = val.split('|');
-        await api.createAbsence({
-          client_id: selectedClient,
-          absence_date: d,
-          absence_hour: parseInt(h, 10),
-          paid: true
-        });
-        setSelectedDates(prev => prev.filter(date => date !== val));
-      }
-
-      setSelectedClient('');
+      const pending = upcomingDates.filter(row => selectedDates.includes(row.value));
+      if (pending.length !== selectedDates.length) throw new Error('Lista terminów zmieniła się. Wybierz terminy ponownie.');
+      const result = await api.createAbsences(pending.map(row => ({client_id: selectedClient,
+        absence_date: row.date, absence_hour: row.hour, paid: row.kind === 'event', mode: row.kind === 'event' ? 'cancel' : 'schedule',
+        expected_event_id: row.event_id, expected_updated_at: row.updated_at})));
+      if (!Array.isArray(result) || result.length !== pending.length) throw new Error('Brak pełnego potwierdzenia zapisu. Odśwież listę przed ponowieniem.');
       setSelectedDates([]);
-      await loadData();
-      Alert.alert('Sukces', `Zgłoszono absencje (${selectedDates.length}). Treningi zostały oznaczone jako odwołane opłacone.`);
+      const refreshed = await Promise.all([loadData(), loadOptions(selectedClient)]);
+      const cancelled = pending.filter(row => row.kind === 'event').length;
+      const scheduled = pending.length - cancelled;
+      Alert.alert('Zapisano absencje', `Zapisano: ${pending.length}.${scheduled ? ` Absencje ze stałego grafiku: ${scheduled}. Kopiowanie tygodnia pominie te terminy; pakiet pozostaje bez zmian.` : ''}${cancelled ? ` Płatne odwołania istniejących treningów: ${cancelled}.` : ''}${refreshed.every(Boolean) ? '' : ' Nie udało się odświeżyć wszystkich danych. Użyj przycisku ponowienia.'}`);
     } catch (e) {
-      await loadData();
+      await Promise.all([loadData(), loadOptions(selectedClient)]);
       Alert.alert('Błąd', e.message);
+    } finally {
+      mutationBusy.current = false;
+      setAdding(false);
     }
-    setAdding(false);
   }
 
   async function handleDeleteAbsence(id) {
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
+    let removed = false;
     try {
+      const confirmed = await askConfirmation('Usuń oznaczenie absencji',
+        'Usunąć oznaczenie nieobecności? Odwołany trening i jego rozliczenie pozostaną bez zmian. Usunięcie oznaczenia pozwala ponownie zaplanować ten termin.', 'Usuń oznaczenie');
+      if (!confirmed) return;
+      setDeleting(id);
       await api.deleteAbsence(id);
-      loadData();
+      await Promise.all([loadData(), loadOptions(selectedClient)]);
+      removed = true;
     } catch (e) {
+      await Promise.all([loadData(), loadOptions(selectedClient)]);
       Alert.alert('Błąd', e.message);
+    } finally {
+      mutationBusy.current = false;
+      setDeleting(null);
+      if (removed) requestAnimationFrame(() => datesToggleRef.current?.focus?.());
     }
   }
 
@@ -152,31 +164,28 @@ export default function AbsencesScreen({ navigation }) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Zgłoś Absencję</Text>
-          <Text style={styles.desc}>Wybierz klienta oraz datę, w której nie pojawi się na treningu. Menedżer tygodnia uwzględni tę informację przy kopiowaniu.</Text>
+          <Text style={styles.desc}>Wybierz klienta oraz termin. Możesz zgłosić absencję ze stałego grafiku przed skopiowaniem tygodnia — bez naliczania treningu. Odwołanie treningu już wpisanego do kalendarza jest płatne. Możesz zaznaczyć do 30 dat.</Text>
 
-          <Text style={styles.label}>1. Wybierz Klienta (Tylko ze stałym grafikiem)</Text>
+          <Text style={styles.label}>1. Wybierz Klienta</Text>
           <DropdownPicker
+            disabled={adding || deleting !== null || loading}
             placeholder="Wybierz klienta"
             selectedValue={selectedClient}
-            onValueChange={value => { if (adding) return; setSelectedClient(value); setSelectedDates([]); setDropdownOpen(false); }}
+            onValueChange={value => { if (mutationBusy.current) return; setSelectedClient(value); setSelectedDates([]); setDropdownOpen(false); }}
             style={styles.pickerWrap}
             dropdownIconColor={themeColors.textSecondary}
             items={[
               { label: "— Wybierz —", value: "", color: themeColors.textMuted },
-              ...clients.map(c => {
-                const hasSchedule = c.training_schedule && c.training_schedule.length > 0;
-                return {
-                  label: hasSchedule ? c.name : `${c.name} (Brak stałych godzin)`,
-                  value: c.id,
-                  color: hasSchedule ? themeColors.text : themeColors.textMuted
-                };
-              })
+              ...clients.map(c => ({ label: c.name, value: c.id, color: themeColors.text }))
             ]}
           />
 
           <Text style={styles.label}>2. Wybierz Datę</Text>
           <TouchableOpacity
-            accessibilityRole="button" accessibilityState={{ expanded: dropdownOpen }} aria-expanded={dropdownOpen}
+            ref={datesToggleRef}
+            accessibilityRole="button" accessibilityState={{ expanded: dropdownOpen, disabled: adding || deleting !== null }} aria-expanded={dropdownOpen}
+            accessibilityLabel={selectedDates.length === 0 ? '— Rozwiń listę dat —' : `Zaznaczono dat: ${selectedDates.length}`}
+            disabled={adding || deleting !== null}
             style={styles.dropdownHeader}
             onPress={() => setDropdownOpen(!dropdownOpen)}
             activeOpacity={0.7}
@@ -189,17 +198,21 @@ export default function AbsencesScreen({ navigation }) {
 
           {dropdownOpen && (
             <View style={styles.dropdownList}>
-              {upcomingDates.length === 0 ? (
+              {optionsLoading ? <ActivityIndicator accessibilityLabel="Wczytywanie terminów" color={C.accent} style={{ padding: 16 }} /> : optionsError ? (
+                <View style={{ padding: 16 }}><Text accessibilityRole="alert" style={[styles.desc, { color: themeColors.text }]}>{optionsError}</Text>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => loadOptions(selectedClient)} style={styles.btn}><Text style={styles.absDate}>Ponów odczyt terminów</Text></TouchableOpacity></View>
+              ) : upcomingDates.length === 0 ? (
                 <Text style={[styles.desc, { fontStyle: 'italic', padding: 16 }]}>
-                  Wybierz najpierw klienta ze stałym grafikiem.
+                  {selectedClient ? 'Brak dostępnych terminów w najbliższych 60 dniach.' : 'Wybierz najpierw klienta.'}
                 </Text>
               ) : (
                 upcomingDates.map(d => {
                   const isSelected = selectedDates.includes(d.value);
+                  const disabled = adding || deleting !== null || (!isSelected && selectedDates.length >= 30);
                   return (
                     <TouchableOpacity
                       key={d.value}
-                      accessibilityRole="button" aria-pressed={isSelected} accessibilityState={{ disabled: adding }} disabled={adding}
+                      accessibilityRole="button" aria-pressed={isSelected} accessibilityState={{ disabled, selected: isSelected }} disabled={disabled}
                       style={styles.dropdownItem}
                       onPress={() => toggleDate(d.value)}
                       activeOpacity={0.7}
@@ -217,7 +230,7 @@ export default function AbsencesScreen({ navigation }) {
             </View>
           )}
 
-          <TouchableOpacity accessibilityRole="button" style={[styles.btn, { backgroundColor: C.accent }, (adding || loading || !!loadError) && { opacity: 0.6 }]} onPress={handleAddAbsence} disabled={adding || loading || !!loadError}>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: adding || deleting !== null || loading || optionsLoading || !!loadError || !!optionsError || !selectedDates.length }} style={[styles.btn, { backgroundColor: C.accent }, (adding || loading || !!loadError || !selectedDates.length) && { opacity: 0.6 }]} onPress={handleAddAbsence} disabled={adding || deleting !== null || loading || optionsLoading || !!loadError || !!optionsError || !selectedDates.length}>
             {adding ? <ActivityIndicator color={themeColors.background} size="small" /> : <Text style={styles.btnText}>Zapisz Absencję</Text>}
           </TouchableOpacity>
         </View>
@@ -232,7 +245,7 @@ export default function AbsencesScreen({ navigation }) {
           <Text style={styles.empty}>Brak zgłoszonych absencji w wyświetlanym okresie.</Text>
         ) : (
           visibleAbsences.map(abs => {
-            const isPast = abs.absence_date < localDate(today);
+            const isPast = abs.absence_date < todayStr;
 
             return (
               <View key={abs.id} style={[styles.absRow, isPast && { opacity: 0.6 }]}>
@@ -243,7 +256,7 @@ export default function AbsencesScreen({ navigation }) {
                     {abs.absence_hour != null ? ` - ${abs.absence_hour}:00` : ''}
                   </Text>
                 </View>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Usuń absencję: ${abs.clients?.name}, ${abs.absence_date}`} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}} onPress={() => handleDeleteAbsence(abs.id)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Usuń absencję: ${abs.clients?.name}, ${abs.absence_date}`} accessibilityState={{ disabled: adding || deleting !== null }} disabled={adding || deleting !== null} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}} onPress={() => handleDeleteAbsence(abs.id)} hitSlop={{top:10,bottom:10,left:10,right:10}}>
                   <Ionicons name="trash-outline" size={20} color={themeColors.danger} />
                 </TouchableOpacity>
               </View>

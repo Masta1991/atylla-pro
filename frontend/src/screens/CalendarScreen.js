@@ -723,9 +723,10 @@ function CalendarScreen({ navigation, route }) {
   // T4: błąd settle przerywa całość — brak cichego połykania (płatne musi być pewne).
   const reportAbsence = useCallback(async (dateStr, hour, ev, paid) => {
     try {
-      await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour), paid });
+      await api.createAbsence({ client_id: ev.client_id, absence_date: dateStr, absence_hour: Number(hour), paid,
+        expected_event_id: ev.id, expected_updated_at: ev.updated_at });
       setSelSlot(null); setAbsenceAsk(false); loadWeek();
-    } catch (e) { Alert.alert('Błąd', e.message); }
+    } catch (e) { setSelSlot(null); setAbsenceAsk(false); await loadWeek(); Alert.alert('Błąd', e.message); }
   }, [loadWeek]);
 
   function getEvent(dayIdx, hour) {
@@ -1150,7 +1151,7 @@ function CalendarScreen({ navigation, route }) {
         </View>
         {!!selSlot.ev && selSlot.ev.status === 'active' && absenceAsk && (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>Odwołany trening zostanie opłacony i zaliczony do rozliczenia.</Text>
+            <Text style={{ color: themeColors.textSecondary, fontSize: 11, fontWeight: '700' }}>{selSlot.ev.partner_client_id ? 'Odwołanie dotyczy całego wspólnego treningu. ' : ''}Odwołany trening zostanie opłacony i zaliczony do rozliczenia.</Text>
           </View>
         )}
         </ScrollView>

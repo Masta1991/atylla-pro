@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
+from datetime import date
 from pydantic import BaseModel
 from billing import slot_done as _slot_done, project_package, event_key
 from billing_data import read_all, load_package_boundaries
@@ -8,7 +9,7 @@ from workout_notes import attach_note_reminders
 from database import get_user_supabase, supabase_retry, utcnow_iso, atomic_rpc
 from models import (
     CalendarEventCreate, CalendarEventUpdate, CalendarEventResponse,
-    CalendarSwapRequest, AbsenceCreate, AbsenceResponse, ReplaceWeekRequest, CalendarWorkoutSave, WorkoutNoteRead
+    CalendarSwapRequest, AbsenceCreate, AbsenceBatchCreate, AbsenceResponse, ReplaceWeekRequest, CalendarWorkoutSave, WorkoutNoteRead
 )
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
@@ -38,29 +39,80 @@ def _partner_names(supabase, events):
 
 # ── Absences ─────────────────────────────────────────────────────────────────
 
+@router.get('/absence-options/{client_id}')
+def get_absence_options(client_id: str, request: Request):
+    from uuid import UUID
+    from datetime import datetime, timedelta
+    from billing import WARSAW
+    from absence_options import build_absence_options
+    try:
+        client_id = str(UUID(client_id))
+    except ValueError:
+        raise HTTPException(422, 'Nieprawidłowy identyfikator klienta.')
+    supabase, user_id = get_user_supabase(request)
+    now = datetime.now(WARSAW)
+    start, end = now.date().isoformat(), (now.date() + timedelta(days=59)).isoformat()
+    try:
+        clients = supabase.table('clients').select('id,training_schedule').eq('id', client_id).eq('trainer_id', user_id).execute().data or []
+        if not clients:
+            raise HTTPException(404, 'Nie znaleziono klienta.')
+        events = read_all(lambda: supabase.table('calendar_events')
+                         .select('id,client_id,partner_client_id,event_date,event_hour,status,updated_at')
+                         .eq('trainer_id', user_id).gte('event_date', start).lte('event_date', end))
+        absences = read_all(lambda: supabase.table('absences').select('id,client_id,absence_date,absence_hour')
+                           .eq('trainer_id', user_id).eq('client_id', client_id)
+                           .gte('absence_date', start).lte('absence_date', end))
+        return build_absence_options(clients[0], events, absences, now)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(503, 'Nie udało się pobrać terminów. Spróbuj ponownie.')
+
 @router.get("/absences", response_model=List[AbsenceResponse])
-def get_absences(date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None), request: Request = None):
-    supabase, _ = get_user_supabase(request)
-    query = supabase.table("absences").select("*, clients(name)").order("absence_date", desc=True)
-    if date_from:
-        query = query.gte("absence_date", date_from)
-    if date_to:
-        query = query.lte("absence_date", date_to)
-    res = query.execute()
-    return res.data or []
+def get_absences(date_from: Optional[date] = Query(None), date_to: Optional[date] = Query(None), request: Request = None):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, 'Początek okresu nie może być późniejszy niż koniec.')
+    supabase, user_id = get_user_supabase(request)
+    def query():
+        result = supabase.table("absences").select("*, clients(name)").eq("trainer_id", user_id)
+        if date_from:
+            result = result.gte("absence_date", date_from.isoformat())
+        if date_to:
+            result = result.lte("absence_date", date_to.isoformat())
+        return result
+    try:
+        return sorted(read_all(query), key=lambda row: (row['absence_date'], row.get('absence_hour') or 0, row['id']), reverse=True)
+    except Exception:
+        raise HTTPException(503, 'Nie udało się pobrać absencji. Spróbuj ponownie.')
 
 @router.post("/absences", response_model=AbsenceResponse, status_code=201)
 def create_absence(data: AbsenceCreate, request: Request):
-    if not data.paid:
+    if data.mode == 'cancel' and not data.paid:
         raise HTTPException(422, 'Odwołanie bez płatności jest obecnie wyłączone. Odwołany trening jest opłacony.')
+    if data.mode == 'schedule' and data.paid:
+        raise HTTPException(422, 'Planowana absencja bez treningu nie jest płatnym odwołaniem.')
     supabase, user_id = get_user_supabase(request)
-    return atomic_rpc(supabase, 'record_absence_v3', {'p_payload': data.model_dump(mode='json')})
+    return atomic_rpc(supabase, 'record_absence_v4', {'p_payload': data.model_dump(mode='json', exclude_unset=True)})
+
+@router.post("/absences/batch", response_model=List[AbsenceResponse], status_code=201)
+def create_absences(data: AbsenceBatchCreate, request: Request):
+    if any(item.mode == 'cancel' and not item.paid for item in data.items):
+        raise HTTPException(422, 'Odwołanie bez płatności jest obecnie wyłączone. Odwołany trening jest opłacony.')
+    if any(item.mode == 'schedule' and item.paid for item in data.items):
+        raise HTTPException(422, 'Planowana absencja bez treningu nie jest płatnym odwołaniem.')
+    supabase, _ = get_user_supabase(request)
+    return atomic_rpc(supabase, 'record_absences_v1', {
+        'p_items': [item.model_dump(mode='json', exclude_unset=True) for item in data.items]})
 
 @router.delete("/absences/{absence_id}")
 def delete_absence(absence_id: str, request: Request):
+    from uuid import UUID
+    try:
+        absence_id = str(UUID(absence_id))
+    except ValueError:
+        raise HTTPException(422, 'Nieprawidłowy identyfikator absencji.')
     supabase, _ = get_user_supabase(request)
-    supabase.table("absences").delete().eq("id", absence_id).execute()
-    return {"status": "deleted"}
+    return atomic_rpc(supabase, 'delete_absence_v1', {'p_absence_id': absence_id})
 
 
 # ── Calendar Events ──────────────────────────────────────────────────────────
