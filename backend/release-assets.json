@@ -1,8 +1,8 @@
 {
-  "version": "2.1.26",
+  "version": "2.1.27",
   "text_newlines": "LF",
   "files": {
-    "_expo/static/js/web/index-79fc7e307c8c79a656dec63204abc45c.js": "ad1886a7e49cb1a72e20b3eb561c2dee07809b2ca795a5606d5da1e95607e014",
+    "_expo/static/js/web/index-7b42154aec77898a54ac5def7d6086e1.js": "d8046e6db2fbc3e9ab72155ac866d5564f49ab97d3cb2a93e602428e911614a2",
     "apple-touch-icon.png": "521c0b85a645e31e3b4ac65181196d6cc8edf7f7d46f3271454c50d1110827b4",
     "assets/____frontend/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf": "08a9d5b513cf947e22ede81e9a843bd8d7763a63444cd21484bfde7662cc6543",
     "assets/____frontend/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf": "16f92298587bab2b469bc13c0dfc6d5d171bca10bad0c9053ad16bc023bf717d",
@@ -44,7 +44,7 @@
     "favicon.png": "0fa7e5360b2ea18af684f3d8e264bb4e7f9f4765d973952b4ebe7312ffb29cfa",
     "icon-192.png": "521c0b85a645e31e3b4ac65181196d6cc8edf7f7d46f3271454c50d1110827b4",
     "icon-512.png": "521c0b85a645e31e3b4ac65181196d6cc8edf7f7d46f3271454c50d1110827b4",
-    "index.html": "8d574693bfb545a8b51cfc9c7eeeafd3395444e42e1bf9fb9ed9fba1f3ac1533",
+    "index.html": "662d69fb4d72a2152f44d682aed0a43362be202e9222c5a2d4d7c539f7c87361",
     "manifest.json": "6a526ce1b551e99ff3a8ee729ad677530c974fad13c33c0374f226cb9c8b6bd6"
   }
 }

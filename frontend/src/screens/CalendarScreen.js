@@ -354,6 +354,8 @@ function CalendarScreen({ navigation, route }) {
   const [packageMode, setPackageMode] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [viewMode, setViewMode] = useState('week');
+  // The calendar covers Monday–Saturday; Sunday opens the preceding Saturday.
+  const [selectedDayIdx, setSelectedDayIdx] = useState(Math.min(5, (today.getDay() + 6) % 7));
   const [historyMode, setHistoryMode] = useState(false);
   const [historyClientId, setHistoryClientId] = useState('');
   const [historyClientName, setHistoryClientName] = useState('');
@@ -405,11 +407,15 @@ function CalendarScreen({ navigation, route }) {
   const dayW = viewMode === 'week' ? (SCREEN_WIDTH - HOUR_W - 8) / visibleDays : (SCREEN_WIDTH - HOUR_W - 8);
   const headerScrollRef = useRef(null);
   const isCurrentWeek = isSameWeek(monday, today);
+  const selectedDate = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + selectedDayIdx);
+  const isCurrentDay = isCurrentWeek && selectedDayIdx === Math.min(5, (today.getDay() + 6) % 7);
+  const dateMonthFormat = SCREEN_WIDTH < 380 ? 'short' : 'long';
   const getDisplayDateLabel = () => {
-    if (isCurrentWeek) return today.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+    if (viewMode === 'day') return selectedDate.toLocaleDateString('pl-PL', { day: 'numeric', month: dateMonthFormat });
+    if (isCurrentWeek) return today.toLocaleDateString('pl-PL', { day: 'numeric', month: dateMonthFormat });
     const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
     if (monday.getMonth() === sunday.getMonth()) {
-      return `${monday.getDate()} - ${sunday.getDate()} ${MONTHS[monday.getMonth()]}`;
+      return `${monday.getDate()} - ${sunday.getDate()} ${dateMonthFormat === 'short' ? MONTHS[monday.getMonth()].substring(0,3) : MONTHS[monday.getMonth()]}`;
     }
     return `${monday.getDate()} ${MONTHS[monday.getMonth()].substring(0,3)} - ${sunday.getDate()} ${MONTHS[sunday.getMonth()].substring(0,3)}`;
   };
@@ -457,9 +463,21 @@ function CalendarScreen({ navigation, route }) {
     api.prefetchTrainingDicts();
   }, []);
 
-  const nextWeek = () => setMonday(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7));
-  const prevWeek = () => setMonday(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7));
-  const goToday = () => setMonday(getMonday(today));
+  const navigatePeriod = direction => {
+    if (viewMode === 'week') {
+      setMonday(current => new Date(current.getFullYear(), current.getMonth(), current.getDate() + direction * 7));
+      return;
+    }
+    const nextIdx = selectedDayIdx + direction;
+    if (nextIdx < 0 || nextIdx >= DAYS.length) {
+      setMonday(current => new Date(current.getFullYear(), current.getMonth(), current.getDate() + direction * 7));
+    }
+    setSelectedDayIdx((nextIdx + DAYS.length) % DAYS.length);
+  };
+  const goToday = () => {
+    setMonday(getMonday(today));
+    setSelectedDayIdx(Math.min(5, (today.getDay() + 6) % 7));
+  };
 
   const [movingSlot, setMovingSlot] = useState(null);
   // Szuflada zarządzania slotem. { date, hour, ev }
@@ -490,6 +508,11 @@ function CalendarScreen({ navigation, route }) {
   },[focusTarget,weekLoading,monday,dayW]);
 
   useEffect(() => {
+    if (viewMode === 'day') {
+      hGridRef.current?.scrollTo({ x: 0, animated: false });
+      headerScrollRef.current?.scrollTo({ x: 0, animated: false });
+      return;
+    }
     // Auto-scroll do bieżącego dnia tylko na telefonie (tablet widzi cały tydzień).
     if (deviceType !== 'phone') return;
     if (viewMode === 'week' && isCurrentWeek && hGridRef.current && headerScrollRef.current) {
@@ -499,11 +522,12 @@ function CalendarScreen({ navigation, route }) {
       else if (d === 4) offsetIdx = 2; // Czwartek
       else if (d === 5 || d === 6 || d === 0) offsetIdx = 3; // Piątek, Sobota, Niedziela
 
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const x = offsetIdx * dayW;
         hGridRef.current?.scrollTo({ x, animated: false });
         headerScrollRef.current?.scrollTo({ x, animated: false });
       }, 100);
+      return () => clearTimeout(timer);
     }
   }, [viewMode, isCurrentWeek, dayW, deviceType]);
 
@@ -734,7 +758,6 @@ function CalendarScreen({ navigation, route }) {
     return events.find(e => e.event_date === formatDateString(date) && e.event_hour === hour);
   }
 
-  const todayDayIdx = Math.min(5, Math.floor((Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - Date.UTC(monday.getFullYear(), monday.getMonth(), monday.getDate())) / 86400000));
   function onHorizontalScroll(e) { const x = e.nativeEvent.contentOffset.x; headerScrollRef.current?.scrollTo?.({ x, animated: false }); }
 
   const isMovingActive = movingSlot !== null;
@@ -809,11 +832,11 @@ function CalendarScreen({ navigation, route }) {
         </TouchableOpacity>
         
         <View style={styles.dateNav}>
-          <TouchableOpacity onPress={prevWeek} style={styles.navBtn}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={viewMode === 'day' ? 'Poprzedni dzień' : 'Poprzedni tydzień'} onPress={() => navigatePeriod(-1)} style={styles.navBtn}>
             <Ionicons name="chevron-back" size={24} color={headerIconColor} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.dateLabel, { backgroundColor: dateLabelBg, flexDirection: 'column', alignItems: 'center' }]} onPress={() => isCurrentWeek ? setShowMonth(true) : goToday()}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity testID="calendar-date" accessibilityRole="button" accessibilityLabel={(viewMode === 'day' ? isCurrentDay : isCurrentWeek) ? 'Wybierz tydzień' : 'Wróć do dzisiaj'} style={[styles.dateLabel, { backgroundColor: dateLabelBg, flexDirection: 'column', alignItems: 'center' }]} onPress={() => (viewMode === 'day' ? isCurrentDay : isCurrentWeek) ? setShowMonth(true) : goToday()}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, maxWidth: '100%' }}>
               <Text style={[styles.dateText, { fontSize: 16, color: dateLabelText }]}>{displayDateLabel}</Text>
               <Ionicons name="chevron-down" size={16} color={dateLabelText} style={{ marginLeft: 6 }} />
             </View>
@@ -822,9 +845,8 @@ function CalendarScreen({ navigation, route }) {
               let count = 0;
               if (viewMode === 'week') {
                 count = validEvents.length;
-              } else if (todayDayIdx >= 0 && todayDayIdx <= 5) {
-                const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + todayDayIdx);
-                const dateStr = formatDateString(date);
+              } else {
+                const dateStr = formatDateString(selectedDate);
                 count = validEvents.filter(e => e.event_date === dateStr).length;
               }
               return (
@@ -834,12 +856,12 @@ function CalendarScreen({ navigation, route }) {
               );
             })()}
           </TouchableOpacity>
-          <TouchableOpacity onPress={nextWeek} style={styles.navBtn}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={viewMode === 'day' ? 'Następny dzień' : 'Następny tydzień'} onPress={() => navigatePeriod(1)} style={styles.navBtn}>
             <Ionicons name="chevron-forward" size={24} color={headerIconColor} />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.headerBtn} onPress={() => { if (viewMode === 'week') setMonday(getMonday(today)); setViewMode(viewMode === 'week' ? 'day' : 'week'); }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={viewMode === 'week' ? 'Widok dnia' : 'Widok tygodnia'} style={styles.headerBtn} onPress={() => { if (viewMode === 'week') goToday(); setViewMode(viewMode === 'week' ? 'day' : 'week'); }}>
           <MaterialCommunityIcons name={viewMode === 'week' ? 'calendar-month-outline' : 'format-list-bulleted'} size={28} color={headerIconColor} />
         </TouchableOpacity>
       </View>
@@ -848,7 +870,7 @@ function CalendarScreen({ navigation, route }) {
     <View style={styles.headerRow}>
       <View style={[styles.hourCell, { borderBottomWidth: 0, backgroundColor: themeColors.background }]} />
       <ScrollView horizontal ref={headerScrollRef} showsHorizontalScrollIndicator={false} scrollEnabled={false} style={{ flex: 1 }}>{DAYS.map((day, idx) => { 
-        if (viewMode === 'day' && idx !== todayDayIdx) return null;
+        if (viewMode === 'day' && idx !== selectedDayIdx) return null;
         const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + idx); 
         const isToday = today.toDateString() === date.toDateString(); 
         return (<TouchableOpacity key={day} style={[styles.dayCell, isToday && styles.todayCell, { width: dayW }]} onPress={() => !packageMode && navigation.navigate('Training', { date: formatDateString(date) })}><Text style={[styles.dayText, isToday && [styles.todayText, mode === 'light' && { color: themeColors.text }]]}>{day}</Text><Text style={[styles.dayNum, isToday && [styles.todayText, mode === 'light' && { color: themeColors.text }]]}>{date.getDate()}</Text></TouchableOpacity>);
@@ -859,7 +881,7 @@ function CalendarScreen({ navigation, route }) {
       <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: themeColors.border }}>
         <View style={{ width: HOUR_W }}>{HOURS.map(hour => (<View key={hour} style={styles.hourCell}><Text style={styles.hourText}>{hour}:00</Text></View>))}</View>
         <ScrollView ref={hGridRef} horizontal showsHorizontalScrollIndicator={false} onScroll={onHorizontalScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
-          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== todayDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} onRepointPick={handleRepointPick} isRepointing={isRepointActive} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setStartPanel(null); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
+          <View>{HOURS.map(hour => (<View key={hour} style={styles.gridRow}>{DAYS.map((dayLabel, dayIdx) => { if (viewMode === 'day' && dayIdx !== selectedDayIdx) return null; const ev = getEvent(dayIdx, hour); const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayIdx); const dateStr = formatDateString(date); const isSource = isMovingActive && movingSlot?.date === dateStr && movingSlot?.hour === hour; const isTarget = isMovingActive && !isSource; return (<CalendarSlot key={dayIdx+'-'+hour} hour={hour} ev={ev} absences={absences} dateStr={dateStr} dayW={dayW} packageMode={packageMode} historyMode={historyMode} onShowHistory={handleShowHistory} navigation={navigation} onMoveTo={handleMoveTo} isMoving={isSource} isMoveTarget={isTarget} onRepointPick={handleRepointPick} isRepointing={isRepointActive} accent={C.accent} styles={styles}             onSelectSlot={(d, h, e) => { setAbsenceAsk(false); setStartPanel(null); setSelSlot({ date: d, hour: h, ev: e }); api.prefetchCalendarEvent(d, h); }} />); })}</View>))}</View>
         </ScrollView>
       </View>
     </ScrollView>
@@ -1172,10 +1194,10 @@ function makeStyles(accent, barBg, TC, insets) { return StyleSheet.create({
   moveCancelText: { color: TC.background, fontSize: 12, fontWeight: '700' },
   iosHeader: { backgroundColor: barBg, paddingHorizontal: 16, paddingTop: Math.max(insets.top + 5, 45), paddingBottom: 12, borderBottomWidth: 2, borderColor: accent, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, overflow: 'hidden' },
   headerBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  dateNav: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateNav: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   navBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  dateLabel: { flexDirection: 'row', alignItems: 'center', backgroundColor: TC.surfaceLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-  dateText: { color: TC.text, fontSize: 14, fontWeight: '700' },
+  dateLabel: { flexDirection: 'row', alignItems: 'center', backgroundColor: TC.surfaceLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 1 },
+  dateText: { color: TC.text, fontSize: 14, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
   headerRow: { flexDirection: 'row', height: CELL_H, backgroundColor: TC.background, borderBottomWidth: 2, borderColor: TC.border },
   dayCell: { height: CELL_H, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderColor: TC.border },
   todayCell: { backgroundColor: accent + '1a' },
