@@ -1,0 +1,1 @@
+- While a measured live run uses frozen code, advance independent work in isolated environments or new unused modules; do not silently patch its runtime or relabel its results. Verify a clean installation with the installed package interpreter and imports, not only the source checkout or globally available report dependencies.

@@ -1,93 +1,52 @@
-# Wytyczne i Standardy Deweloperskie — Atylla Pro
+# Agent — atylla-pro
 
-## Wspólne rules projektu
+## Start i zakres
 
-Przed pracą przeczytaj wszystkie pliki Markdown z `.agents/rules/` i zastosuj je
-według `Activation` oraz `Scope`: `always` zawsze, `model` gdy pasuje zadanie,
-`glob` dla wskazanych plików, a `manual` tylko po jawnym wywołaniu. Antigravity
-korzysta z własnego mechanizmu rules, a Codex z tego obowiązkowego mostu.
-`.codex/rules/*.rules` służy wyłącznie polityce wykonywania poleceń.
+Najpierw `CONTEXT_MAP.md`, następnie tylko dokumenty pasujące do zadania.
+`docs/project/PROJECT.md` służy architekturze; handoff kontynuacji; historia wyjaśnia wcześniejsze
+decyzje. Nie ładuj całych logów, wszystkich skilli ani wszystkich rules.
+Jeżeli istnieje `.agents/rules/INDEX.md`, wybierz reguły przez Activation i Scope.
+Nowsza jawna decyzja użytkownika zastępuje starszą dokumentację.
 
-## 1. Rola i Zakres Agenta
+## Zasady domenowe
 
-Działasz jako Główny Architekt Systemu, Lead Developer i Tester aplikacji **Atylla Pro** (FastAPI + Supabase PostgreSQL + Expo SDK 56 / React Native 0.85 / React 19 / PWA). Rozwijasz aplikację dla trenerów personalnych (docelowo profil Darka), dbając o bezbłędną logikę rozliczeń finansowych, wydajność kalendarza, spójność danych oraz ochronę warstwy wizualnej.
+- Aplikacja trenera: FastAPI + Expo/PWA + Supabase. Obliczenia pakietów wynikają
+  z chronologii i trwałych faktów; nie twórz drugiego źródła liczników.
+- Zachowaj kotwice pakietów, rozróżnienie completed/cancelled/planned i wygląd UI.
+- Zapisy testowe tylko na koncie `staws22-1@gmail.com` w potwierdzonym środowisku
+  testowym; dane rzeczywistych trenerów są wyłączone z testów zapisów.
+- Przed edycją sprawdź także stash; nie wykonuj pop/reset ani automatycznego przenoszenia.
+- Dla kodu zastosuj projektowe wersjonowanie; dokumentacja nie podbija wersji aplikacji.
+- Przed wydaniem sprawdź wersję, adres API, migracje i test awarii/rollbacku;
+  lokalny PASS nie oznacza potwierdzonego Supabase ani gotowej produkcji.
 
----
+## Realizacja i pamięć
 
-## 2. Architektura Systemu i Źródło Prawdy (SSOT)
+- Przed edycją sprawdź stan Git, jeśli projekt ma repozytorium, i zachowaj cudze zmiany.
+- Dopasuj skill do rzeczywistego zadania; testuj zmienione zachowanie, także błąd wejścia.
+- Dane pozostają w zatwierdzonym zakresie. Nowa chmura, publikacja, tunel lub koszt
+  cykliczny wymagają odpowiedniej zgody; zastana konfiguracja nie rozszerza zgody.
+- Backup przed destrukcją: `backup/latest.zip.dpapi (docs/project/BACKUP_POLICY.md)`; sprawdź hash
+  i możliwość odtworzenia. Nie usuwaj źródeł tylko dlatego, że wyglądają na duplikat.
+- Zakończ zatwierdzony zakres proporcjonalną weryfikacją. Rozróżniaj PASS, FAIL
+  i NOT_TESTED oraz test lokalny, odbiór urządzenia i wdrożenie.
+- Handoff aktualizuj po zmianie stanu: cel, wynik, dowód, blokery i dokładnie jeden
+  następny krok. Celuj w 50–100 linii, wcześniej zabezpieczając pełną historię.
+- Powtarzalną lekcję wpisz w jedno właściwe miejsce; nie kopiuj historii do instrukcji.
+  Zwykłe zamknięcie sesji nie synchronizuje LLM-WIKI.
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                 FRONTEND (Expo SDK 56 / PWA)                │
-│  - React Native 0.85 / React 19 (New Architecture)          │
-│  - Współdzielony Cache: global.cachedClients,               │
-│    global.cachedWorkoutTypes, global.cachedExercisesByGroup  │
-│  - Widoki: Kalendarz, Klienci, Rozliczenia, Pomiary, Dziennik│
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTPS / REST (JWT Auth)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     BACKEND (FastAPI API)                   │
-│  - Python 3.12, Uvicorn, Pydantic v2                        │
-│  - Moduły: Auth, Calendar, Workouts, Measurements, Clients, │
-│            Config, Email (Matplotlib Charts)                │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Supabase Client / PostgREST
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 BAZA DANYCH (Supabase PostgreSQL)           │
-│  - Tabele: users, clients, calendar_events, workout_logs,   │
-│            measurements, packages, settlements, configs     │
-└─────────────────────────────────────────────────────────────┘
-```
+Ten katalog jest kanoniczną Atyllą; sandbox 2.0 usunięto 2026-09-15.
+Porządek folderu opisuje README.md. Część .tmp jest aktywną zależnością testów.
 
-### Złote Zasady Logiki Biznesowej:
-1. **Single Source of Truth (SSOT):** Baza danych przechowuje wyłącznie *twarde fakty* (ID treningu startowego `start_training_id`, offset, rozmiar pakietu). Wszelkie numeracje (np. "3/10") są wyliczane **dynamicznie w locie** na podstawie chronologii zdarzeń w kalendarzu.
-2. **Poka-yoke (Idiotoodporność):** Interfejs zapobiega błędom. Ukrywamy lub blokujemy akcje niemożliwe.
-3. **Ochrona Karoserii UI:** Kategoryczny zakaz niszczenia warstwy wizualnej (layout, flexbox, modale, motyw psa). W plikach takich jak `PaymentsScreen.js` (900 linii) wolno jedynie chirurgicznie podmieniać logikę biznesową.
-4. **Izolacja Środowiska Testowego:** Wszelkie operacje modyfikujące i testy przeprowadzaj WYŁĄCZNIE na koncie testowym: `staws22-1@gmail.com`. Nigdy nie modyfikuj bezpośrednio danych produkcyjnych trenera (`treneratyll@gmail.com`).
+## Stały układ folderu
 
----
+Root: tylko README, AGENTS, CONTEXT_MAP i konfiguracja uruchomienia/Git.
+Bieżący handoff i plan: docs/project. Narzędzia: scripts. Nowe raporty sesji nie
+trafiają do root. Nie odtwarzaj usuniętych LOG.md, FILE_LAYOUT.md i deploy.ps1.
+W backup utrzymuj jeden latest: wymiana dopiero po sprawdzeniu kompletności,
+szyfrowania i odtworzenia nowej kopii. Nie usuwaj aktywnego buildu, zależności
+testów, danych ani nierozstrzygniętych wymagań pod pretekstem porządków.
 
-## 3. Procedury Operacyjne i Git
+## Dobór procedury
 
-### A. Rozpoczęcie Sesji (Stash & Status Check)
-Przed przystąpieniem do jakichkolwiek modyfikacji wykonaj:
-1. **Sprawdź stash**: `git stash list` (zarówno w głównym repozytorium, jak i w podkatalogach). Jeśli stash nie jest pusty, poinformuj użytkownika.
-2. **Sprawdź status repozytorium**: `git status --short`.
-3. **Sprawdź wersję**: Porównaj `frontend/package.json` oraz `frontend/src/version.js`.
-
-### B. Wersjonowanie i Automatyczne Wdrażanie (Deployment)
-Po każdej zmianie w kodzie podnieś numer wersji w formacie `X.Y.Z` (MAJOR.MINOR.PATCH):
-- **PATCH (`Z`)**: bugfixy, drobna kosmetyka UI.
-- **MINOR (`Y`)**: nowa funkcjonalność, nowy ekran, nowy endpoint.
-- **MAJOR (`X`)**: przełomowe zmiany architektury.
-
-Miejsca aktualizacji wersji:
-- `export const APP_VERSION = 'X.Y.Z';` w `frontend/src/version.js`.
-- Pole `version` w `frontend/package.json` oraz `expo.version` w `frontend/app.json`.
-
-Do wdrożenia nowej wersji służy automatyczny skrypt PowerShell:
-```powershell
-./deploy.ps1 -Version "1.0.31"
-```
-Skrypt automatycznie podbija wersję, buduje wersję webową PWA, kopiuje pliki do `backend/static/`, aktualizuje Service Workera (`sw.js`) i pushuje zmiany do repozytorium.
-
-### C. Procedura Tworzenia i Przywracania Kopii (Git Bundles)
-- Tworzenie pełnego backupu:
-  ```powershell
-  git tag -a backup-v<wersja> -m "Backup: stabilna wersja v<wersja>"
-  git bundle create backup/atylla-pro-backup-v<wersja>.bundle --all
-  ```
-- Odtwarzanie z pliku bundle:
-  ```powershell
-  git clone backup/atylla-pro-backup-v<wersja>.bundle atylla-pro-restore
-  ```
-
----
-
-## 4. Architektura Pamięci Podręcznej (Cache)
-
-Aby wyeliminować niepotrzebne zapytania sieciowe i loading spinners:
-1. **Globalny Cache:** Używaj obiektów `global.cachedClients`, `global.cachedWorkoutTypes` oraz `global.cachedExercisesByGroup`.
-2. **Asynchroniczne Odświeżanie:** Ekrany najpierw natychmiast renderują dane z cache, a w tle pobierają świeże dane z FastAPI.
+Przed realizacją wybierz pasujący wiersz [Preferowane procedury](CONTEXT_MAP.md#preferowane-procedury); odczytaj tylko potrzebną procedurę.

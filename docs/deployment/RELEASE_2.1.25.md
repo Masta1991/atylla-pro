@@ -1,4 +1,19 @@
-# Kandydat 2.1.25 — absencje
+# Wydanie 2.1.25 — absencje
+
+Korekta odbioru 2026-10-11: po zgłoszeniu użytkownika potwierdzono brak 30
+zasobów ikon w opublikowanym commicie. Poprzednie stwierdzenie zgodności
+paczki dotyczyło głównego JS i wybranych plików, nie pełnego exportu.
+Naprawa i rozszerzony odbiór: docs/deployment/RELEASE_2.1.26.md.
+
+Wdrożono na produkcję: commit `2932cdc9da6ce7fa9f2e7eeb964db756a81ab1bb`,
+Railway deployment `9fbac1c6-0e67-4a21-8bc0-ddffffae0666`, status success.
+Odbiór 2026-10-11: /version 2.1.25, /health healthy, paczka zgodna bajtowo.
+Pełna 015 zastosowana po uruchomieniu nowej aplikacji. Źródła funkcji,
+uprawnienia i niezmienione liczniki danych potwierdzone w Supabase;
+nowe funkcje widoczne w PostgREST i niedostępne anonimowo.
+Raport: `docs/audits/DEPLOY_2.1.25_2026-10-11.json`.
+Kopia: checkpoint.zip.dpapi + checkpoint-manifest.json w katalogu poniżej;
+kontrola wpisów ZIP, odzyskania DPAPI i odtworzenia public/auth PASS.
 
 Stan 2026-10-11: użytkownik zatwierdził wdrożenie po ponownym audycie.
 Powtórna regresja i 14 wariantów przeglądarki PASS; niezależny audyt bez
@@ -34,7 +49,7 @@ SHA256: `87855f4be547ae4b5d74254c727938c0b029f0ab73b2fe3ccf11ed02f01a14d7`.
 Dowody: `.tmp/absences-20261011/release-browser-r3/report.json`,
 `candidate-manifest.json` i `release-build-r3.log` w katalogu tej sesji.
 
-## Po uzyskaniu zgody na publikację
+## Wykonana procedura publikacji
 
 1. Potwierdzić aktualny HEAD/wydanie i stan migracji w docelowym środowisku.
    Jeżeli produkcja zmieniła się od bazy, ponownie ocenić diff kandydata.
@@ -67,4 +82,5 @@ Po ponownym wdrożeniu 2.1.25 zastosować 015 jeszcze raz, aby odebrać uprawnie
 v3. Lokalnie sprawdzono grant, wejście do starej funkcji, brak zmian danych
 przy jej błędzie, ponowną migrację oraz ponowne zablokowanie starej ścieżki.
 
-Pełny rollback Railway/Supabase i równoległe połączenia bazy: NOT_TESTED.
+Rollback produkcji nie był potrzebny i pozostaje NOT_TESTED. Lokalny rollback
+uprawnień PASS; cztery scenariusze równoległych połączeń PostgreSQL 17 PASS.

@@ -1,0 +1,1 @@
+- At session close the handoff carries only current state and the next concrete action: accepted stages with their evidence paths, the stage in flight with its state document, external blockers with reset times, and the first command of the next session. Do not re-open accepted gates in the handoff and do not describe an unaccepted implementation as done.

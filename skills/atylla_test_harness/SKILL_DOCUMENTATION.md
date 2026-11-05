@@ -1,5 +1,33 @@
 # Zakres testów Atylla Pro
 
+## Absencje — 2026-10-11, lokalne 2.1.25
+
+`test_absences.py`: 20 testów API/opcji, paginacji, błędów i izolacji.
+`postgres_absences.test.cjs`: 20 scenariuszy rzeczywistego SQL w PGlite,
+w tym odtworzenie zgłoszonego błędu, harmonogram bez kafelka, pakiet/partner,
+kopiowanie tygodnia, CAS, atomowość, idempotencja, RLS i rollback uprawnień.
+Uruchomienie: `python -B skills/atylla_test_harness/harness.py --postgres`.
+Pełny izolowany kandydat: PASS 151 odkrytych testów Python (1 SKIP XLSX),
+51 JS, parser 50 modułów, 92 SQL. Kanoniczne drzewo zawiera dodatkowo
+niewydany test i moduł opisów planowania; nie należy włączać ich do poprawki.
+
+`browser_absence_contract.test.cjs <build>` sprawdza syntetyczne API w 14
+wariantach, zapis mieszany, błędy, dialogi, klawiaturę, fokus i konflikt zmiany
+typu terminu. `ATYLLA_QA_API_ORIGIN` wskazuje przechwytywany adres API
+(domyślnie localhost:8000), `ATYLLA_QA_OUTPUT` katalog wyników. Żądania API
+są przechwycone lokalnie, pozostałe zewnętrzne żądania blokowane. Nie jest to
+integracja z Supabase. Raport: `docs/audits/ABSENCES_2.1.25_2026-10-11.md`.
+
+## Opis wzorców przerw — 2026-10-04, lokalne 2.1.24
+
+`frontend_planning_text.test.cjs` sprawdza pełne wyjaśnienie licznika wzorca
+oraz polskie formy nazw dni (np. 1 środę, 2 środy, 6 i 12 śród). Skrypt
+`browser_planning_copy.test.cjs` porównuje produkcyjne 2.1.23 z lokalnym 2.1.24
+na siedmiu rozmiarach 320–1440 px i w widoku poziomym oraz sprawdza tekst 200%,
+overflow, błędy konsoli/sieci i nowe serious/critical axe. Używa syntetycznego API.
+Dowody: `.tmp/planning-copy-2.1.24/browser/report.json` i zrzuty w tym katalogu.
+Aktualny zakres runnera: 131 Python/API, 52 JS i parser 51 modułów; bez PGlite.
+
 ## Ciekawostki dnia — 2026-10-04, lokalne 2.1.23
 
 Runner obejmuje `test_daily_facts_import.py` i `frontend_daily_facts.test.cjs`:
@@ -7,7 +35,7 @@ zgodność 313 wpisów z Excelem, odrzucanie niepoprawnych danych, dokładne dat
 niedziele, powtarzanie cykli, lata przestępne, Europe/Warsaw i północ przy DST.
 Dodatkowy test: jednorazowy podgląd 4.10.2026 wygasa o polskiej północy.
 Porównanie z XLSX wymaga źródła lokalnego; w klonie bez niego jest SKIP.
-Aktualny zakres: 131 Python/API, 51 JS i parser 50 modułów; bez PGlite.
+Zakres po wydaniu 2.1.23: 131 Python/API, 51 JS i parser 50 modułów; bez PGlite.
 
 `python scripts/import-daily-facts.py --check` porównuje JSON z Excelem bez zmian.
 Uruchomienie bez `--check` aktualizuje lokalny JSON; aplikacja nie czyta XLSX w runtime.
@@ -18,7 +46,7 @@ z `--baseline` i ścieżką bazowego buildu. Wyniki w `.tmp/daily-facts-2.1.23`.
 Test blokuje zewnętrzne połączenia i przechwytuje API; baza i prawdziwe konta są
 nieużywane. Zakres i ograniczenia: `docs/audits/DAILY_FACTS_2.1.23_2026-10-04.md`.
 
-## Aktualizacja 2026-10-02 — lokalna 2.1.18
+## Aktualizacja 2026-10-03 — testy 2.1.18
 
 Runner `harness.py --postgres`: 200 kontroli (100 Python/API, 44 JS, 56 SQL/PGlite)
 oraz parser 43 modułów JS. Nowe `test_seasonality.py` i `postgres_seasonality.test.cjs`
@@ -33,6 +61,10 @@ node backend/tests/offline/browser_workout_notes.test.cjs .tmp/LOKALNY-BUILD
 node backend/tests/offline/browser_requested_changes.test.cjs .tmp/LOKALNY-BUILD
 node backend/tests/offline/browser_seasonality.test.cjs .tmp/LOKALNY-BUILD
 ```
+
+W `browser_requested_changes.test.cjs` ustaw `ATYLLA_QA_THEME=light` lub `dark`,
+aby wykonać pełną macierz wybranego motywu. `ATYLLA_QA_ZOOM=2` wybiera reflow.
+Oba motywy i oba warianty przeszły odbiór 2026-10-03. Usuń zmienne po teście.
 
 Dowody z bieżącej sesji: `.tmp/changes-20261002/`. API musi wskazywać
 `http://127.0.0.1:8000`; przechwyty są syntetyczne, ruch zewnętrzny blokowany.
@@ -221,3 +253,18 @@ Czasy zawierają okno 250 ms ciszy sieciowej; nie są czasami Railway ani LCP.
 
 Historyczny raport audytu i jego skrypty w `docs/audits/` dokumentują stan
 sprzed poprawek. Skrypt odtwarzający defekty nie jest bieżącym testem akceptacyjnym.
+
+
+## Planowanie — dowody 2.1.21 (2026-10-04)
+
+Runner obejmuje teraz test_trainer_planning.py i postgres_planning.test.cjs.
+PASS: 128 Python/API, 44 JS, 72 PGlite, parser 46 modułów. Testy planowania
+sprawdzają przerwy, pary, blokady zajętości, limity, brakujące miesiące,
+propozycje jednej/dwóch sesji, izolację profili, CAS, idempotencję i rollback.
+Końcowe 16 testów SQL ponowiono po dopasowaniu uprawnień do domyślnych grantów
+Supabase. PGlite nie zastępuje testu równoległych połączeń.
+
+Osobny test `.tmp/release-2.1.21/browser.cjs` z syntetycznym fixture wykonał
+196 stanów / 14 wariantów dokładnie publikowanego buildu. Raport UI w docs/audits.
+Migrację 014 potwierdzono osobno w Supabase: treść funkcji, granty, RLS,
+PostgREST i niezmienność istniejących liczników. Brak testowych zapisów produkcji.

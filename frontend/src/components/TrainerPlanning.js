@@ -6,6 +6,7 @@ import { PanelButton, LoadState, usePanelTheme } from './TrainerPanels';
 import TrainerSection from './TrainerSection';
 import DropdownPicker from './DropdownPicker';
 import PlanningPreferences, { DAYS, GOALS, hour } from './PlanningPreferences';
+import { patternHistoryText } from '../services/planningText';
 
 // A random operation identifier is for retry deduplication, never authorization.
 const requestId=()=>globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return(c==='x'?n:(n&3)|8).toString(16);});
@@ -76,9 +77,9 @@ export default function TrainerPlanning({navigation,settingsOnly=false}) {
         {!settingsOnly&&context.patterns.length>0&&<View style={{gap:8}} testID="planning-patterns">
           {context.patterns.slice(0,3).map(p=><View key={p.id} style={[s.card,{padding:12,gap:4}]}>
             <Text style={s.title}>{DAYS[p.weekday]} · {hour(p.start_hour)}–{hour(p.end_hour)}</Text>
-            <Text style={s.muted}>{p.hits} z {p.observed_days} takich dni z zapisanymi treningami</Text>
+            <PatternHistory pattern={p}/>
           </View>)}
-          <Text style={s.muted}>Okna z historii. W pytaniach poniżej określisz, które przerwy chcesz zachować.</Text>
+          <Text style={s.muted}>To wolne okna pomiędzy pierwszym a ostatnim treningiem dnia, a nie liczba treningów. W pytaniach poniżej określisz, które przerwy chcesz zachować.</Text>
         </View>}
         <PlanningPreferences key={`${months}-${context.revision}`} value={prefs} onChange={changePrefs} clients={context.clients} disabled={frozen}/>
         {!settingsOnly&&<>
@@ -120,9 +121,14 @@ function Question({question:q,pattern,index,value,onChange,disabled}) {
   const {s}=usePanelTheme();
   return <View style={[s.line,{gap:10}]} testID={`planning-question-${index}`}>
     <Text style={s.title}>{q.text}</Text>
-    {!!pattern&&<Text style={s.muted}>Wystąpiło w {pattern.hits} z {pattern.observed_days} takich dni tygodnia z zapisanymi treningami.</Text>}
+    {!!pattern&&<PatternHistory pattern={pattern}/>}
     <View style={s.row}>{q.options.map(option=><PanelButton key={option.value} disabled={disabled} selected={value===option.value} label={`${q.text} ${option.label}`} onPress={()=>onChange(option.value)}>{option.label}</PanelButton>)}</View>
   </View>;
+}
+
+function PatternHistory({pattern:p}) {
+  const {s}=usePanelTheme();
+  return <Text style={s.muted}>{patternHistoryText(p)}</Text>;
 }
 
 function Report({report,navigation}) {

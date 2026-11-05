@@ -72,6 +72,7 @@ const eventRows = monday => Array.from({ length: 6 }, (_, i) => {
         return slots.length === 16 && slots.every(el => el.dataset.slotDate === date);
       }, date);
       assert.equal(await slots().count(), 16);
+      await page.getByTestId('calendar-date').getByText('Treningi: ' + dayCount(date), { exact: true }).waitFor();
       const label = await page.getByTestId('calendar-date').innerText();
       assert(label.includes(new Date(date + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: width < 380 ? 'short' : 'long' })), label);
       assert(label.includes('Treningi: ' + dayCount(date)), label);

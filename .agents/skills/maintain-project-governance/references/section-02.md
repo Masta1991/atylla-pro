@@ -1,0 +1,1 @@
+- Keep the canonical implementation plan authoritative when a repair, pilot or live-search subplan is introduced. Map that subplan back to the full stages and preserve unimplemented integrations, migration, host operations and long-duration acceptance as open work. Delivering one pilot report does not complete the tool.

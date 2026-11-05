@@ -1,0 +1,1 @@
+- Two parts of a plan can reuse the same defect label — an `F1`/`F2` in one repair, another `F1` in a later feature. Qualify each in the register row with its part, date and evidence path; an unqualified "F1 fixed" is read as closure of the other part and closes a live gap by accident.

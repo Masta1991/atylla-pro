@@ -17,10 +17,10 @@ For a playbook section, read from the listed heading to the next heading of the 
 | Task type | Load |
 |---|---|
 | Small code or file question | AGENTS.md, the target file, and the matching playbook section |
-| Continuation or status | MODEL_HANDOFF.md; PROJECT.md only for scope or architecture |
+| Continuation or status | ../docs/project/MODEL_HANDOFF.md; ../docs/project/PROJECT.md only for scope or architecture |
 | Implementation | matching playbook sections, matching skill, implementation files, and tests |
-| Architecture, data, cost, or cloud | PROJECT.md, memory/decisions.md, safety rules, and matching playbook sections |
-| Deploy or release | release docs, matching release/QA skill, and current handoff |
+| Architecture, data, cost, or cloud | ../docs/project/PROJECT.md, ../docs/project/DECISIONS.md, applicable project rules |
+| Deploy or release | ../CONTEXT_MAP.md release row, matching release/QA skill, and ../docs/project/MODEL_HANDOFF.md |
 | Session closeout | close-project-session; no LLM-WIKI sync |
 | Explicit LLM-WIKI synchronization | sync-projects-to-llm-wiki |
 

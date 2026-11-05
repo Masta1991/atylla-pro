@@ -1,5 +1,11 @@
 # 2.1.26 — przywrócenie ikon, 2026-10-11
 
+Wdrożono: `f18309b74fd7c4c0058a4e9341557285bf40f7c4`, Railway `77b1567f-a4f7-4446-b97a-62d0ced59059`.
+Produkcja /version 2.1.26, /health healthy; 44/44 zasobów HTTP/hash PASS.
+Log predeploy potwierdza 44 sprawdzone zasoby. Renderowanie z produkcyjnych
+plików: 14 wariantów PASS, fonty loaded, API syntetyczne bez zmian danych.
+Raport: `docs/audits/ICONS_2.1.26_2026-10-11.json`.
+
 Przyczyna regresji 2.1.25: Expo budowane z dowiązanymi zależnościami zmieniło
 ścieżkę zasobów na `assets/____frontend/node_modules`. Reguła Git
 `**/node_modules/` wykluczyła 19 fontów i 11 PNG z commitu. Lokalny export
@@ -50,4 +56,4 @@ Nie cofać do niepełnej statyki 2.1.25; ewentualny rollback logiki powinien
 zachować dodane fonty/PNG. Brak zmian produkcyjnych danych w tym wydaniu.
 
 NOT_TESTED: fizyczny telefon, natywne aplikacje i rzeczywiste zapisy trenera.
-Wyniki live dopisać po potwierdzeniu, nie utożsamiać lokalnego PASS z produkcją.
+Wyniki live powyżej dotyczą statyki; nie potwierdzają zapisów rzeczywistych trenerów.
